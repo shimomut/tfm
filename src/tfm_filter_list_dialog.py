@@ -60,12 +60,18 @@ class FilterListDialog(FocusContainer, Widget):
         to_label: Callable[[Any], str] = str,
         on_accept: Callable[[Any], None] | None = None,
         on_cancel: Callable[[], None] | None = None,
+        on_accept_text: Callable[[str], None] | None = None,
     ):
         self.all_items = list(items)
         self.to_label = to_label
         self.title = title
         self.on_accept = on_accept
         self.on_cancel = on_cancel
+        #: Optional free-text fallback: when Enter is pressed with no list row
+        #: matching the query, the raw filter text is handed here instead — so the
+        #: picker can double as an editor (e.g. the Filter prompt applies a
+        #: brand-new pattern that isn't in its history).
+        self.on_accept_text = on_accept_text
         self._panel: Any = None
         # Values currently passing the filter, parallel to ``self.list.items``.
         self.filtered: list[Any] = list(self.all_items)
@@ -155,7 +161,15 @@ class FilterListDialog(FocusContainer, Widget):
             if key == "escape":
                 self._cancel()
             elif key == "enter":
-                self._accept_index(self.list.selected)
+                # A row matched the query -> take it; otherwise fall back to the
+                # raw typed text (so a brand-new value still applies), if a
+                # free-text handler was given.
+                if not self.filtered and self.on_accept_text is not None:
+                    text = self.filter_edit.text
+                    self._close()
+                    self.on_accept_text(text)
+                else:
+                    self._accept_index(self.list.selected)
             elif key in _LIST_KEYS:
                 self.list.handle_event(event)  # arrows drive the list selection
             else:
@@ -190,6 +204,7 @@ def show_filter_list(
     to_label: Callable[[Any], str] = str,
     on_accept: Callable[[Any], None] | None = None,
     on_cancel: Callable[[], None] | None = None,
+    on_accept_text: Callable[[str], None] | None = None,
     region: tuple[float, float] | None = None,
     z: int = 70,
 ) -> FilterListDialog:
@@ -206,6 +221,7 @@ def show_filter_list(
     bit wider than the pane for comfort (see :func:`tfm_dialog_geometry`)."""
     dialog = FilterListDialog(
         items, title=title, to_label=to_label, on_accept=on_accept, on_cancel=on_cancel,
+        on_accept_text=on_accept_text,
     )
     sw, sh = panel.backend.size_units
     w = max(36.0, min(sw * 0.6, 72.0))

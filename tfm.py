@@ -44,12 +44,18 @@ from puikit.widgets.base import Widget  # noqa: E402
 #: Initial share of the content area given to the file panes (vs the log pane).
 PANES_FRACTION = 0.74
 
+#: Persistent, most-recent-first history of filename-filter patterns (fed by
+#: isearch's Enter and the ';' Filter prompt), and the cap kept in the store.
+_FILTER_HISTORY_KEY = "filter.history"
+_FILTER_HISTORY_MAX = 100
+
 from tfm_config import KeyBindings, get_favorite_directories  # noqa: E402
 from tfm_file_list_manager import FileListManager  # noqa: E402
 from tfm_file_monitor_manager import FileMonitorManager  # noqa: E402
 from tfm_file_pane import FilePane  # noqa: E402
 from tfm_filter_list_dialog import show_filter_list  # noqa: E402
 from tfm_input_dialog import show_input  # noqa: E402
+from tfm_isearch_bar import ISearchBar  # noqa: E402
 from tfm_pane_manager import PaneManager  # noqa: E402
 from tfm_path import Path  # noqa: E402
 from tfm_state_manager import get_state_manager  # noqa: E402
@@ -130,8 +136,12 @@ class PaneFooter(Widget):
     def __init__(self, app: "TfmApp", pane_name: str):
         self.app = app
         self.pane_name = pane_name
+        #: This footer's absolute rect (base units), captured each draw, so the
+        #: controller can position the isearch overlay exactly on top of it.
+        self.rect: tuple[float, float, float, float] | None = None
 
     def draw(self, ctx) -> None:
+        self.rect = ctx.screen_rect
         pane = self.app.pane(self.pane_name)
         active = self.app.pm.active_pane == self.pane_name
         dirs, files = self.app.counts(pane)
@@ -151,11 +161,17 @@ class StatusBar(Widget):
     HINTS = ("q quit   tab switch   space select   a all-files   ↵ open   "
              "⌫ parent   f find   ; filter   . hidden")
 
+    #: Shown in place of HINTS while the footer isearch is open, so the bottom bar
+    #: explains the isearch keys rather than the (now-inaccessible) global ones.
+    ISEARCH_HINTS = ("I-Search   ↑/↓ prev/next match   "
+                     "↵ stop (save to filter history)   esc cancel")
+
     def __init__(self, app: "TfmApp"):
         self.app = app
 
     def draw(self, ctx) -> None:
-        text = elide(" " + self.HINTS, ctx.width, where="end", measure=ctx.measure_text)
+        hints = self.ISEARCH_HINTS if self.app._isearch_active else self.HINTS
+        text = elide(" " + hints, ctx.width, where="end", measure=ctx.measure_text)
         ctx.draw_text(0, 0, text, Style(fg=ctx.theme.muted_text))
 
 
@@ -237,6 +253,20 @@ class TfmApp:
         self._history: list[str] = []
         for p in (self.pm.left_pane["path"], self.pm.right_pane["path"]):
             self._record_history_path(str(p))
+
+        #: Pane footers by name, so ``enter_isearch`` can read the active footer's
+        #: captured rect and position the isearch overlay exactly on it.
+        self._footers: dict[str, PaneFooter] = {}
+        #: Incremental-search state. The prompt is an overlay layer pinned to the
+        #: pane footer (``ISearchBar``); the list above stays visible and its
+        #: cursor keeps moving as you type. ``_isearch_origin`` is the pre-search
+        #: cursor (restored on cancel); ``_isearch_matches`` caches the current
+        #: hit indices for Up/Down navigation; ``_isearch_active`` only drives the
+        #: bottom status-bar hint line.
+        self._isearch_active = False
+        self._isearch_origin = 0
+        self._isearch_matches: list[int] = []
+        self._isearch_bar: "ISearchBar | None" = None
 
         self.panel = Panel(backend)
         self.left_view = FilePane(
@@ -344,10 +374,14 @@ class TfmApp:
         # file list on GUI (zero base-unit cost) — without it the footer's status
         # surface matches the content background and the boundary vanishes; on TUI
         # nothing is reserved and the surface-role contrast does the separating.
+        footer = PaneFooter(self, name)
+        # Kept so enter_isearch can read the footer's captured rect and drop the
+        # isearch overlay exactly on it.
+        self._footers[name] = footer
         return LayoutView(VSplit(
             Item(PaneHeader(self, name), size=1, hints={"surface": "header"}),
             Item(view, weight=1, hints={"surface": "content"}),
-            Item(PaneFooter(self, name), size=1, hints={"surface": "status"}),
+            Item(footer, size=1, hints={"surface": "status"}),
             divider="subtle",
         ))
 
@@ -2227,63 +2261,178 @@ class TfmApp:
     def _active_view(self) -> FilePane:
         return self.left_view if self.pm.active_pane == "left" else self.right_view
 
+    #: First row of the Filter picker — selecting it clears the filter. A
+    #: distinctive label so a real ``fnmatch`` glob never collides with it.
+    _FILTER_CLEAR = "␀  (clear filter)"
+
     def enter_filter(self) -> None:
-        """Prompt for a filename filter and apply it to the active pane (the ';'
-        key). An ``fnmatch`` glob (e.g. ``*.py``); directories are always shown,
-        an empty pattern clears the filter. Mirrors ttk TFM's filter mode — the
-        pattern lives in ``pane['filter_pattern']`` and the footer already shows
-        it. Prefilled with the current filter so it's easy to edit or clear."""
+        """Filename-filter picker for the active pane (the ';' key).
+
+        A searchable list of the saved filter history (fed by isearch's Enter and
+        by past filters), plus a "clear filter" row on top. Type to narrow the
+        list; ``↑/↓`` pick a row; ``Enter`` applies the highlighted pattern. If the
+        typed text matches no saved pattern, ``Enter`` applies it verbatim — so a
+        brand-new ``fnmatch`` glob (e.g. ``*.py``) still works. Directories are
+        always shown; the applied pattern is (re)recorded most-recent-first."""
         pane = self.active_pane()
 
-        def accept(pattern: str) -> None:
+        def apply(pattern: str) -> None:
             pattern = pattern.strip()
             count = self.flm.apply_filter(pane, pattern)
             if pattern:
+                self._record_filter_pattern(pattern)
                 self.log_info(f"Filter '{pattern}': {count} item(s)")
             else:
                 self.log_info("Filter cleared")
             self.panel.render()
 
-        show_input(self.panel, title="Filter", prompt="Pattern:",
-                   text=pane["filter_pattern"], on_accept=accept,
-                   region=self._active_pane_region())
+        items = [self._FILTER_CLEAR, *self._filter_history()]
+        show_filter_list(
+            self.panel, items, title="Filter", to_label=lambda v: v,
+            on_accept=lambda v: apply("" if v == self._FILTER_CLEAR else v),
+            on_accept_text=apply, region=self._active_pane_region())
         self.panel.render()
 
     def enter_isearch(self) -> None:
-        """Incremental search over the active pane (the 'F' key): a compact prompt
-        pinned above the pane; as you type a case-insensitive *contains* pattern
-        (space-separated patterns all match), every hit is highlighted and the
-        cursor jumps to the nearest match at or after its current position. Enter
-        keeps the landing spot; Esc restores the pre-search position. Mirrors ttk
-        TFM's isearch, reusing ``FileListManager.find_matches``."""
-        pane = self.active_pane()
-        view = self._active_view()
-        origin = pane["focused_index"]
+        """Incremental search over the active pane (the 'F' key).
 
-        def jump(pattern: str) -> None:
-            matches = self.flm.find_matches(
-                pane, pattern, match_all=True, return_indices_only=True)
-            view.search_matches = set(matches)
-            if matches:
-                cur = pane["focused_index"]
-                pane["focused_index"] = next((m for m in matches if m >= cur), matches[0])
-            else:
-                pane["focused_index"] = origin
-            self.panel.render()
+        The prompt is not a centered modal: an ``ISearchBar`` overlay is pinned to
+        the active pane's footer bar (same slot, same size), so the list above
+        stays visible and its cursor keeps moving as you type.
 
-        def finish(_pattern: str) -> None:
-            view.search_matches = set()
-            self.panel.render()
-
-        def cancel() -> None:
-            view.search_matches = set()
-            pane["focused_index"] = origin
-            self.panel.render()
-
-        show_input(self.panel, prompt="I-Search:", on_change=jump,
-                   on_accept=finish, on_cancel=cancel,
-                   anchor="top", region=self._active_pane_region())
+        Type a case-insensitive *contains* pattern (space-separated tokens all
+        match); every hit is highlighted and the cursor jumps to the nearest match
+        at/after its current position. ``Up``/``Down`` walk the previous/next
+        match; ``Enter`` stops at the current match and records the pattern in the
+        filter history (so the ';' Filter prompt can recall it); ``Esc`` cancels
+        and restores the pre-search cursor. Reuses ``FileListManager.find_matches``
+        for the hits."""
+        if self._isearch_active or not self.active_pane()["files"]:
+            return
+        footer = self._footers.get(self.pm.active_pane)
+        if footer is None or footer.rect is None:
+            return  # footer not drawn yet — nothing to anchor to
+        x, y, w, h = footer.rect
+        self._isearch_active = True
+        self._isearch_origin = self.active_pane()["focused_index"]
+        self._isearch_matches = []
+        self._active_view().search_matches = set()
+        self._isearch_bar = ISearchBar(
+            on_change=self._isearch_recompute,
+            on_navigate=self._isearch_step,
+            on_submit=self._isearch_stop,
+            on_cancel=self._isearch_cancel,
+            get_status=self._isearch_status,
+        )
+        # Positioned exactly over the footer, with its "status" surface so it
+        # reads as the footer bar. No shadow/dim: the pane stays fully lit.
+        self.panel.push_layer(self._isearch_bar, z=70,
+                              hints={"surface": "status", "x": x, "y": y, "w": w, "h": h})
         self.panel.render()
+
+    def _isearch_recompute(self, pattern: str) -> None:
+        """Recompute the match set for ``pattern`` (fired live on every edit),
+        repaint the pane's highlights, and jump the cursor to the nearest match
+        at/after the current position (or back to the origin when nothing
+        matches)."""
+        pane = self.active_pane()
+        matches = self.flm.find_matches(
+            pane, pattern, match_all=True, return_indices_only=True)
+        self._isearch_matches = matches
+        self._active_view().search_matches = set(matches)
+        if matches:
+            cur = pane["focused_index"]
+            pane["focused_index"] = next((m for m in matches if m >= cur), matches[0])
+        else:
+            pane["focused_index"] = self._isearch_origin
+        self.panel.render()
+
+    def _isearch_step(self, delta: int) -> None:
+        """Move the cursor to the previous (``delta<0``) or next (``delta>0``)
+        match, wrapping around the ends. A no-op when there are no matches."""
+        matches = self._isearch_matches
+        if not matches:
+            return
+        pane = self.active_pane()
+        cur = pane["focused_index"]
+        if cur in matches:
+            idx = (matches.index(cur) + delta) % len(matches)
+        elif delta > 0:
+            idx = next((i for i, m in enumerate(matches) if m > cur), 0)
+        else:
+            idx = next((i for i in range(len(matches) - 1, -1, -1)
+                        if matches[i] < cur), len(matches) - 1)
+        pane["focused_index"] = matches[idx]
+        self.panel.render()
+
+    def _isearch_status(self) -> tuple[int, int]:
+        """``(position, total)`` for the bar's match counter: the 1-based index of
+        the cursor within the current matches (0 when it sits off any match) and
+        the total number of matches."""
+        matches = self._isearch_matches
+        cur = self.active_pane()["focused_index"]
+        pos = matches.index(cur) + 1 if cur in matches else 0
+        return (pos, len(matches))
+
+    def _isearch_close(self) -> None:
+        """Tear down the isearch overlay and clear the pane's match highlights."""
+        self._isearch_active = False
+        self._isearch_matches = []
+        self._active_view().search_matches = set()
+        if (self.panel.has_layers
+                and self.panel._layers[-1].widget is self._isearch_bar):
+            self.panel.pop_layer()
+        self._isearch_bar = None
+
+    def _isearch_stop(self) -> None:
+        """Enter in the field: keep the current match, record the pattern in the
+        filter history (as a ready-to-apply glob), and close."""
+        raw = self._isearch_bar.pattern.strip() if self._isearch_bar else ""
+        self._isearch_close()
+        if raw:
+            self._record_filter_pattern(self._isearch_to_filter(raw))
+        self.panel.render()
+
+    def _isearch_cancel(self) -> None:
+        """Esc / outside click: restore the pre-search cursor and close."""
+        self.active_pane()["focused_index"] = self._isearch_origin
+        self._isearch_close()
+        self.panel.render()
+
+    def _record_filter_pattern(self, pattern: str) -> None:
+        """Add ``pattern`` to the most-recent-first filter history (persisted via
+        the state manager, capped), so the ';' Filter prompt can recall it. Silent
+        and best-effort — a history write must never break isearch."""
+        pattern = pattern.strip()
+        if not pattern:
+            return
+        try:
+            hist = [p for p in self.state_manager.get_state(_FILTER_HISTORY_KEY, [])
+                    if p != pattern]
+            hist.insert(0, pattern)
+            self.state_manager.set_state(_FILTER_HISTORY_KEY, hist[:_FILTER_HISTORY_MAX])
+        except Exception:
+            pass
+
+    def _filter_history(self) -> list[str]:
+        """The saved filter patterns, most-recent first (best-effort)."""
+        try:
+            hist = self.state_manager.get_state(_FILTER_HISTORY_KEY, [])
+            return [p for p in hist if isinstance(p, str)]
+        except Exception:
+            return []
+
+    @staticmethod
+    def _isearch_to_filter(pattern: str) -> str:
+        """Translate an isearch pattern into the single ``fnmatch`` glob the pane
+        filter stores, so the saved/applied filter keeps the same *contains*
+        semantics the search highlighted. A bare token becomes ``*token*``;
+        multiple tokens chain (``foo bar`` -> ``*foo*bar*``); a pattern that
+        already carries glob metacharacters is passed through untouched."""
+        pattern = pattern.strip()
+        if not pattern or any(c in pattern for c in "*?["):
+            return pattern
+        return "*" + "*".join(pattern.split()) + "*"
 
     def jump_to_path(self) -> None:
         """Prompt for a directory path and navigate the active pane there.
