@@ -7,12 +7,17 @@ identical) with a centre separator glyph carrying the verdict. Directories
 expand/collapse; ``n``/``N`` jump between differences; Enter on a differing file
 opens the per-file diff (reusing :func:`tfm_diff_viewer.show_diff_viewer`).
 
-Scanning is **progressive**: on open the viewer starts a background worker that
-first walks both directory trees (metadata) and then compares each candidate
-file's content, mutating the shared tree under a lock and raising a dirty flag.
-A per-frame tick registered via ``panel.request_animation_ticks`` runs on the
-main thread and re-renders when the flag is set, so a large tree fills in live
-without blocking the UI. Pass ``background=False`` (tests) to scan synchronously.
+Scanning is **progressive** and breadth-first: on open the viewer scans only the
+top level of both roots (so items appear at once), then a background *scanner*
+worker pulls directories off a queue level-by-level, inserting nodes into the
+shared tree as they're discovered — the tree grows live, top-down. A decoupled
+*comparator* worker resolves each two-sided file's content verdict off its own
+queue. Both queues are priority queues so **visible / expanded** directories are
+scanned first (re-prioritised on scroll / expand / collapse). Tree mutation
+happens under a lock and raises a dirty flag; a per-frame tick registered via
+``panel.request_animation_ticks`` runs on the main thread and re-renders when the
+flag is set, so nothing blocks the UI. Pass ``background=False`` (tests) to scan
+synchronously (full walk + one-shot classification).
 
 This module keeps the backend-agnostic scanning/classification logic and renders
 via a :class:`~puikit.widgets.base.Widget`, following the
@@ -21,8 +26,9 @@ via a :class:`~puikit.widgets.base.Widget`, following the
 
 from __future__ import annotations
 
+import itertools
+import queue
 import threading
-import time
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from enum import Enum
@@ -91,6 +97,18 @@ class TreeNode:
     is_expanded: bool
     children: list["TreeNode"] = field(default_factory=list)
     parent: Optional["TreeNode"] = None
+    #: Progressive-scan bookkeeping (background mode). ``children_scanned`` guards
+    #: against a directory being scanned twice; ``_hi_pri`` against re-enqueuing
+    #: an already-prioritised directory on every scroll.
+    children_scanned: bool = False
+    content_compared: bool = False
+    _hi_pri: bool = False
+
+
+#: Scan-task priorities (higher = pulled off the queue first).
+_PRIO_IMMEDIATE = 1000  # user just expanded this directory
+_PRIO_VISIBLE = 100     # currently in the viewport
+_PRIO_NORMAL = 10       # discovered but off-screen
 
 
 # --- scanning / classification (backend-agnostic) ---------------------------
@@ -144,6 +162,29 @@ class DirectoryScanner:
                 continue
         if on_progress is not None:
             on_progress(count)
+        return files
+
+    def scan_level(self, directory: Path) -> dict[str, FileInfo]:
+        """List only the *immediate* children of ``directory`` (non-recursive),
+        keyed by bare filename. Powers the progressive breadth-first scan: each
+        level is scanned on demand so the tree can grow top-down without a full
+        upfront walk. Inaccessible entries are recorded, not raised."""
+        files: dict[str, FileInfo] = {}
+        try:
+            children = list(directory.iterdir())
+        except (OSError, PermissionError):
+            return files
+        for child in children:
+            name = child.name
+            if not self.show_hidden and name.startswith("."):
+                continue
+            try:
+                st = child.stat()
+                is_dir = child.is_dir()
+                files[name] = FileInfo(child, name, is_dir,
+                                       0 if is_dir else st.st_size, st.st_mtime, True)
+            except (OSError, PermissionError) as exc:
+                files[name] = FileInfo(child, name, False, 0, 0.0, False, str(exc))
         return files
 
 
@@ -252,19 +293,6 @@ def summarize_directory(node: TreeNode) -> DifferenceType:
     return DifferenceType.PENDING
 
 
-def reclassify_directories(node: TreeNode) -> None:
-    """Post-order re-summarise every two-sided directory (and the root) from its
-    children's current verdicts, leaving file and one-sided nodes untouched.
-    Used after the comparison phase resolves file verdicts, so ancestor
-    directories flip PENDING → identical / contains-difference."""
-    for child in node.children:
-        reclassify_directories(child)
-    if node.is_directory:
-        two_sided = node.left_path is not None and node.right_path is not None
-        if node.depth == 0 or two_sided:
-            node.difference_type = summarize_directory(node)
-
-
 def _recursive_delete(entry: Path) -> None:
     """Delete a file or directory through the storage-agnostic Path API,
     recursing into directories (mirrors ``tfm.TfmApp._delete_path``)."""
@@ -314,97 +342,298 @@ class DirectoryDiffView(Widget):
         # Nested modals (confirm boxes, the per-file diff) must sit *above* this
         # full-window layer; show_directory_diff_viewer raises it to (push z + 10).
         self._child_z = 90
-        # Progressive-scan state shared with the worker thread. ``_lock`` guards
-        # tree mutation + reflow; ``visible`` is swapped atomically so draw reads
-        # it lock-free. ``_dirty`` requests a main-thread re-render.
+        # Progressive-scan state shared with the worker threads. ``_lock`` guards
+        # all tree mutation + reflow; ``visible`` is swapped atomically so draw
+        # reads it lock-free. ``_dirty`` requests a main-thread re-render.
         self._lock = threading.RLock()
         self._dirty = True
         self._scanning = True
         self._cancel = False
         self._scanners: list[DirectoryScanner] = []
         self._phase = "scan"
-        self._scanned = 0
+        # Breadth-first directory-scan queue and decoupled file-comparison queue.
+        # Both are priority queues holding ``(-priority, seq, node)`` — the seq
+        # keeps items unique so ``TreeNode``s are never compared, and negating the
+        # priority turns the min-heap into "highest priority first".
+        self._scan_q: queue.PriorityQueue = queue.PriorityQueue()
+        self._cmp_q: queue.PriorityQueue = queue.PriorityQueue()
+        self._seq = itertools.count()
+        # Progress counters surfaced in the footer / status screen.
+        self._scanned = 0        # files + dirs discovered
+        self._dirs_scanned = 0   # directories whose level has been listed
+        self._dirs_total = 0     # directories queued for scanning
         self._compared = 0
         self._compare_total = 0
-        self._thread: Optional[threading.Thread] = None
-        # A rescan (after copy/delete) restores expansion + cursor across the
-        # freshly built tree instead of auto-expanding from scratch.
+        self._thread: Optional[threading.Thread] = None  # the coordinator
+        self._workers: list[threading.Thread] = []       # scanner + comparator
+        # A rescan (after copy/delete) restores the prior expansion + cursor
+        # across the freshly built tree so the user keeps their place.
         self._restore_expanded: Optional[set[str]] = None
         self._restore_cursor_path: Optional[str] = None
         if background:
-            self._thread = threading.Thread(target=self._scan_worker, daemon=True)
+            self._thread = threading.Thread(target=self._scan_coordinator, daemon=True)
             self._thread.start()
         else:
-            self._scan_worker()
+            self._scan_sync()
 
-    # --- background scanning -------------------------------------------------
+    # --- synchronous scan (tests) --------------------------------------------
 
-    def _scan_worker(self) -> None:
-        """Walk both trees (metadata), build the deferred-comparison tree, then
-        compare each candidate file's content, refreshing the view as it goes."""
+    def _scan_sync(self) -> None:
+        """Full recursive walk + one-shot classification, for ``background=False``
+        (deterministic tests). Converges to the same finished tree the background
+        workers produce, then finalises (restore on rescan; else collapsed)."""
+        left_scanner = DirectoryScanner(self.show_hidden)
+        right_scanner = DirectoryScanner(self.show_hidden)
+        self._scanners = [left_scanner, right_scanner]
+        left_files = left_scanner.scan(self.left_path)
+        right_files = right_scanner.scan(self.right_path)
+        with self._lock:
+            self.root = DiffEngine(left_files, right_files, compare_content=True).build_tree()
+            # The tree is fully built, so no branch needs an on-expand lazy scan.
+            self.root.children_scanned = True
+            for node in self._iter_nodes(self.root):
+                if node.is_directory:
+                    node.children_scanned = True
+            self._scanned = len(left_files) + len(right_files)
+            self._compared = self._compare_total = sum(
+                1 for n in self._iter_nodes(self.root)
+                if not n.is_directory and n.left_path is not None and n.right_path is not None)
+            self._finalize_locked()
+            self._dirty = True
+            self._scanning = False
+
+    # --- progressive background scanning -------------------------------------
+
+    def _enqueue_scan(self, node: TreeNode, priority: int) -> None:
+        self._scan_q.put((-priority, next(self._seq), node))
+
+    def _enqueue_cmp(self, node: TreeNode, priority: int) -> None:
+        self._cmp_q.put((-priority, next(self._seq), node))
+
+    def _scan_coordinator(self) -> None:
+        """Background driver (the joinable thread). Scans the roots' top level so
+        items appear immediately, starts the scanner + comparator workers, waits
+        for both queues to drain (breadth-first, visible-first), then finalises."""
         try:
-            left_scanner = DirectoryScanner(self.show_hidden)
-            right_scanner = DirectoryScanner(self.show_hidden)
-            self._scanners = [left_scanner, right_scanner]
-
-            def on_scan(count: int) -> None:
-                self._scanned += 50
-                self._dirty = True
-
-            self._phase = "scan"
-            left_files = left_scanner.scan(self.left_path, on_scan)
+            self._seed_root()
             if self._cancel:
                 return
-            right_files = right_scanner.scan(self.right_path, on_scan)
+            scanner = threading.Thread(target=self._scanner_worker, daemon=True)
+            comparator = threading.Thread(target=self._comparator_worker, daemon=True)
+            self._workers = [scanner, comparator]
+            scanner.start()
+            comparator.start()
+            self._scan_q.join()          # every directory level listed
             if self._cancel:
                 return
-
-            root = DiffEngine(left_files, right_files, compare_content=False).build_tree()
-            with self._lock:
-                self.root = root
-                if self._restore_expanded is not None:
-                    self._restore_expansion(self._restore_expanded)
-                    self._restore_expanded = None
-                else:
-                    self._auto_expand(self.root)
-                self._reflow_locked()
-                if self._restore_cursor_path is not None:
-                    self._restore_cursor(self._restore_cursor_path)
-                    self._restore_cursor_path = None
-                self._dirty = True
-
-            # Comparison phase: resolve every two-sided file's content verdict,
-            # periodically re-summarising ancestors and refreshing the view.
             self._phase = "compare"
-            pending = [n for n in self._iter_nodes(root)
-                       if not n.is_directory and n.left_path is not None
-                       and n.right_path is not None]
-            self._compare_total = len(pending)
-            last = time.monotonic()
-            for i, node in enumerate(pending):
-                if self._cancel:
-                    return
-                verdict = (DifferenceType.IDENTICAL
-                           if DiffEngine.compare_file_content(node.left_path, node.right_path)
-                           else DifferenceType.CONTENT_DIFFERENT)
-                with self._lock:
-                    node.difference_type = verdict
-                    self._compared = i + 1
-                    now = time.monotonic()
-                    if now - last > 0.15:
-                        reclassify_directories(self.root)
-                        self._reflow_locked()
-                        self._dirty = True
-                        last = now
-            with self._lock:
-                reclassify_directories(self.root)
-                self._reflow_locked()
+            self._cmp_q.join()           # every two-sided file compared
         finally:
-            # Set dirty *before* clearing scanning so the tick always paints the
-            # final state before it unregisters (see _tick).
+            # Dirty *before* clearing scanning so the tick paints the final state
+            # before it unregisters (see _tick).
             with self._lock:
+                if not self._cancel:
+                    self._finalize_locked()
                 self._dirty = True
                 self._scanning = False
+
+    def _seed_root(self) -> None:
+        """Build the top level of the unified tree (both roots' immediate
+        children) and queue every two-sided subdirectory for background scanning."""
+        left = DirectoryScanner(self.show_hidden).scan_level(self.left_path)
+        right = DirectoryScanner(self.show_hidden).scan_level(self.right_path)
+        with self._lock:
+            self.root = TreeNode("", self.left_path, self.right_path, True,
+                                 DifferenceType.PENDING, 0, True)
+            self.root.children_scanned = True
+            self._insert_children_locked(self.root, left, right)
+            self._reflow_locked()
+            self._dirty = True
+
+    def _scanner_worker(self) -> None:
+        """Pull directories off ``_scan_q`` and list one level each, enqueuing
+        child directories (breadth-first) and file comparisons as it goes."""
+        while self._scanning:
+            try:
+                _, _, node = self._scan_q.get(timeout=0.1)
+            except queue.Empty:
+                if self._cancel:
+                    return
+                continue
+            try:
+                if not self._cancel:
+                    self._scan_node(node)
+            finally:
+                self._scan_q.task_done()
+
+    def _scan_node(self, node: TreeNode) -> None:
+        with self._lock:
+            if node.children_scanned or self._cancel:
+                return
+            node.children_scanned = True      # claim it so duplicates skip
+            left_root, right_root = node.left_path, node.right_path
+        left = DirectoryScanner(self.show_hidden).scan_level(left_root) if left_root else {}
+        right = DirectoryScanner(self.show_hidden).scan_level(right_root) if right_root else {}
+        with self._lock:
+            if self._cancel:
+                return
+            self._insert_children_locked(node, left, right)
+            self._dirs_scanned += 1
+            # Reflow only if this directory's new children are actually on screen.
+            if node.is_expanded and self._rendered_locked(node):
+                self._reflow_locked()
+            self._dirty = True
+
+    def _comparator_worker(self) -> None:
+        """Resolve two-sided files' content verdicts off ``_cmp_q``, decoupled
+        from directory scanning so neither blocks the other."""
+        while self._scanning:
+            try:
+                _, _, node = self._cmp_q.get(timeout=0.1)
+            except queue.Empty:
+                if self._cancel:
+                    return
+                continue
+            try:
+                if not self._cancel:
+                    self._compare_node(node)
+            finally:
+                self._cmp_q.task_done()
+
+    def _compare_node(self, node: TreeNode) -> None:
+        if node.left_path is None or node.right_path is None:
+            return
+        identical = DiffEngine.compare_file_content(node.left_path, node.right_path)
+        with self._lock:
+            if self._cancel:
+                return
+            node.difference_type = (DifferenceType.IDENTICAL if identical
+                                    else DifferenceType.CONTENT_DIFFERENT)
+            node.content_compared = True
+            self._compared += 1
+            self._reclassify_ancestors_locked(node)
+            self._dirty = True
+
+    # --- incremental tree mutation (call under _lock) ------------------------
+
+    def _insert_children_locked(self, parent: TreeNode,
+                                left: dict[str, FileInfo],
+                                right: dict[str, FileInfo]) -> None:
+        """Merge a freshly scanned level into ``parent``: create/attach new child
+        nodes, classify them (queuing follow-up scans/comparisons), re-sort, and
+        re-summarise the ancestor chain."""
+        existing = {c.name: c for c in parent.children}
+        for name in set(left) | set(right):
+            li, ri = left.get(name), right.get(name)
+            child = existing.get(name)
+            if child is not None:
+                if li is not None:
+                    child.left_path = li.path
+                if ri is not None:
+                    child.right_path = ri.path
+                continue
+            is_dir = bool((li and li.is_directory) or (ri and ri.is_directory))
+            child = TreeNode(name, li.path if li else None, ri.path if ri else None,
+                             is_dir, DifferenceType.PENDING, parent.depth + 1, False,
+                             parent=parent)
+            parent.children.append(child)
+            self._classify_new_locked(child)
+        parent.children.sort(key=lambda c: (not c.is_directory, c.name.lower()))
+        self._scanned += len(left) + len(right)
+        # Re-summarise the scanned directory itself (an empty two-sided directory
+        # has no children to trigger a later reclassify, so resolve it now) and
+        # its ancestors.
+        self._reclassify_self_and_ancestors_locked(parent)
+
+    def _classify_new_locked(self, node: TreeNode) -> None:
+        """Assign a newly created node's initial verdict and queue any follow-up
+        work: two-sided directories go on the scan queue, two-sided files on the
+        comparison queue; one-sided nodes are already fully classified."""
+        left = node.left_path is not None
+        right = node.right_path is not None
+        if left and not right:
+            node.difference_type = DifferenceType.ONLY_LEFT
+        elif right and not left:
+            node.difference_type = DifferenceType.ONLY_RIGHT
+        elif node.is_directory:
+            node.difference_type = DifferenceType.PENDING
+            self._dirs_total += 1
+            self._enqueue_scan(node, _PRIO_NORMAL)
+        else:
+            node.difference_type = DifferenceType.PENDING
+            self._compare_total += 1
+            self._enqueue_cmp(node, _PRIO_NORMAL)
+
+    def _reclassify_ancestors_locked(self, node: TreeNode) -> None:
+        """Re-summarise every two-sided directory (and the root) strictly *above*
+        ``node``, so PENDING ancestors flip to identical / contains-difference as
+        leaves resolve."""
+        self._resummarize_chain_locked(node.parent)
+
+    def _reclassify_self_and_ancestors_locked(self, node: TreeNode) -> None:
+        """Like :meth:`_reclassify_ancestors_locked` but starting at ``node``
+        itself (used after scanning a directory's level)."""
+        self._resummarize_chain_locked(node)
+
+    @staticmethod
+    def _resummarize_chain_locked(node: Optional[TreeNode]) -> None:
+        while node is not None:
+            two_sided = node.left_path is not None and node.right_path is not None
+            if node.depth == 0 or two_sided:
+                node.difference_type = summarize_directory(node)
+            node = node.parent
+
+    def _rendered_locked(self, node: TreeNode) -> bool:
+        """True if every ancestor of ``node`` is expanded (so ``node`` and its
+        children currently contribute to the flattened ``visible`` list)."""
+        cur = node.parent
+        while cur is not None and cur.depth > 0:
+            if not cur.is_expanded:
+                return False
+            cur = cur.parent
+        return True
+
+    def _finalize_locked(self) -> None:
+        """One-shot tree finish (both scan paths). Directories stay collapsed —
+        only the root is open (ttk parity: the user drills down themselves). A
+        rescan restores the pre-rescan expansion + cursor so the user keeps their
+        place across a copy/delete."""
+        if self._restore_expanded is not None:
+            self._restore_expansion(self._restore_expanded)
+            self._restore_expanded = None
+        self._reflow_locked()
+        if self._restore_cursor_path is not None:
+            self._restore_cursor(self._restore_cursor_path)
+            self._restore_cursor_path = None
+
+    def _lazy_scan(self, node: TreeNode) -> None:
+        """Scan a directory's single level on the main thread (used when the
+        background pass has already finished — one-sided branches are scanned
+        on demand as the user drills into them)."""
+        left = (DirectoryScanner(self.show_hidden).scan_level(node.left_path)
+                if node.left_path else {})
+        right = (DirectoryScanner(self.show_hidden).scan_level(node.right_path)
+                 if node.right_path else {})
+        with self._lock:
+            node.children_scanned = True
+            self._insert_children_locked(node, left, right)
+
+    def _update_priorities(self) -> None:
+        """Re-enqueue viewport directories at higher priority so what the user is
+        looking at fills in first (called on scroll / expand / collapse). The
+        scanner dedups via ``children_scanned``; ``_hi_pri`` bounds re-enqueues to
+        one per node."""
+        if not self._scanning:
+            return
+        first = int(self.top)
+        for node in self.visible[first:first + self._view_h]:
+            # Two-sided directories only — they're already queued (at NORMAL), so
+            # this just bumps the on-screen ones ahead. One-sided branches stay
+            # lazy (scanned on expand), so touching them here would skew progress.
+            if (node.is_directory and not node.children_scanned and not node._hi_pri
+                    and node.left_path is not None and node.right_path is not None):
+                node._hi_pri = True
+                self._enqueue_scan(node, _PRIO_VISIBLE)
 
     def _tick(self) -> bool:
         """Animation-tick callback (main thread): re-render when the worker has
@@ -433,16 +662,24 @@ class DirectoryDiffView(Widget):
         self._restore_expanded = self._save_expansion()
         node = self._current()
         self._restore_cursor_path = self._node_rel_path(node) if node is not None else None
+        # Tear the old coordinator + workers down before swapping in fresh queues
+        # (the workers read ``self._scan_q`` each loop, so they must be stopped).
         self.cancel()
         if self._thread is not None:
             self._thread.join(1.0)
+        for worker in self._workers:
+            worker.join(1.0)
         self._cancel = False
         self._scanning = True
         self._dirty = True
         self._phase = "scan"
-        self._scanned = self._compared = self._compare_total = 0
+        self._scan_q = queue.PriorityQueue()
+        self._cmp_q = queue.PriorityQueue()
+        self._scanned = self._dirs_scanned = self._dirs_total = 0
+        self._compared = self._compare_total = 0
         self._scanners = []
-        self._thread = threading.Thread(target=self._scan_worker, daemon=True)
+        self._workers = []
+        self._thread = threading.Thread(target=self._scan_coordinator, daemon=True)
         self._thread.start()
         if self._panel is not None:
             self._panel.request_animation_ticks(self._tick)
@@ -481,15 +718,6 @@ class DirectoryDiffView(Widget):
                 self.cursor = i
                 self._ensure_cursor_visible()
                 return
-
-    def _auto_expand(self, node: TreeNode) -> None:
-        """Open directories that (may) contain a difference so diffs are visible
-        as they resolve; identical/leaf branches stay collapsed."""
-        for child in node.children:
-            if child.is_directory and child.difference_type in (
-                    _IS_DIFF | {DifferenceType.PENDING}):
-                child.is_expanded = True
-                self._auto_expand(child)
 
     def _reflow(self) -> None:
         with self._lock:
@@ -575,13 +803,23 @@ class DirectoryDiffView(Widget):
         """Expand/collapse the focused directory. ``expand`` forces a direction;
         None toggles. Preserves the focused node across the reflow."""
         node = self._current()
-        if node is None or not node.is_directory or not node.children:
+        if node is None or not node.is_directory:
             return
         node.is_expanded = (not node.is_expanded) if expand is None else expand
+        # Expanding a not-yet-scanned directory (a one-sided branch, or one still
+        # queued): pull it in now. During the background pass a scanner worker
+        # handles it at top priority; once idle, scan the single level inline.
+        if node.is_expanded and not node.children_scanned:
+            if self._scanning:
+                self._dirs_total += 1
+                self._enqueue_scan(node, _PRIO_IMMEDIATE)
+            else:
+                self._lazy_scan(node)
         self._reflow()
         if node in self.visible:
             self.cursor = self.visible.index(node)
         self._ensure_cursor_visible()
+        self._update_priorities()
 
     def _step_diff(self, delta: int) -> None:
         """Move the cursor to the next/previous node that is a difference."""
@@ -772,12 +1010,22 @@ class DirectoryDiffView(Widget):
             msg = "Directories are identical — no differences found"
         ctx.draw_text(max(0, (w - len(msg)) // 2), h // 2, msg[:w], Style(fg=muted, bg=bg))
 
+    @staticmethod
+    def _pct(done: int, total: int) -> int:
+        return int(100 * done / total) if total else 100
+
     def _footer(self) -> str:
         if self._scanning:
             if self._phase == "compare" and self._compare_total:
-                return (f" Comparing {self._compared}/{self._compare_total} files… "
-                        "· esc cancel ")
-            return f" Scanning… ({self._scanned} items) · esc cancel "
+                queued = self._cmp_q.qsize()
+                return (f" Comparing {self._compared}/{self._compare_total} "
+                        f"({self._pct(self._compared, self._compare_total)}%) · "
+                        f"{queued} queued · esc cancel ")
+            queued = self._scan_q.qsize()
+            return (f" Scanning… {self._scanned} items · dirs "
+                    f"{self._dirs_scanned}/{self._dirs_total} "
+                    f"({self._pct(self._dirs_scanned, self._dirs_total)}%) · "
+                    f"{queued} queued · esc cancel ")
         diffs = sum(1 for n in self.visible if n.difference_type in _IS_DIFF)
         return (f" {len(self.visible)} nodes · {diffs} differences · "
                 "n/N jump · ←/→ expand · tab side · enter diff · q close ")
@@ -916,6 +1164,7 @@ class DirectoryDiffView(Widget):
             uy = event.hints.get("scroll_units")
             self.top -= float(uy) if uy is not None else float(event.scroll)
             self._clamp_scroll()
+            self._update_priorities()  # scan what scrolled into view first
             return True
         if event.type in self._MOUSE:
             return True  # slice 4: click-to-focus row; display-only for now
@@ -971,6 +1220,7 @@ class DirectoryDiffView(Widget):
             self._restart_scan()
         elif char == "?":
             self._show_help()
+        self._update_priorities()  # bias scanning toward the new viewport
         return True
 
 

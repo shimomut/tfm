@@ -122,9 +122,25 @@ Four capabilities the inline reimplementation dropped, to build back:
   an "apply to all remaining" option), as the ttk `FileOperationUI` /
   `ArchiveOperationUI` offered, interleaved with the background execution.
 
-### 2.5 Make the Directory Diff Viewer scan more progressively (ttk parity)
-The ported viewer (`tfm_directory_diff_viewer.py`) *is* threaded, but its
-progressive model is **coarser** than the ttk original. `_scan_worker` currently:
+### 2.5 Make the Directory Diff Viewer scan more progressively (ttk parity) — DONE
+**Done.** `_scan_worker`'s two-phase full-walk was replaced with the
+breadth-first, queue-driven progressive scan described below:
+`_scan_coordinator` seeds the roots' top level (items appear at once), then a
+`_scanner_worker` pulls directory levels off a `_scan_q` priority queue and
+inserts nodes into the shared tree as they're discovered (`_insert_children_locked`
+/ `_reclassify_self_and_ancestors_locked`); a decoupled `_comparator_worker`
+resolves file-content verdicts off a `_cmp_q`. `_update_priorities` re-enqueues
+on-screen two-sided directories at `_PRIO_VISIBLE` on scroll / expand / collapse;
+one-sided branches are scanned lazily on expand (`_PRIO_IMMEDIATE` / `_lazy_scan`).
+The footer reports scan/compare queue depth + percentage. The `background=False`
+synchronous full-build path is retained for tests, and the existing
+`_lock` / `_dirty` / `_tick` / `request_animation_ticks` redraw loop is reused
+unchanged. Covered by new tests in `test/test_directory_diff_viewer.py`
+(breadth-first convergence, empty-dir classification, lazy one-sided scan,
+`scan_level`, queue-progress footer).
+
+*Original problem statement (for reference):* the ported viewer was threaded, but
+its progressive model was **coarser** than the ttk original. `_scan_worker`:
 scans the **whole** left tree, then the **whole** right tree, builds the entire
 tree in one shot (`DiffEngine(...).build_tree()`), and only then compares files
 sequentially. So on a large / slow tree the user sees only `Scanning… (N items)`

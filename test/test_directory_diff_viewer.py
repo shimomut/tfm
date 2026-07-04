@@ -89,9 +89,21 @@ def test_scanner_respects_show_hidden(tmp_path):
 # --- tree / navigation -------------------------------------------------------
 
 
-def test_auto_expand_reveals_nested_difference(trees):
+def test_directories_start_collapsed(trees):
+    # ttk parity: only the root is open — directories are NOT auto-expanded, even
+    # when they contain a difference. The user drills down themselves.
     view = _sync_view(*trees)
-    # "sub" contains a difference, so it is auto-expanded and its child shows.
+    sub = _find(view.root, "sub")
+    assert sub.difference_type is DifferenceType.CONTAINS_DIFFERENCE
+    assert not sub.is_expanded
+    assert not any(n.name == "a.txt" for n in view.visible)
+
+
+def test_expand_reveals_nested_difference(trees):
+    view = _sync_view(*trees)
+    sub = _find(view.root, "sub")
+    view.cursor = view.visible.index(sub)
+    view._toggle(expand=True)   # user opens it
     assert any(n.name == "a.txt" and n.depth == 2 for n in view.visible)
 
 
@@ -182,15 +194,93 @@ def test_enter_on_differing_file_opens_file_diff(backend, trees):
 # --- progressive scanning (slice 3) ------------------------------------------
 
 
+def test_scan_level_lists_immediate_children_only(tmp_path):
+    d = tmp_path / "d"
+    (d / "sub").mkdir(parents=True)
+    (d / "top.txt").write_text("t")
+    (d / "sub" / "nested.txt").write_text("n")
+    level = DirectoryScanner().scan_level(Path(str(d)))
+    assert set(level) == {"sub", "top.txt"}          # nested.txt NOT listed
+    assert level["sub"].is_directory and level["sub"].relative_path == "sub"
+
+
+def test_background_scan_grows_breadth_first_and_converges(tmp_path):
+    """The background pass must reach the same finished tree the synchronous full
+    walk builds — deep both-sided branches included."""
+    left, right = tmp_path / "L", tmp_path / "R"
+    for root in (left, right):
+        (root / "a" / "b" / "c").mkdir(parents=True)
+        (root / "a" / "b" / "c" / "leaf.txt").write_text("same")
+    (right / "a" / "b" / "c" / "leaf.txt").write_text("changed")   # deep diff
+    lp, rp = Path(str(left)), Path(str(right))
+
+    bg = DirectoryDiffView(lp, rp, background=True)
+    bg.join()
+    # Expand the whole tree so every node is flattened into `visible`.
+    for n in bg._iter_nodes(bg.root):
+        if n.is_directory:
+            n.is_expanded = True
+    bg._reflow()
+    leaf = next(n for n in bg.visible if n.name == "leaf.txt")
+    assert leaf.difference_type is DifferenceType.CONTENT_DIFFERENT
+    # The deep difference propagates up every ancestor directory.
+    assert all(n.difference_type is DifferenceType.CONTAINS_DIFFERENCE
+               for n in bg.visible if n.is_directory)
+
+
+def test_empty_two_sided_dir_resolves_identical(tmp_path):
+    """A two-sided directory with no children must settle on IDENTICAL, not stay
+    PENDING (an empty dir has no child resolution to trigger a reclassify)."""
+    left, right = tmp_path / "L", tmp_path / "R"
+    (left / "empty").mkdir(parents=True)
+    (right / "empty").mkdir(parents=True)
+    view = DirectoryDiffView(Path(str(left)), Path(str(right)), background=True)
+    view.join()
+    assert _find(view.root, "empty").difference_type is DifferenceType.IDENTICAL
+    assert view.root.difference_type is DifferenceType.IDENTICAL
+
+
+def test_one_sided_dir_scanned_lazily_on_expand(tmp_path):
+    """One-sided directories aren't walked up front; their contents materialise
+    only when the user expands them (ttk-parity lazy scan)."""
+    left, right = tmp_path / "L", tmp_path / "R"
+    (left / "only" / "deep").mkdir(parents=True)
+    (left / "only" / "deep" / "x.txt").write_text("x")
+    right.mkdir()
+    view = DirectoryDiffView(Path(str(left)), Path(str(right)), background=True)
+    view.join()
+    only = _find(view.root, "only")
+    assert only.difference_type is DifferenceType.ONLY_LEFT
+    assert not only.children_scanned          # not walked during the initial pass
+    # Focus + expand it: the level is scanned inline and its child appears.
+    view.cursor = view.visible.index(only)
+    view._toggle(expand=True)
+    assert only.children_scanned
+    assert _find(only, "deep") is not None
+
+
+def test_footer_reports_scan_queue_progress(trees):
+    # Use the synchronous view (no worker thread) and drive the progress fields
+    # directly so the assertion can't race a background finish.
+    view = _sync_view(*trees)
+    view._scanning = True
+    view._phase = "scan"
+    view._dirs_scanned, view._dirs_total = 2, 5
+    footer = view._footer()
+    assert "40%" in footer and "queued" in footer
+
+
 def test_background_scan_populates_and_resolves(trees):
     view = DirectoryDiffView(*trees, background=True)
     view.join()
     assert not view._scanning
-    assert any(n.name == "a.txt" for n in view.visible)
+    # The nested child was discovered (in the tree, though "sub" stays collapsed).
+    assert _find(_find(view.root, "sub"), "a.txt") is not None
     # Deferred comparison resolved every file's verdict (nothing left pending).
     assert _find(view.root, "diff.txt").difference_type is DifferenceType.CONTENT_DIFFERENT
     assert _find(view.root, "same.txt").difference_type is DifferenceType.IDENTICAL
-    assert not any(n.difference_type is DifferenceType.PENDING for n in view.visible)
+    assert not any(n.difference_type is DifferenceType.PENDING
+                   for n in view._iter_nodes(view.root))
 
 
 def test_tick_renders_when_dirty_and_stops_when_done(trees):
@@ -270,10 +360,13 @@ def test_rescan_preserves_collapsed_state(trees):
 def test_rescan_preserves_expanded_state(trees):
     view = DirectoryDiffView(*trees, background=True)
     view.join()
-    assert _find(view.root, "sub").is_expanded  # auto-expanded (contains diff)
+    sub = _find(view.root, "sub")
+    view.cursor = view.visible.index(sub)
+    view._toggle(expand=True)                   # user expands it
+    assert _find(view.root, "sub").is_expanded
     view._restart_scan()
     view.join()
-    assert _find(view.root, "sub").is_expanded
+    assert _find(view.root, "sub").is_expanded  # expansion survived the rescan
 
 
 def test_help_pushes_message_box(backend, trees):
