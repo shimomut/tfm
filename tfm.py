@@ -2142,9 +2142,9 @@ class TfmApp:
 
             if archive_path.exists():
                 show_message_box(
-                    self.panel, f"'{name}' already exists in the other pane. Overwrite?",
+                    self.panel, f"`{name}` already exists in the other pane. Overwrite?",
                     title="Create Archive", icon="warning", buttons=("Overwrite", "Cancel"),
-                    default=1, cancel=1,
+                    default=1, cancel=1, markdown=True,
                     on_result=lambda l: go() if l == "Overwrite" else self.panel.render())
                 self.panel.render()
             else:
@@ -2191,12 +2191,15 @@ class TfmApp:
 
         exists = target.exists()
         if exists or getattr(self.config, "CONFIRM_EXTRACT_ARCHIVE", True):
-            message = f"Extract '{entry.name}' to {target}?"
+            # Markdown message: the archive name and destination render as `code`
+            # chips (backticks also shield a path's _ / * from markdown). A blank
+            # line makes the warning a separate paragraph, not a folded-in clause.
+            message = f"Extract `{entry.name}` to `{target}`?"
             if exists:
-                message += "\nThe destination exists; files may be overwritten."
+                message += "\n\nThe destination exists; files may be overwritten."
             show_message_box(
                 self.panel, message, title="Extract Archive", icon="info",
-                buttons=("Extract", "Cancel"), default=0, cancel=1,
+                buttons=("Extract", "Cancel"), default=0, cancel=1, markdown=True,
                 on_result=lambda l: go() if l == "Extract" else self.panel.render())
             self.panel.render()
         else:
