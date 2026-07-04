@@ -198,18 +198,25 @@ class _StreamToLog:
     on worker threads (async listings, file ops, archives) that must never touch
     the widget. The UI thread drains the queue on its monitoring pump."""
 
-    def __init__(self, source: str, sink: "queue.Queue"):
+    def __init__(self, source: str, sink: "queue.Queue", on_write=None):
         self.source = source  # "STDOUT" or "STDERR"
         self._sink = sink
+        self._on_write = on_write  # wakes the UI thread to drain (event-driven mode)
         self._buffer = ""
         self._lock = threading.Lock()
 
     def write(self, text: str) -> int:
+        wrote_line = False
         with self._lock:
             self._buffer += text
             while "\n" in self._buffer:
                 line, self._buffer = self._buffer.split("\n", 1)
                 self._sink.put((self.source, line))
+                wrote_line = True
+        # Wake outside the lock: a worker thread posted a line; the UI thread must
+        # drain it. No-op when nothing is draining the queue on a timer already.
+        if wrote_line and self._on_write is not None:
+            self._on_write()
         return len(text)
 
     def drain_partial(self) -> None:
@@ -229,6 +236,11 @@ class _StreamToLog:
 
 class TfmApp:
     """Controller: owns pane state and maps key actions onto it."""
+
+    #: Default until ``__init__`` resolves it from the backend's capabilities.
+    #: False means "drain queues via the polling tick" — also the right behavior
+    #: for a partially constructed app (unit tests that drive listings manually).
+    _event_driven = False
 
     def __init__(self, backend, left_dir: str, right_dir: str, *,
                  left_provided: bool = True, right_provided: bool = True,
@@ -364,7 +376,20 @@ class TfmApp:
         self.file_monitor = FileMonitorManager(self.config, self)
         self._monitored: dict[str, object] = {"left": None, "right": None}
         self._sync_monitored_dirs()
-        self.panel.request_animation_ticks(self._reload_tick)
+
+        # Idle-CPU strategy. When the backend can accept work from other threads
+        # (native run loop → ``dispatches_to_main_thread``), go fully event-driven:
+        # each producer (fs watcher, listing worker, stdout/stderr streams) wakes
+        # the UI thread to drain, so there is NO idle polling timer at all. A burst
+        # of producer signals coalesces into at most one pending main-thread hop
+        # (``_wake_lock``/``_wake_pending``). On a poll-loop backend (curses) that
+        # can't dispatch, fall back to the animation-tick pump that drains queues
+        # each frame. See ``_wake_pump`` / ``_reload_tick``.
+        self._event_driven = self.panel.dispatches_to_main_thread
+        self._wake_lock = threading.Lock()
+        self._wake_pending = False
+        if not self._event_driven:
+            self.panel.request_animation_ticks(self._reload_tick)
 
         # Route stdout/stderr into the log pane (as the terminal build does), so
         # output that would otherwise vanish behind the GUI surfaces here: worker
@@ -374,8 +399,8 @@ class TfmApp:
         self._log_queue: queue.Queue = queue.Queue()
         self._orig_stdout = sys.stdout
         self._orig_stderr = sys.stderr
-        sys.stdout = _StreamToLog("STDOUT", self._log_queue)
-        sys.stderr = _StreamToLog("STDERR", self._log_queue)
+        sys.stdout = _StreamToLog("STDOUT", self._log_queue, on_write=self._wake_pump)
+        sys.stderr = _StreamToLog("STDERR", self._log_queue, on_write=self._wake_pump)
 
     def _pane_column(self, name: str, view: FilePane) -> LayoutView:
         # A LayoutView wraps the header/list/footer sub-layout as a single widget
@@ -614,8 +639,15 @@ class TfmApp:
                 sort_mode=sort_mode, sort_reverse=sort_reverse,
             )
             self._result_queue.put((pane_name, gen, result, on_ready))
+            self._wake_pump()  # wake the UI thread to install the listing
 
         threading.Thread(target=worker, name=f"tfm-list-{pane_name}", daemon=True).start()
+
+        # Event-driven mode has no permanent tick, so a slow listing would never
+        # surface its "Loading…" indicator; a transient tick runs while any pane
+        # is loading and retires itself the moment the listing lands.
+        if self._event_driven:
+            self.panel.request_animation_ticks(self._loading_tick)
 
     def _process_result_queue(self) -> bool:
         """Install completed async listings on the UI thread, dropping any that a
@@ -680,10 +712,48 @@ class TfmApp:
 
     def _reload_tick(self) -> bool:
         """Animation-tick pump: drains reload requests on idle. Stays registered
-        for the app's lifetime (returns True)."""
+        for the app's lifetime (returns True). Used only on backends that can't
+        dispatch to the main thread; the event-driven path uses ``_wake_pump``."""
         if self._pump_monitoring():
             self.panel.render()
         return True
+
+    # --- event-driven pump (no idle timer) -----------------------------------
+
+    def _wake_pump(self) -> None:
+        """Ask the UI thread to drain the monitoring queues. Thread-safe and
+        callable from any producer thread (fs watcher, listing worker, log
+        streams). Coalesces a burst of signals into at most one pending
+        main-thread hop. No-op on a poll-loop backend, where the animation-tick
+        pump drains queues each frame instead."""
+        if not self._event_driven:
+            return
+        with self._wake_lock:
+            if self._wake_pending:
+                return
+            self._wake_pending = True
+        self.panel.call_on_main_thread(self._on_pump_wake)
+
+    def _on_pump_wake(self) -> None:
+        """Main thread: clear the pending flag BEFORE draining so a producer that
+        enqueues mid-drain re-arms a fresh wake (never a lost update), then drain
+        and render if anything changed."""
+        with self._wake_lock:
+            self._wake_pending = False
+        if self._pump_monitoring():
+            self.panel.render()
+
+    def _any_pane_loading(self) -> bool:
+        return any(self.pane(n).get("loading") for n in ("left", "right"))
+
+    def _loading_tick(self) -> bool:
+        """Transient tick, registered only while a listing is in flight in
+        event-driven mode: reveals the "Loading…" indicator at the delay
+        threshold and installs a completed listing. Unregisters (returns False)
+        once no pane is loading, so it never runs at idle."""
+        if self._pump_monitoring():
+            self.panel.render()
+        return self._any_pane_loading()
 
     def _process_reload_queue(self) -> bool:
         reloaded = False

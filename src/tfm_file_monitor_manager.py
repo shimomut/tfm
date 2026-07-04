@@ -472,6 +472,12 @@ class FileMonitorManager:
             # Post to reload queue (thread-safe)
             self.reload_queue.put(pane_name)
             self.logger.debug(f"Posted reload request for {pane_name} pane")
+
+        # Wake the UI thread to drain the queue (event-driven backends have no
+        # idle polling timer). Outside the state lock; a no-op where unsupported.
+        wake = getattr(self.file_manager, "_wake_pump", None)
+        if wake is not None:
+            wake()
     
     def update_monitored_directory(self, pane_name: str, new_path: Path) -> None:
         """
