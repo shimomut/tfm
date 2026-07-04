@@ -20,7 +20,7 @@ modal — it owns events while open — and reports its outcome through
 ``on_accept(value)`` / ``on_cancel()``.
 
 Push it with :func:`show_filter_list`, which sizes and centers the layer with the
-shared shadow / dim-below intent the other PuiKit modals use.
+shared drop-shadow intent the other PuiKit modals use.
 """
 
 from __future__ import annotations
@@ -196,7 +196,7 @@ def show_filter_list(
     """Push a modal :class:`FilterListDialog` over ``panel`` and return it.
 
     Sized to a comfortable fraction of the window and centered, with the shared
-    shadow + dim-below modal intent. The chosen value is reported through
+    drop-shadow modal intent. The chosen value is reported through
     ``on_accept``; ``on_cancel`` fires on escape / outside-click.
 
     ``region`` is an optional ``(x, width)`` column span (in base units) to anchor
@@ -210,7 +210,7 @@ def show_filter_list(
     sw, sh = panel.backend.size_units
     w = max(36.0, min(sw * 0.6, 72.0))
     h = max(8.0, min(sh * 0.6, float(len(items) + 5)))
-    hints: dict[str, Any] = {"shadow": True, "dim_below": True, "w": w, "h": h}
+    hints: dict[str, Any] = {"shadow": True, "w": w, "h": h}
     if region is not None:
         # Anchor over the pane, but a bit wider than it for comfort (still
         # centered on the pane's center, so it leans over its target pane).

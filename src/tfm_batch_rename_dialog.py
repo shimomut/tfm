@@ -292,14 +292,14 @@ def show_batch_rename(
 ) -> BatchRenameDialog:
     """Push a modal :class:`BatchRenameDialog` over ``panel`` and return it.
 
-    Sized large (the preview wants room) and centered, with the shared shadow /
-    dim-below modal intent. ``on_done(success_count, errors)`` fires after a
-    successful run; the dialog reports nothing on cancel."""
+    Sized large (the preview wants room) and centered, with the shared drop-shadow
+    modal intent. ``on_done(success_count, errors)`` fires after a successful run;
+    the dialog reports nothing on cancel."""
     dialog = BatchRenameDialog(files, on_done=on_done)
     sw, sh = panel.backend.size_units
     w = max(56.0, min(sw * 0.8, 110.0))
     h = max(14.0, min(sh * 0.85, float(len(files) + 10)))
     dialog._panel = panel
-    panel.push_layer(dialog, z=z, hints={"shadow": True, "dim_below": True, "w": w, "h": h})
+    panel.push_layer(dialog, z=z, hints={"shadow": True, "w": w, "h": h})
     panel.animate(dialog, hints={"transition": "fade", "duration_ms": 150})
     return dialog

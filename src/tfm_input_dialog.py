@@ -19,7 +19,7 @@ returning an error string keeps the dialog open and shows the message inline
 (empty / duplicate names), so a bad value never silently closes the dialog.
 
 Push it with :func:`show_input`, which sizes and centers the layer with the
-shared shadow / dim-below intent the other PuiKit modals use, and can anchor it
+shared drop-shadow intent the other PuiKit modals use, and can anchor it
 over the active pane via ``region`` (the same contract as ``show_filter_list``).
 """
 
@@ -191,21 +191,19 @@ def show_input(
     validate: Callable[[str], str | None] | None = None,
     select_all: bool = True,
     region: tuple[float, float] | None = None,
-    dim_below: bool = True,
     anchor: str = "center",
     z: int = 70,
 ) -> InputDialog:
     """Push a modal :class:`InputDialog` over ``panel`` and return it.
 
     Sized to a comfortable fraction of the window and centered, with the shared
-    shadow + dim-below modal intent. The entered text is reported through
+    drop-shadow modal intent. The entered text is reported through
     ``on_accept``; ``on_cancel`` fires on escape / outside-click; ``on_change``
     fires live on every keystroke (incremental search). ``region`` is an optional
     ``(x, width)`` column span to anchor the dialog over the pane it acts on (see
-    :func:`tfm_filter_list_dialog.show_filter_list`). ``dim_below`` can be turned
-    off so the pane behind stays fully lit (a live-preview prompt like isearch,
-    where the cursor jumps behind the box); ``anchor="top"`` pins the box near the
-    top of the window instead of centering it, keeping the list below visible."""
+    :func:`tfm_filter_list_dialog.show_filter_list`). ``anchor="top"`` pins the box
+    near the top of the window instead of centering it, keeping the list below
+    visible."""
     dialog = InputDialog(
         title=title, prompt=prompt, text=text,
         on_accept=on_accept, on_cancel=on_cancel, on_change=on_change,
@@ -216,7 +214,7 @@ def show_input(
     # pad + [title + gap] + field + error row + pad. Error shares the row directly
     # below the field, so no blank line is reserved for it.
     h = 6.0 if title else 4.0
-    hints: dict[str, Any] = {"shadow": True, "dim_below": dim_below, "w": w, "h": h}
+    hints: dict[str, Any] = {"shadow": True, "w": w, "h": h}
     if anchor == "top":
         hints["y"] = 2.0
     if region is not None:

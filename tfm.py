@@ -56,7 +56,7 @@ from tfm_state_manager import get_state_manager  # noqa: E402
 from tfm_batch_rename_dialog import show_batch_rename  # noqa: E402
 from tfm_diff_viewer import show_diff_viewer  # noqa: E402
 from tfm_directory_diff_viewer import show_directory_diff_viewer  # noqa: E402
-from tfm_text_dialog import show_text  # noqa: E402
+from tfm_text_dialog import show_markdown  # noqa: E402
 from tfm_text_viewer import show_text_viewer  # noqa: E402
 
 
@@ -1123,8 +1123,11 @@ class TfmApp:
 
     def file_details(self) -> None:
         """Show stat details for the focused entry — or an aggregate summary plus
-        per-item details for a multi-file selection — in a scrollable text dialog
-        (mirrors ttk TFM's file-details, reusing the shared text-dialog)."""
+        per-item details for a multi-file selection — in a scrollable Markdown
+        dialog (mirrors ttk TFM's file-details, reusing the shared text-dialog).
+
+        Each entry renders as a heading followed by a GFM table of its stat
+        fields, so the values line up in a real column instead of hand-padded."""
         import datetime as _dt
         import stat as _stat
         pane = self.active_pane()
@@ -1135,12 +1138,19 @@ class TfmApp:
         selected = [f for f in files if str(f) in pane["selected_files"]]
         targets = selected if selected else [files[pane["focused_index"]]]
 
+        def _md_escape(text: str) -> str:
+            # Keep a filename with Markdown-significant characters (``|`` splits a
+            # table cell, ``*``/``_``/`` ` `` are emphasis) rendering literally.
+            for ch in "\\`*_[]|":
+                text = text.replace(ch, "\\" + ch)
+            return text
+
         def details(entry) -> list[str]:
-            out = [entry.name, f"  Path: {entry}"]
+            out = [f"### {_md_escape(entry.name)}", ""]
             try:
                 st = entry.stat()
             except Exception as exc:
-                out.append(f"  (stat unavailable: {exc})")
+                out += [f"*stat unavailable: {_md_escape(str(exc))}*", ""]
                 return out
             try:
                 kind = "Directory" if entry.is_dir() else \
@@ -1149,10 +1159,14 @@ class TfmApp:
                 kind = "File"
             mtime = _dt.datetime.fromtimestamp(st.st_mtime).strftime("%Y-%m-%d %H:%M:%S")
             out += [
-                f"  Type: {kind}",
-                f"  Size: {st.st_size:,} bytes",
-                f"  Modified: {mtime}",
-                f"  Permissions: {_stat.filemode(st.st_mode)}",
+                "| Field | Value |",
+                "| --- | --- |",
+                f"| Path | `{entry}` |",
+                f"| Type | {kind} |",
+                f"| Size | {st.st_size:,} bytes |",
+                f"| Modified | {mtime} |",
+                f"| Permissions | `{_stat.filemode(st.st_mode)}` |",
+                "",
             ]
             return out
 
@@ -1165,10 +1179,15 @@ class TfmApp:
                     total += t.stat().st_size
                 except Exception:
                     pass
-            lines = [f"{len(targets)} items selected", f"  Total size: {total:,} bytes", ""]
+            lines = [
+                f"# {len(targets)} items selected",
+                "",
+                f"**Total size:** {total:,} bytes",
+                "",
+            ]
             for t in targets:
-                lines += details(t) + [""]
-        show_text(self.panel, lines, title="Details")
+                lines += details(t)
+        show_markdown(self.panel, "\n".join(lines), title="Details")
         self.panel.render()
 
     def open_with_os(self) -> None:
@@ -2262,7 +2281,7 @@ class TfmApp:
             self.panel.render()
 
         show_input(self.panel, prompt="I-Search:", on_change=jump,
-                   on_accept=finish, on_cancel=cancel, dim_below=False,
+                   on_accept=finish, on_cancel=cancel,
                    anchor="top", region=self._active_pane_region())
         self.panel.render()
 
@@ -2389,15 +2408,20 @@ class TfmApp:
         return ", ".join(self.keys.format_key_for_display(k) for k in keys)
 
     def show_help(self) -> None:
-        """A scrollable key-binding reference, built live from the port's keymap."""
+        """A scrollable key-binding reference, built live from the port's keymap.
+
+        Each section renders as a Markdown heading over a two-column table
+        (Key(s) / Action), so bindings align in a real column and the section
+        titles stand out."""
         from tfm_const import VERSION
-        lines = [f"TFM on PuiKit — Version {VERSION}", ""]
+        lines = [f"# TFM on PuiKit", f"Version {VERSION}", ""]
         for title, entries in self._HELP_SECTIONS:
-            lines.append(f"{title}:")
+            lines += [f"## {title}", "", "| Key(s) | Action |", "| --- | --- |"]
             for action, desc in entries:
-                lines.append(f"  {self._keys_label(action)}  —  {desc}")
+                keys = self._keys_label(action).replace("|", "\\|")
+                lines.append(f"| `{keys}` | {desc} |")
             lines.append("")
-        show_text(self.panel, lines, title="Help")
+        show_markdown(self.panel, "\n".join(lines), title="Help")
         self.panel.render()
 
     @staticmethod

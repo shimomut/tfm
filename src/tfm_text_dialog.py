@@ -1,57 +1,76 @@
-"""TextDialog — a modal scrollable-text viewer for the PuiKit port.
+"""Modal scrollable-info viewers for the PuiKit port.
 
-The read-only counterpart to the input / filter dialogs: a centered modal that
-shows a title and a scrollable block of lines. It is the PuiKit equivalent of
-ttk TFM's ``InfoDialog`` (help, file details, …).
+The read-only counterparts to the input / filter dialogs: a centered modal that
+shows a title and a scrollable body. They are the PuiKit equivalent of ttk TFM's
+``InfoDialog`` (help, file details, …).
 
-It reuses PuiKit's ``ListView`` for the body — virtualized draw, smooth scroll,
-a scrollbar, and ↑/↓/PageUp/PageDown navigation for free — and simply does not
-act on a row selection: Enter and Esc both close the dialog. Push it with
-:func:`show_text`, which sizes and centers the layer with the shared shadow /
-dim-below intent the other PuiKit modals use.
+Two flavors share the same modal chrome (box, title, hint line, drop shadow,
+Enter/Esc/outside-click to dismiss), differing only in the body widget:
+
+- :func:`show_text` hosts a PuiKit ``ListView`` — a flat list of preformatted
+  lines. Cheapest for log-like or already-aligned content.
+- :func:`show_markdown` hosts a ``MarkdownView`` — CommonMark-ish rich text with
+  headings, bold/italic, tables, ``code`` and links — so information that reads
+  better as *structured* prose (help, file details) lays itself out instead of
+  being hand-aligned into columns.
+
+Both reuse the body widget's own virtualized draw, smooth scroll, scrollbar, and
+↑/↓/PageUp/PageDown navigation; the modal simply forwards those keys and closes
+on Enter / Esc / outside-click.
 """
 
 from __future__ import annotations
 
 from typing import Any, Callable, Sequence
 
-from puikit.backend import Style, TextAttribute
+from puikit.backend import DEFAULT_STYLE, Style, TextAttribute
 from puikit.event import Event, EventType
 from puikit.focus import FocusContainer
 from puikit.panel import Rect
 from puikit.widgets.base import Widget
 from puikit.widgets.list import ListView
+from puikit.widgets.markdown_view import MarkdownView
 
-#: Keys the body list consumes for scrolling while the dialog is open. (Backend
-#: key names are unsuffixed: "pageup"/"pagedown", matching ListView.)
+#: Keys the body widget consumes for scrolling while the dialog is open. (Backend
+#: key names are unsuffixed: "pageup"/"pagedown", matching ListView / MarkdownView.)
 _SCROLL_KEYS = frozenset({"up", "down", "pageup", "pagedown", "home", "end"})
 
+_MOUSE_EVENTS = (
+    EventType.MOUSE_DOWN, EventType.MOUSE_UP, EventType.MOUSE_CLICK,
+    EventType.MOUSE_DRAG, EventType.MOUSE_SCROLL,
+)
 
-class TextDialog(FocusContainer, Widget):
-    """Modal scrollable-text viewer. Construct via :func:`show_text`, which sizes
-    and pushes the layer; this class owns layout, focus, and events."""
+
+class _ScrollModal(FocusContainer, Widget):
+    """Shared chrome for a modal that hosts a single scrollable ``body`` widget.
+
+    Owns layout, focus, the title / hint header, and event routing: navigation
+    keys and mouse go to the body, Enter / Esc / outside-click close. Subclasses
+    supply the body and may override :meth:`_style_body` to theme it each draw."""
 
     focusable = True
     focus_stop_when_empty = True
 
     def __init__(
         self,
-        lines: Sequence[str],
+        body: Widget,
         *,
         title: str = "",
+        hint: str = "↑/↓ scroll · Esc close",
         on_close: Callable[[], None] | None = None,
     ):
         self.title = title
+        self.hint = hint
         self.on_close = on_close
         self._panel: Any = None
-        self.list = ListView([str(line) for line in lines])
-        self._list_rect = Rect(0.0, 0.0, 0.0, 0.0)
+        self.body = body
+        self._body_rect = Rect(0.0, 0.0, 0.0, 0.0)
         self._size: tuple[float, float] = (0.0, 0.0)
 
     # --- focus ---------------------------------------------------------------
 
     def focus_children(self) -> list[Any]:
-        return [self.list]
+        return [self.body]
 
     # --- outcome -------------------------------------------------------------
 
@@ -63,6 +82,11 @@ class TextDialog(FocusContainer, Widget):
             self.on_close()
 
     # --- drawing -------------------------------------------------------------
+
+    def _style_body(self, theme, surface_bg) -> None:
+        """Hook: let a subclass push theme-derived colors onto its body before it
+        draws (a MarkdownView needs its base fg/bg to match the popup surface).
+        Default: nothing — a ListView carries its own row styles."""
 
     def draw(self, ctx) -> None:
         self._panel = ctx.panel
@@ -79,16 +103,17 @@ class TextDialog(FocusContainer, Widget):
             ctx.draw_text(2, y, self.title, Style(bg=surface_bg, attr=TextAttribute.BOLD))
             y += 1
         # A hint at the bottom of the title area.
-        ctx.draw_text(2, y, "↑/↓ scroll · Esc close",
+        ctx.draw_text(2, y, self.hint,
                       Style(bg=surface_bg, fg=theme.muted_text if theme else None,
                             attr=TextAttribute.DIM))
         y += 2
 
-        list_h = max(1.0, hu - y - pad)
-        self._list_rect = Rect(2.0, y, max(1.0, wu - 4.0), list_h)
+        self._style_body(theme, surface_bg)
+        body_h = max(1.0, hu - y - pad)
+        self._body_rect = Rect(2.0, y, max(1.0, wu - 4.0), body_h)
         ctx.draw_child(
-            self.list, self._list_rect.x, self._list_rect.y,
-            self._list_rect.w, self._list_rect.h, hints={"focused": False},
+            self.body, self._body_rect.x, self._body_rect.y,
+            self._body_rect.w, self._body_rect.h, hints={"focused": False},
         )
 
     # --- events --------------------------------------------------------------
@@ -99,22 +124,61 @@ class TextDialog(FocusContainer, Widget):
             if key in ("escape", "enter"):
                 self._close()
             elif key in _SCROLL_KEYS:
-                self.list.handle_event(event)
+                self.body.handle_event(event)
             return True
 
-        if event.type in (
-            EventType.MOUSE_DOWN, EventType.MOUSE_UP, EventType.MOUSE_CLICK,
-            EventType.MOUSE_DRAG, EventType.MOUSE_SCROLL,
-        ):
-            if event.x is not None and self._list_rect.contains(event.x, event.y):
-                local = event.translated(-self._list_rect.x, -self._list_rect.y)
-                self.list.handle_event(local)
+        if event.type in _MOUSE_EVENTS:
+            if event.x is not None and self._body_rect.contains(event.x, event.y):
+                local = event.translated(-self._body_rect.x, -self._body_rect.y)
+                self.body.handle_event(local)
             elif event.type is EventType.MOUSE_CLICK and event.x is not None and not (
                 0 <= event.x < self._size[0] and 0 <= event.y < self._size[1]
             ):
                 self._close()  # click outside dismisses
             return True
         return True  # modal: swallow everything else
+
+
+class TextDialog(_ScrollModal):
+    """Modal scrollable plain-text viewer. Construct via :func:`show_text`, which
+    sizes and pushes the layer; the body is a ``ListView`` of preformatted lines."""
+
+    def __init__(
+        self,
+        lines: Sequence[str],
+        *,
+        title: str = "",
+        on_close: Callable[[], None] | None = None,
+    ):
+        super().__init__(
+            ListView([str(line) for line in lines]),
+            title=title, on_close=on_close,
+        )
+        #: Kept as an alias for the ListView body (older call sites / tests).
+        self.list = self.body
+
+
+class MarkdownDialog(_ScrollModal):
+    """Modal scrollable Markdown viewer. Construct via :func:`show_markdown`; the
+    body is a ``MarkdownView`` that renders headings, emphasis, tables and links."""
+
+    def __init__(
+        self,
+        source: str,
+        *,
+        title: str = "",
+        on_close: Callable[[], None] | None = None,
+    ):
+        super().__init__(MarkdownView(source), title=title, on_close=on_close)
+        self.md = self.body
+
+    def _style_body(self, theme, surface_bg) -> None:
+        # The MarkdownView colors inline roles from the live theme, but its base
+        # prose fg/bg must match the popup surface (fg=None would fall back to the
+        # backend default, wrong on some palettes). Colors don't affect wrapping,
+        # so mutating the style between draws is safe.
+        if theme is not None:
+            self.md.style = Style(fg=theme.text, bg=surface_bg)
 
 
 def show_text(
@@ -128,12 +192,36 @@ def show_text(
     """Push a modal :class:`TextDialog` over ``panel`` and return it.
 
     Sized to a comfortable fraction of the window and centered, with the shared
-    shadow + dim-below modal intent. Closes on Enter / Esc / outside-click."""
+    drop-shadow modal intent. Closes on Enter / Esc / outside-click."""
     dialog = TextDialog(lines, title=title, on_close=on_close)
+    _push(panel, dialog, rows=len(lines), z=z)
+    return dialog
+
+
+def show_markdown(
+    panel: Any,
+    source: str,
+    *,
+    title: str = "",
+    on_close: Callable[[], None] | None = None,
+    z: int = 70,
+) -> MarkdownDialog:
+    """Push a modal :class:`MarkdownDialog` over ``panel`` and return it.
+
+    Same chrome and sizing as :func:`show_text`, but ``source`` is Markdown and
+    lays out as rich text (headings, tables, emphasis, links)."""
+    dialog = MarkdownDialog(source, title=title, on_close=on_close)
+    _push(panel, dialog, rows=source.count("\n") + 1, z=z)
+    return dialog
+
+
+def _push(panel: Any, dialog: _ScrollModal, *, rows: int, z: int) -> None:
+    """Size, center, and push a scroll-modal, with the shared modal intent. Height
+    is a rough estimate from the source ``rows`` (Markdown may wrap/expand, but the
+    body scrolls, so an approximate reserve is fine)."""
     sw, sh = panel.backend.size_units
     w = max(48.0, min(sw * 0.7, 96.0))
-    h = max(10.0, min(sh * 0.8, float(len(lines) + 6)))
+    h = max(10.0, min(sh * 0.8, float(rows + 6)))
     dialog._panel = panel
-    panel.push_layer(dialog, z=z, hints={"shadow": True, "dim_below": True, "w": w, "h": h})
+    panel.push_layer(dialog, z=z, hints={"shadow": True, "w": w, "h": h})
     panel.animate(dialog, hints={"transition": "fade", "duration_ms": 150})
-    return dialog
