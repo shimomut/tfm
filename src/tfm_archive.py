@@ -19,7 +19,6 @@ import fnmatch
 from dataclasses import dataclass
 from pathlib import Path as PathlibPath
 from tfm_path import Path, PathImpl
-from tfm_progress_manager import ProgressManager, OperationType
 from tfm_str_format import format_size
 from typing import List, Optional, Union, Tuple, Dict, Any, Iterator
 
