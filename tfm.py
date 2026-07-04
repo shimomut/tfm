@@ -470,6 +470,28 @@ class TfmApp:
         except Exception:
             pass
 
+    def _remember_cursor(self, pane: dict) -> None:
+        """Persist the cursor position of the directory ``pane`` currently shows so
+        a later revisit (entering a child, jumping to a favorite/drive/history) can
+        land the cursor back on the same file. Left and right panes are remembered
+        independently. No-op for a virtual (search-results) pane, whose rows aren't
+        a single directory's listing. Call this *before* changing ``pane['path']``."""
+        if pane.get("virtual"):
+            return
+        try:
+            self.pm.save_cursor_position(pane)
+        except Exception:
+            pass
+
+    def _restore_remembered_cursor(self, pane: dict) -> None:
+        """``on_ready`` hook for a directory change: land the cursor on the file
+        remembered for this pane's new directory, or leave it at the top when
+        nothing is remembered."""
+        try:
+            self.pm.restore_cursor_position(pane, self._display_height())
+        except Exception:
+            pass
+
     def _save_application_state(self) -> None:
         """Persist window layout, pane state, cursor positions, and recent dirs.
         Called on quit; best-effort so a state-store failure never blocks exit."""
@@ -1029,9 +1051,10 @@ class TfmApp:
         entry = files[pane["focused_index"]]
         try:
             if entry.is_dir():
+                self._remember_cursor(pane)  # remember where we were in this dir
                 self._exit_virtual(pane)  # entering a dir leaves the result set
                 pane["path"] = entry
-                self._refresh(pane)
+                self._refresh(pane, on_ready=self._restore_remembered_cursor)
                 self.log_info(f"Entered {entry.name}/")
         except Exception as exc:
             self.log_info(f"Cannot open {entry.name}: {exc}")
@@ -1047,6 +1070,7 @@ class TfmApp:
         parent = pane["path"].parent
         if str(parent) != str(pane["path"]):
             child_name = pane["path"].name
+            self._remember_cursor(pane)  # remember the child's cursor for later
             pane["path"] = parent
 
             # Land the cursor on the directory we came from — once the listing is
@@ -1568,10 +1592,11 @@ class TfmApp:
 
     def _go_to_drive(self, drive: dict) -> None:
         pane = self.active_pane()
+        self._remember_cursor(pane)
         self._exit_virtual(pane)
         pane["path"] = Path(drive["path"])
-        self._refresh(pane)
         pane["selected_files"].clear()
+        self._refresh(pane, on_ready=self._restore_remembered_cursor)
         self.log_info(f"Drive: {drive['path']}")
         self.panel.render()
 
@@ -1735,12 +1760,14 @@ class TfmApp:
         and always re-lists — so it is correct even when ``dest``'s path already
         equals ``target_dir`` (a stale virtual listing still gets replaced, and an
         'already there' sync just moves the cursor)."""
+        self._remember_cursor(dest)
         self._exit_virtual(dest)
         dest["path"] = target_dir
         dest["selected_files"].clear()
         self._refresh(
             dest,
-            on_ready=(lambda p: self._select_by_name(p, target_name)) if target_name else None,
+            on_ready=(lambda p: self._select_by_name(p, target_name)) if target_name
+            else self._restore_remembered_cursor,
         )
         self.panel.render()
 
@@ -1754,6 +1781,7 @@ class TfmApp:
         if entry is None:
             return False
         other = self.pm.get_inactive_pane()
+        self._remember_cursor(other)
         self._exit_virtual(other)
         other["path"] = entry.parent
         other["selected_files"].clear()
@@ -1839,10 +1867,11 @@ class TfmApp:
 
     def _go_to_history(self, path: str) -> None:
         pane = self.active_pane()
+        self._remember_cursor(pane)
         self._exit_virtual(pane)
         pane["path"] = Path(path)
-        self._refresh(pane)
         pane["selected_files"].clear()
+        self._refresh(pane, on_ready=self._restore_remembered_cursor)
         self.log_info(f"History: {path}")
         self.panel.render()
 
@@ -1894,9 +1923,10 @@ class TfmApp:
 
     def _jump_to_favorite(self, fav: dict) -> None:
         pane = self.active_pane()
+        self._remember_cursor(pane)
         self._exit_virtual(pane)
         pane["path"] = Path(fav["path"])
-        self._refresh(pane)
+        self._refresh(pane, on_ready=self._restore_remembered_cursor)
         self.log_info(f"Jumped to {fav['name']} ({fav['path']})")
         self.panel.render()
 
@@ -2640,9 +2670,10 @@ class TfmApp:
 
         def accept(text: str) -> None:
             target = resolve(text)
+            self._remember_cursor(pane)
             pane["path"] = target
-            self._refresh(pane)
             pane["selected_files"].clear()
+            self._refresh(pane, on_ready=self._restore_remembered_cursor)
             self.log_info(f"Jumped to: {target}")
             self.panel.render()
 
