@@ -888,6 +888,10 @@ class TfmApp:
                 # synced to the other pane's cursor).
                 self._go_to_dir(pane, other["path"], self._focused_name(other))
                 self.log_info(f"Go to {other['path']}")
+            elif pane["path"] == other["path"]:
+                # Both panes already show the same directory: a second O moves
+                # this pane's cursor onto the file the other pane is highlighting.
+                self.pm.sync_cursor_to_other_pane(self.log_info)
             elif self.pm.sync_current_to_other(self.log_info):
                 self._list_pane(self._pane_name_of(self.active_pane()))
         elif action == "sync_other_to_current":
@@ -898,6 +902,10 @@ class TfmApp:
                 pass
             elif self.pm.get_inactive_pane().get("virtual"):
                 self.log_info("The other pane is a search-results view")
+            elif pane["path"] == self.pm.get_inactive_pane()["path"]:
+                # Both panes already show the same directory: a second Shift-O
+                # moves the other pane's cursor onto this pane's focused file.
+                self.pm.sync_cursor_from_current_pane(self.log_info)
             elif self.pm.sync_other_to_current(self.log_info):
                 self._list_pane(self._pane_name_of(self.pm.get_inactive_pane()))
         elif action == "redraw":
