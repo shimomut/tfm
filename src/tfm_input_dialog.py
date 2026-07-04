@@ -130,11 +130,15 @@ class InputDialog(FocusContainer, Widget):
             ctx.draw_text(2, y, self.prompt, Style(bg=surface_bg))
             field_x = 2.0 + ctx.measure_text(self.prompt + " ")
         field_w = max(1.0, wu - field_x - 2.0)
+        # The field's own ``width`` caps how wide its box draws, so stretch it to
+        # the slot we hand it — otherwise it keeps its default 24u and leaves a gap
+        # to the dialog's right edge.
+        self.edit.width = field_w
         self._field_rect = Rect(field_x, y, field_w, 1.0)
         ctx.draw_child(
             self.edit, field_x, y, field_w, 1.0, hints={"focused": True},
         )
-        y += 2
+        y += 1
 
         if self._error:
             ctx.draw_text(2, y, self._error,
@@ -209,7 +213,9 @@ def show_input(
     )
     sw, sh = panel.backend.size_units
     w = max(36.0, min(sw * 0.6, 64.0))
-    h = 7.0 if title else 5.0
+    # pad + [title + gap] + field + error row + pad. Error shares the row directly
+    # below the field, so no blank line is reserved for it.
+    h = 6.0 if title else 4.0
     hints: dict[str, Any] = {"shadow": True, "dim_below": dim_below, "w": w, "h": h}
     if anchor == "top":
         hints["y"] = 2.0

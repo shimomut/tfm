@@ -15,16 +15,24 @@ def _center(w, x):
     return x + w / 2.0
 
 
-def test_grows_past_the_pane():
-    # A 60-wide dialog over a 50-wide pane: the old code clamped to 50; now it
-    # grows toward its desired width (capped at 1.4*pane = 70), so it lands at 60
-    # — wider than the pane. Over the left-edge pane the on-screen clamp keeps it
-    # from overhanging the screen, but it still leans left (center in the left
+def test_keeps_desired_width_over_pane():
+    # A 60-wide dialog over a 50-wide pane keeps its desired 60 — the width is
+    # independent of the pane. Over the left-edge pane the on-screen clamp keeps
+    # it from overhanging the screen, but it still leans left (center in the left
     # half) and covers the pane.
     w, x = pane_anchored_box(60.0, SCREEN, LEFT)
     assert w == 60.0
     assert x >= 2.0 and x + w <= SCREEN - 2.0 + 1e-9  # on-screen with margin
     assert _center(w, x) < SCREEN / 2.0               # leans over the left pane
+
+
+def test_width_independent_of_pane_width():
+    # The whole point: a narrow pane (splitter dragged over) must not shrink the
+    # dialog. The same desired width lands the same width over a wide pane and a
+    # sliver pane alike.
+    wide_w, _ = pane_anchored_box(60.0, SCREEN, (10.0, 80.0))
+    narrow_w, _ = pane_anchored_box(60.0, SCREEN, (85.0, 10.0))
+    assert wide_w == narrow_w == 60.0
 
 
 def test_interior_pane_stays_centered_on_it():
@@ -35,14 +43,15 @@ def test_interior_pane_stays_centered_on_it():
     assert _center(w, x) == 50.0
 
 
-def test_capped_at_factor_times_pane():
-    # A very wide desired width is capped at factor*pane_w (1.4*50 = 70).
-    w, x = pane_anchored_box(200.0, SCREEN, LEFT, factor=1.4)
-    assert w == 70.0
+def test_capped_at_screen_width():
+    # A very wide desired width is capped only by the on-screen margins, never by
+    # the pane: 200 over a 50-wide pane on a 100-wide screen becomes 96.
+    w, x = pane_anchored_box(200.0, SCREEN, LEFT)
+    assert w == SCREEN - 4.0  # 96
 
 
-def test_never_narrower_than_pane_fit():
-    # A dialog whose desired width already fits inside the pane is unchanged.
+def test_narrow_desired_width_unchanged():
+    # A dialog whose desired width is small keeps it, centered over the pane.
     w, x = pane_anchored_box(40.0, SCREEN, LEFT)
     assert w == 40.0
     assert _center(w, x) == 25.0

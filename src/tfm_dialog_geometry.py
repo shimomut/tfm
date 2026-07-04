@@ -1,10 +1,10 @@
 """Geometry for pane-anchored dialogs.
 
 A picker that acts on one pane (filter, favorites, drives, an input prompt) is
-anchored over that pane so the user can see which side it targets. It should read
-as belonging to the pane, but it need not be *confined* to the pane's width: a
-dialog a bit wider than the pane is more comfortable to read and still clearly
-leans over its target as long as it stays centered on the pane's center.
+anchored over that pane so the user can see which side it targets. It reads as
+belonging to the pane by being *centered over it*, but its width is independent
+of the pane: a narrow pane (splitter dragged over) must not shrink the dialog.
+The box keeps its own desired width and just leans over its target pane.
 """
 
 from __future__ import annotations
@@ -15,23 +15,19 @@ def pane_anchored_box(
     screen_w: float,
     region: tuple[float, float],
     *,
-    factor: float = 1.4,
     margin: float = 2.0,
 ) -> tuple[float, float]:
     """Return ``(w, x)`` in base units for a dialog anchored over the pane whose
     column span is ``region`` (its ``(x, width)``).
 
-    The box may grow up to ``factor``× the pane width for breathing room, but
-    never past its own ``desired_w`` and never narrower than a plain pane-confined
-    box — subject to a final on-screen cap that keeps a ``margin`` on each side.
-    It is centered on the pane's center so it still leans over the pane it acts on
-    (near a screen edge the on-screen clamp shifts it inward, but it stays over
-    its target pane rather than the other)."""
+    The width is ``desired_w`` regardless of the pane's width — the splitter
+    position never changes the dialog's size — subject only to an on-screen cap
+    that keeps a ``margin`` on each side. The box is centered on the pane's
+    center so it leans over the pane it acts on (near a screen edge the on-screen
+    clamp shifts it inward, but it stays over its target pane rather than the
+    other)."""
     region_x, region_w = region
-    pane_fit = min(desired_w, region_w)              # the old, pane-confined width
-    w = min(desired_w, region_w * factor)            # grow past the pane a bit
-    w = max(w, pane_fit)                             # never narrower than pane-fit
-    w = min(w, max(1.0, screen_w - 2.0 * margin))    # ...but keep a screen margin
+    w = min(desired_w, max(1.0, screen_w - 2.0 * margin))
     center = region_x + region_w / 2.0
     if w >= screen_w - 2.0 * margin:
         # Too wide to keep both margins: center it in the whole window.
