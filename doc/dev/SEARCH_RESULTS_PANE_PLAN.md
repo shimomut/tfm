@@ -1,7 +1,7 @@
 # Search Results Pane — Plan
 
-Status: **draft — design agreed (feed results into a virtual pane), not yet
-started.**
+Status: **draft — design agreed (feed results into a virtual pane; feed-by-default
+entry; content hits keep line numbers as metadata), not yet started.**
 
 Branch: `puikit-port`
 Goal: let TFM's full pane feature set (copy/move, archive, view/diff,
@@ -64,8 +64,16 @@ pane["virtual"] = {
     "mode": "filename" | "content",
     "query": str,
     "results": list[Path],   # the full, unsorted/unfiltered found set (source of truth)
+    "meta": dict[Path, dict],  # per-entry extras, e.g. {"line": int, "text": str} for content hits
 }
 ```
+
+`meta` carries per-entry metadata that isn't part of the `Path` — chiefly the
+**matched line number** (and matched line text) for content hits (§9.2). It is
+*not* rendered in the file list (the list stays a plain filename view); it
+surfaces in the **Info/details dialog** as an extra field, and can drive
+"reopen at line" on view/edit (§9.2). `meta` is keyed by the (deduped) result
+path; a filename-search set leaves it empty.
 
 When `pane["virtual"]` is set:
 
@@ -128,7 +136,7 @@ consumes that and works **unchanged** on a virtual pane.
 | Diff | ✓ | Pulls 2 selected `Path`s (already cross-pane, [tfm.py:1862](../../tfm.py#L1862)). |
 | Delete | ✓ (source) | Post-op re-stat: deleted entries drop from the set. |
 | Rename / batch-rename | ✓ (source) | Uses `entry.parent / name` ([tfm.py:1800](../../tfm.py#L1800)). Post-op re-stat; renamed path changes. |
-| Info / details | ✓ | Reads `_selected_or_focused`. |
+| Info / details | ✓ + | Reads `_selected_or_focused`. For a content-hit entry, append the matched **line number** (and matched text) from `virtual["meta"]` as an extra detail field. |
 | Edit | ✓ | Opens editor on the focused `Path`. |
 | **Sort** | ✗ needs work | Must re-sort the in-memory `results`, not re-list a dir (§7). |
 | **Filter** | ✗ needs work | Must filter the in-memory `results`, not re-list a dir (§7). |
@@ -170,21 +178,46 @@ Sort/filter currently flow through `compute_listing(path, …)` in
 
 ## 8. Entry & exit UX
 
-**Entry.** Change the search dialog's `on_accept` path. Two ways in:
+**Entry — feed-by-default.** Accept (Enter/click) **feeds the whole result set
+into the active pane**; there is no separate "navigate to one file" accept. The
+dialog's `on_accept` closes and calls a new
+`TfmApp._feed_search_results(mode, query, root, results, meta)` which sets
+`pane["virtual"]`, builds `files`, suspends monitoring, and renders.
 
-- Accept a single row (Enter/click) → **keep today's behavior** (navigate to the
-  file in its real directory). Least surprising for "I just want to find one
-  file."
-- A new "feed all results into the pane" action from the dialog — a distinct key
-  (e.g. `Ctrl-Enter` / a labeled button) that closes the dialog and calls a new
-  `TfmApp._feed_search_results(mode, query, root, results)` which sets
-  `pane["virtual"]`, builds `files`, suspends monitoring, and renders.
-  - The dialog already streams into `self.results` ([tfm_progressive_search_dialog.py:94](../../src/tfm_progressive_search_dialog.py#L94)); the feed action hands that list (its `Path`s / content-hit `path`s) to the app. For content mode, dedupe by file path (many line-hits → one entry).
+- The dialog already streams into `self.results`
+  ([tfm_progressive_search_dialog.py:94](../../src/tfm_progressive_search_dialog.py#L94));
+  the feed action hands that list to the app. For **content mode**, dedupe by
+  file path (many line-hits → one entry) and stash each file's **first** matched
+  `{line, text}` into `virtual["meta"]` (§3, §9.2).
+- The dialog's `on_accept(mode, value)` signature is single-value today; feed
+  needs the *set*, so the app captures the dialog's full `results` list (it
+  already owns the `ProgressiveSearchDialog` instance returned from
+  `show_progressive_search`) rather than relying on the single accepted value.
 
-**Exit.** Any navigation that sets a real `path` (§4.3), plus an explicit
-"restore listing" (Esc / go-up) that clears `pane["virtual"]` and `_refresh`es
-the real `pane["path"]`. Decide whether entering the virtual pane should first
-snapshot the prior real listing to restore on exit, or simply re-list the root.
+**Reveal a result's location.** Since accept no longer navigates, wire the
+existing pane-sync keys to "open the focused result's real directory" while a
+virtual pane is focused. **Neither key exits virtual mode** — the virtual results
+pane is preserved; the reveal always targets the *other* pane:
+
+- **O** (`sync_current_to_other`, [_config.py:145](../../src/_config.py#L145)) →
+  open the focused entry's **parent directory in the *other* pane**; focus stays
+  on the virtual results pane.
+- **Shift-O** (`sync_other_to_current`, [_config.py:146](../../src/_config.py#L146)) →
+  open that directory in the **other** pane and **move focus to it** — "go to the
+  location," leaving the virtual results pane intact in place.
+
+Both reuse the sync semantics contextually: on a virtual pane the "current
+directory" being synced is the focused entry's parent rather than
+`pane["path"]`, and the sync writes into the *other* (real) pane so the virtual
+listing is never overwritten. (My earlier draft had Shift-O re-list the current
+pane and thereby exit virtual mode — corrected here.)
+
+**Exit.** Any navigation that sets a **real `path` on the virtual pane itself**
+(§4.3) — enter-directory, go-up, jump-to-favorite/drive/history — plus an
+explicit restore (Esc / go-up) that clears `pane["virtual"]` and `_refresh`es the
+real `pane["path"]`. The O / Shift-O reveals are **not** exits (they touch the
+other pane). Decide whether entering the virtual pane snapshots the prior real
+listing to restore on exit, or simply re-lists the root (§9.3).
 
 ---
 
@@ -194,10 +227,13 @@ snapshot the prior real listing to restore on exit, or simply re-list the root.
    are args passed? Options: (a) pass absolute paths, `cwd` = search root;
    (b) pass absolute paths, `cwd` = focused entry's parent; (c) disable
    run-command on a virtual pane for the first cut. Leaning (a).
-2. **Content-mode entries.** A content search yields *line* hits. Feeding the
-   pane should collapse to **one entry per file** (ops act on files, not lines);
-   the line context is lost once fed. Acceptable? Or keep a side-map for
-   "reopen at line" on view/edit?
+2. **Content-mode entries — resolved.** A content search yields *line* hits.
+   Feeding collapses to **one entry per file** (ops act on files), but the
+   matched **line number** (+ text) is kept in `virtual["meta"]` (§3): not
+   rendered in the list, shown as an extra field in the **Info dialog**, and
+   available to open the file **at that line** on view/edit. Remaining detail:
+   keep only the *first* match per file, or a small list of all matched lines for
+   the Info dialog? First cut: first match only.
 3. **Exit-restore.** Snapshot-and-restore the prior listing, or just re-list the
    root on exit? Snapshot is nicer but adds state.
 4. **Both panes virtual.** Copy/move needs a real destination directory. If the
@@ -216,11 +252,13 @@ snapshot the prior real listing to restore on exit, or simply re-list the root.
    (→ `_refresh_virtual`), monitoring suspend, header banner, and the
    navigation-clears-virtual rule. No ops yet — just enter (via a temporary test
    hook) and exit cleanly.
-2. **Feed action + entry UX.** `Ctrl-Enter` in the dialog → `_feed_search_results`;
-   content-mode dedupe; render.
+2. **Feed-by-default entry.** Dialog accept → `_feed_search_results`;
+   content-mode dedupe + `meta` (line numbers); render. Wire **O / Shift-O**
+   reveal-location on a virtual pane (§8).
 3. **Sort & filter in memory** (§7).
 4. **Post-op reconciliation** (§6) + verify the free ops (copy/move, archive,
-   view/diff, delete, rename, info, edit) on a virtual pane.
+   view/diff, delete, rename, edit) on a virtual pane. **Info** shows the
+   content-hit line number from `meta`; view/edit can open at that line.
 5. **Run-command** per §9.1.
 
 ---
