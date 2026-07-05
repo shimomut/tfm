@@ -172,6 +172,38 @@ is queue-driven and incremental:
   change. Keep the `background=False` synchronous path for tests.
 - Surface scan/compare queue depth (+ %) in the status/progress line.
 
+### 2.6 Draw the tree disclosure indicator as a vector chevron in GUI
+The expand/collapse indicator on tree rows is a **glyph** today — `▸` (collapsed)
+/ `▾` (expanded), drawn as text in both backends. In GUI it should instead be a
+**line-drawn chevron** (a `>` that rotates to `⌄` when open), rendered with vector
+primitives so it reads as UI chrome rather than a font character. The grid
+backend keeps the `▸`/`▾` glyph (a vector chevron can't be drawn on a character
+cell).
+
+Where the marker is emitted today:
+- **Directory Diff Viewer** — `_draw_side_vector` / `_draw_side_grid`
+  (`tfm_directory_diff_viewer.py`) build `marker = "▾ "|"▸ "` and `draw_text` it,
+  even on the vector path. This is TFM's live tree, so it's the primary target.
+- **PuiKit `TreeView`** (`puikit/widgets/tree.py`, `_EXPANDED`/`_COLLAPSED`) — the
+  reusable widget carries the same glyph; give it the same GUI chevron so the
+  behavior is shared, not re-bespoked per viewer.
+
+**Key sub-decision — how to draw the diagonal.** `DrawContext` currently exposes
+**only `fill_rect`** (axis-aligned); there is no line / polyline / polygon /
+triangle primitive, so the diff viewer's existing vector connectors are all
+horizontal / vertical bars. A chevron needs diagonals. Two routes:
+- approximate the chevron with a short **staircase of `fill_rect`s** (a few
+  device-pixel steps) — no new PuiKit surface, but crisp only at small sizes; or
+- add a real vector primitive to PuiKit (`draw_line` with arbitrary endpoints, or
+  a `fill_polygon` for a filled triangle) — the cleaner long-term primitive, also
+  reusable for a filled-triangle disclosure look, but a new backend seam (macOS +
+  memory + curses no-op) with its own regression test.
+Prefer the primitive if a filled triangle / smooth chevron is wanted; the
+staircase if a 1–2px hairline `>` is enough. Decide with a small spike.
+
+Reserve the same marker-column width so the label origin (`label_x`) and the
+expander hit region are unchanged; only the mark's rendering swaps.
+
 ---
 
 ## 3. Reference — PuiKit keyboard contract
