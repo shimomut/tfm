@@ -270,6 +270,117 @@ Caveat: names can contain Markdown-special characters (`_ * [ ]` and backticks).
 Code spans neutralise most, but a name containing a backtick needs escaping —
 add a small helper (or reuse one) to wrap a filename safely as inline code.
 
+### 2.10 Archive virtual-directory browsing
+Let the user **enter an archive** (Enter on a `.zip` / `.tar.*`) and browse its
+contents in the pane as if it were a directory — navigate in/out, view files,
+extract out — rather than only create/extract as a whole (§2.4 / `create_archive`
+/ `extract_archive`). The port currently has **no archive browsing** wired
+(`tfm.py` only creates/extracts).
+
+The backend already exists (ported from ttk, unhooked in the UI):
+- `tfm_archive.py` — `ArchiveHandler` / `ZipHandler` (+ tar) with
+  `list_entries(internal_path)`, `get_entry_info`, `extract_to_bytes` /
+  `extract_to_file`, and the `ArchiveEntry` dataclass (`to_stat_result`).
+- `tfm_path.py` — recognises the archive-entry URI
+  `archive:///path/to/file.zip#internal/path.txt` (`get_scheme`, needs-extraction
+  / caching / entry-type branches), and `archive://` is already in `tfm.py`'s
+  `_REMOTE_SCHEMES`.
+
+Wire it on top of the existing **virtual-pane** mechanism (the same
+`pane["virtual"]` feed the search results use — see the header-label branch at
+`tfm.py:130`+ and `_exit_virtual` / `_refresh_virtual`):
+- Entering an archive sets the pane into an "archive" virtual mode carrying the
+  archive path + current `internal_path`; the row list comes from
+  `ArchiveHandler.list_entries(internal_path)` (async via the existing `_list_pane`
+  worker, like other listings).
+- Navigation updates `internal_path`; **up** from the archive root `_exit_virtual`s
+  back to the real containing directory (mirrors leaving a search feed).
+- Header label like the search feed's (a distinct icon + `archive.zip › sub/dir`)
+  so it's clearly not a real directory.
+- Opening a file extracts it (`extract_to_bytes` / a temp file) and hands it to
+  the text / diff viewer; **read-only** first (no writing back into the archive);
+  copy-out = extract. Reuse the entry cache in `ArchiveHandler`.
+- Guard the write-side ops the way virtual panes already do (a virtual pane isn't
+  a writable destination — see the `_transfer` virtual guard).
+
+### 2.11 "Compare and select" (ttk `W` key)
+Port the ttk **compare-selection** feature. The binding already exists —
+`_config.py:147` `'compare_selection': ['W']` — but there is **no handler** in
+`tfm.py` for it. Legacy behavior (`show_compare_selection` in
+`legacy/src/tfm_list_dialog.py`): a small menu of three criteria —
+**By filename**, **By filename and size**, **By filename, size, and timestamp** —
+then it **marks** every active-pane entry that has a same-named, **same-type**
+(file-vs-dir) counterpart in the other pane matching the chosen criteria (size
+equal; mtime within 1s), after clearing the current selection, and logs a
+summary (files / dirs counts). Names are NFC-normalised before comparison and
+`stat()` is called only on name-matches (cheap).
+
+Port shape:
+- Add a `compare_selection` handler dispatched from the keymap; open the ported
+  searchable list picker (the favorites/drives/programs/jump dialog) with the
+  three criteria.
+- On choice, run the comparison against the **inactive** pane's entries and set
+  the active pane's `selected_files` (the same selection set the file ops read);
+  `render()` + log the summary.
+- Guard when the other pane is virtual (search results / archive) — no real
+  listing to compare against — as the other cross-pane ops do.
+
+### 2.12 Color theme brush-up (file types, cursor, syntax)
+The port's palette is thin in three places; brush them up into one coherent,
+light/dark-aware scheme.
+
+- **File / directory type colors.** `tfm_file_pane.py:411` colors rows with just
+  `name_fg = theme.accent if is_dir else theme.text` — directory vs. everything
+  else. Restore richer type coloring (executable, symlink, archive, image /
+  media, source code, hidden, broken symlink, …) as ttk's `tfm_colors.py`
+  (`get_file_color`, executables green, etc.) did. Decide the category source: an
+  extension / mode → category map on the TFM side, keyed to the active theme.
+- **Cursor color.** The row cursor cue is a **hardcoded red** constant in
+  `tfm_file_pane.py` (`_CURSOR_*`, `_draw_cursor`) — not theme-driven and the
+  same on light and dark. Promote it to a theme role (active vs. inactive pane
+  variants) so it stays legible on either scheme and matches the palette.
+- **Syntax highlighting.** `tfm_text_viewer.py`'s `_SYNTAX` / `_syntax_fg` is a
+  **fixed VS-Code-dark** RGB map keyed by pygments token substring; it does not
+  adapt to a light theme. Make it theme-aware (a light + dark token palette, or
+  derive from theme roles), consistent with the rest of the UI.
+
+Cross-cutting:
+- **Where the palette lives** — the PuiKit `Theme` (`puikit/theme.py`) currently
+  has **no** file-type / cursor / syntax roles (only accent / text / chrome).
+  Decide: extend `Theme` with these roles (reusable, switches with the theme), or
+  keep a TFM-side palette module (a revived `tfm_colors.py`) selected by the
+  active scheme. Prefer whichever keeps the light/dark toggle (`toggle_color_scheme`)
+  driving *all three* palettes from one switch.
+- **Light + dark parity** — every new color needs both scheme values, not just a
+  dark one; verify contrast on each.
+- **Terminal quantization** — re-check the TUI palette on the VS Code integrated
+  terminal specifically (suspected 256-color / palette quantization differs from
+  Terminal.app); test there, not only in Terminal.app.
+
+### 2.13 Conflict resolution: "keep both" (auto-rename to a free name)
+Add a conflict-resolution choice that writes the source under a new,
+non-colliding name (`foo (1).txt`, then `foo (2).txt`, …) instead of overwriting
+or skipping. Refines §2.4's conflict-resolution bullet.
+
+Today (`tfm_file_operations.py`): the conflict prompt is Overwrite / Skip
+existing / Cancel, collapsed to a single `overwrite` **bool** for the whole
+batch; `_run` does `dest = dest_dir / t.name` and, when `dest.exists() and not
+overwrite`, just increments `skipped`. There is **no** unique-name helper in the
+port.
+
+To build:
+- A helper `_unique_dest(dest_dir, name)` that returns the first free name,
+  inserting ` (N)` **before the extension** for files (`foo (1).txt`) and
+  appended for directories / extension-less names (`foo (1)`), incrementing N.
+- A new prompt button ("Keep both" / "Rename") on the conflict dialog.
+- Widen the batch policy from the `overwrite` bool to a small mode
+  (overwrite / skip / keep-both), threaded through `_transfer` → `_run`; on
+  keep-both, per-target `dest = self._unique_dest(dest_dir, t.name)` and copy /
+  move there (never `overwrite=True`).
+- Fold into the richer **per-conflict** resolution §2.4 calls for (per-file
+  choice + "apply to all remaining"), so keep-both is one of the per-conflict
+  options, not only a batch-wide one.
+
 ---
 
 ## 3. Reference — PuiKit keyboard contract
