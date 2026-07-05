@@ -336,6 +336,53 @@ To build:
   platform.
 - Remove the "later phase" note from `jump_to_path` once wired.
 
+### 2.13 macOS app bundle — port the build system from ttk to PuiKit
+The `macos_app/` build system (`build.sh` + `collect_dependencies.py` +
+`create_dmg.sh` + the Obj-C launcher in `macos_app/src/`) still packages the
+**old ttk toolkit** and has never been rebuilt against PuiKit. `make macos-app`
+will not produce a working bundle today. Stand it up so a 1.0 `.dmg` can ship.
+
+Good news: **PuiKit is pure Python** — its macOS backend
+(`puikit/backends/macos_backend.py`) is PyObjC (AppKit / Foundation / objc), with
+**no compiled module**. So the whole ttk native-render path drops out; nothing new
+has to be compiled, and `pyobjc` is already in `requirements.txt`.
+
+Concrete stale points to fix:
+- **Bundle PuiKit, not ttk.** `build.sh` copies `${PROJECT_ROOT}/ttk` →
+  `Resources/ttk` (`build.sh:185`+, the `backends/serialization/utils` loop) — but
+  `ttk/` no longer exists at the project root. Replace with a copy of the `puikit`
+  package. **Decide the source:** PuiKit is an **editable** install
+  (`.venv/…/__editable__.puikit-0.1.0.pth` → `/Users/crftwr/projects/puikit`), so
+  `collect_dependencies.py` (site-packages walk) won't pick it up as a normal dir.
+  Either copy `puikit/puikit/` from the sibling repo directly (like ttk was), or
+  add it to `requirements.txt` as a path/VCS dependency and let the collector
+  handle it. Prefer whatever keeps a single source of truth.
+- **Drop the ttk native module.** `build.sh:230`+ copies
+  `ttk_coregraphics_render.cpython-313-darwin.so` — a ttk-only compiled render lib.
+  PuiKit has no equivalent; delete this whole step. (It's also ABI-stale: hardcoded
+  `cpython-313` while the venv is now `cpython-314` — dead either way.)
+- **Fix the launcher's ttk assumptions.** `macos_app/src/TFMAppDelegate.m` hard-
+  errors if a `ttk/` dir is missing (`~:127`) and its comments/`sys.path` setup name
+  ttk (`~:114`,`134`). Swap the existence check to `puikit` (or drop it); the
+  `Resources` + `python_packages` `sys.path.insert`s and the `tfm.tfm_main` /
+  `cli_main` import path are otherwise unchanged (tfm source still copies `src/*` →
+  `Resources/tfm/`, `build.sh:171`+).
+- **Bump the version.** `VERSION` defaults to `0.99` (`build.sh:104`, and the
+  `Info.plist.template`); set the 1.0 string for release.
+
+Risk to verify while standing it up: the Obj-C launcher creates its **own**
+`NSApplication` and then embeds Python and calls `cli_main()`, which builds
+PuiKit's PyObjC macOS backend — which *also* wants the shared `NSApp` / an
+AppKit run loop. ttk's split (Obj-C owns the app, C++ `.so` only renders) may not
+map cleanly onto PuiKit driving AppKit from Python. Confirm the single-process
+launcher still hands control to the PuiKit event loop correctly (window shows,
+menu bar is the native `NSMenu`, keyboard contract holds), or simplify the
+launcher now that rendering is Python-side.
+
+Then run the existing `macos_app/README.md` / `doc/dev/MACOS_APP_TESTING.md`
+smoke tests against the rebuilt bundle, and update both docs + `build.sh`'s inline
+comments (they still describe copying ttk).
+
 ---
 
 ## 3. Reference — PuiKit keyboard contract
