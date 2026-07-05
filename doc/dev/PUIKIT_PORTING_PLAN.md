@@ -74,54 +74,46 @@ already dispatch through `self._menu("<action>")` name their action directly;
 the ones wired to bespoke callbacks need an action id (or an explicit mapping) so
 the same lookup applies.
 
-### 2.4 File / archive operations: threading, progress, cancellation, conflict resolution
-The port did **not** reuse the ttk four-layer operation framework
-(`BaseTask` + `FileOperationTask` / `Executor` / `UI` and the `ArchiveOperation*`
-trio). Instead it **reimplemented copy / move / delete and archive create /
-extract inline and synchronously** on `TfmApp`:
+### 2.4 File operations: threading, progress, cancellation, conflict resolution — DONE
+**Done.** Copy / move / delete now run through a small central task system built
+fresh for PuiKit (the ttk `BaseTask` / `FileOperationTask` / `Executor` / `UI`
+framework in `legacy/src/` was consulted for its *algorithms* but not imported —
+its `Executor` batch API can't express per-item renames, and its UI is ttk-bound):
 
-- copy / move → [`tfm.py` `_transfer()`](../../tfm.py) — conflict check, a
-  `show_message_box` confirm, then a synchronous `run()` closure calling
-  `Path.copy_to` / `Path.move_to`.
-- delete → `delete_files` / `_delete_path` (recurse + `unlink` / `rmdir`).
-- archive → `create_archive` / `_write_archive` / `_extract_archive` (stdlib
-  `zipfile` / `tarfile`).
+- **`tfm_task.py`** (new) — `Task` (`PENDING → RUNNING → DONE | CANCELLED |
+  FAILED`) + `TaskManager` (central registry; `has_active()` / `active_tasks()` for
+  future queued / non-modal tasks + a task UI) + a **blocking worker↔main UI
+  bridge** (`Task.ask`) so an operation reads as one linear function instead of a
+  state machine, + the generic `ProgressDialog` (drives off `Task` + the shared
+  `ProgressManager`, so any task type reuses it).
+- **`tfm_file_operations.py`** (rewritten) — `FileOperationService` submits a
+  linear worker: **threaded recursive count** (files + bytes; `BusyIndicator`
+  "Preparing…" phase) → **conflict resolution** → **per-file execute** with a
+  determinate item bar, a **secondary byte bar**, and the current file name.
+  `background=False` keeps the deterministic inline test path (conflicts resolve
+  headlessly = skip).
 
-The heavy lifting — directory recursion and cross-storage (S3 / SSH) transfer —
-is delegated to the storage-agnostic `Path` API (`tfm_path.py`), which the port
-reuses unchanged. That is why the whole task framework became orphaned; it now
-lives under **`legacy/src/`** (`tfm_file_operation_*.py`, `tfm_archive_operation_*.py`,
-`tfm_base_task.py`) as **reference only** — consult it for the state-machine /
-executor design when building the items below, but the port does not import it.
-`tfm_progress_manager.py` / `tfm_progress_animator.py` remain live in `src/` but
-the operation path does not currently wire into them.
+The four rebuilt capabilities:
+- **Threading** — the whole operation (count, conflict detection, IO) runs off the
+  UI thread; the main thread only pumps the bridge + repaints on the tick.
+- **Progress UI** — `BusyIndicator` while preparing, then a primary item
+  `ProgressBar`, a **second per-file byte bar** (chunked local copies + cross-
+  storage `copy_to(progress_callback=…)`), and the current file name.
+- **Cancellation** — a cooperative `threading.Event` polled at per-file / per-chunk
+  `checkpoint()`s; `Esc` opens a confirm box → "Cancelling…" → clean partial
+  summary, dropping a partial file on mid-copy cancel.
+- **Conflict resolution** — restored TTK **file-by-file** flow: detect all
+  top-level conflicts up front, then a per-conflict `ConflictDialog`
+  (Overwrite / Skip / **Keep both** / Cancel) with an **"apply to all remaining"**
+  checkbox, resolved over the bridge before execution.
 
-Four capabilities the inline reimplementation dropped, to build back. **Three of
-the four (threading, progress UI, cancellation) landed for copy / move / delete
-in `tfm_file_operations.py` (the "Added progress dialog" commit); only conflict
-resolution remains, and archive operations are not yet wired through the same
-path.**
+Covered by `test/test_file_operations.py` (count, `_unique_dest`, resolution +
+apply-to-all, keep-both, cancel, the bridge, and background conflict/cancel with a
+real `MemoryBackend`).
 
-- **Threading** — DONE for copy / move / delete: the work runs on a daemon
-  `tfm-op-*` thread driving a `ProgressManager`, and a per-frame tick pops the
-  dialog + fires `on_complete` on the main thread (`_run`). Tests keep the
-  synchronous inline path (`background=False`). *Archive create / extract still
-  run synchronously on the UI thread.*
-- **Progress UI** — DONE: `ProgressDialog` (`tfm_file_operations.py`) built on
-  PuiKit's `ProgressBar`, reading the shared `ProgressManager` state during its
-  own `draw` (item %, current item, byte progress via
-  `update_file_byte_progress`). *Not yet: a second dedicated per-file byte bar /
-  `BusyIndicator` fallback — currently the one determinate bar.*
-- **Cancellation** — DONE: a `threading.Event` cancel flag the worker polls
-  between items, set by `Esc` (`on_cancel=cancel.set`). *Not yet: a visible
-  "cancelling…" state / a Cancel button (only `Esc`).*
-- **Conflict resolution** — STILL the collapsed batch-wide three-button prompt
-  (Overwrite / Skip existing / Cancel → a single `overwrite` bool for the whole
-  batch, `_transfer`/`_run`). Restore richer per-conflict resolution (overwrite /
-  skip / rename, with an "apply to all remaining" option), as the ttk
-  `FileOperationUI` / `ArchiveOperationUI` offered, interleaved with the
-  background execution. **This is the main remaining §2.4 work; §2.11 (keep both)
-  folds into it.**
+*Still open (separate items): archive create / extract are not yet routed through
+this task path (§2.10 area); the `TaskManager` runs one modal task at a time —
+background / queued execution + a task-management UI are future work.*
 
 ### 2.5 Draw the tree disclosure indicator as a vector chevron in GUI
 The expand/collapse indicator on tree rows is a **glyph** today — `▸` (collapsed)
@@ -282,29 +274,15 @@ Cross-cutting:
   terminal specifically (suspected 256-color / palette quantization differs from
   Terminal.app); test there, not only in Terminal.app.
 
-### 2.11 Conflict resolution: "keep both" (auto-rename to a free name)
-Add a conflict-resolution choice that writes the source under a new,
-non-colliding name (`foo (1).txt`, then `foo (2).txt`, …) instead of overwriting
-or skipping. Refines §2.4's conflict-resolution bullet.
-
-Today (`tfm_file_operations.py`): the conflict prompt is Overwrite / Skip
-existing / Cancel, collapsed to a single `overwrite` **bool** for the whole
-batch; `_run` does `dest = dest_dir / t.name` and, when `dest.exists() and not
-overwrite`, just increments `skipped`. There is **no** unique-name helper in the
-port.
-
-To build:
-- A helper `_unique_dest(dest_dir, name)` that returns the first free name,
-  inserting ` (N)` **before the extension** for files (`foo (1).txt`) and
-  appended for directories / extension-less names (`foo (1)`), incrementing N.
-- A new prompt button ("Keep both" / "Rename") on the conflict dialog.
-- Widen the batch policy from the `overwrite` bool to a small mode
-  (overwrite / skip / keep-both), threaded through `_transfer` → `_run`; on
-  keep-both, per-target `dest = self._unique_dest(dest_dir, t.name)` and copy /
-  move there (never `overwrite=True`).
-- Fold into the richer **per-conflict** resolution §2.4 calls for (per-file
-  choice + "apply to all remaining"), so keep-both is one of the per-conflict
-  options, not only a batch-wide one.
+### 2.11 Conflict resolution: "keep both" (auto-rename to a free name) — DONE
+**Done** (built with §2.4). `_unique_dest(dest_dir, name)`
+(`tfm_file_operations.py`) returns the first free name — ` (N)` **before the
+extension** for files (`foo (1).txt`), appended for directories / extension-less
+names (`foo (1)`) — and **"Keep both"** is a per-conflict button in the
+`ConflictDialog` (alongside Overwrite / Skip / Cancel), honoured by "apply to all
+remaining" like the others. On keep-both the target copies/moves to the unique
+dest (never `overwrite=True`). Covered by `test/test_file_operations.py`
+(`_unique_dest` naming + `test_resolve_keep_both`).
 
 ### 2.12 Filepath TAB completion in input dialogs
 Complete paths with TAB in the text-input prompts. `jump_to_path` in `tfm.py`

@@ -64,6 +64,7 @@ from tfm_batch_rename_dialog import show_batch_rename  # noqa: E402
 from tfm_diff_viewer import show_diff_viewer  # noqa: E402
 from tfm_directory_diff_viewer import show_directory_diff_viewer  # noqa: E402
 from tfm_file_operations import FileOperationService  # noqa: E402
+from tfm_task import TaskManager  # noqa: E402
 from tfm_text_dialog import show_markdown  # noqa: E402
 from tfm_text_viewer import show_text_viewer  # noqa: E402
 
@@ -253,9 +254,13 @@ class TfmApp:
         self._log_copy_mod = "cmd" if type(backend).__name__ == "MacOSBackend" else "ctrl"
         self.config = _config.Config()
         self.keys = KeyBindings(self.config.KEY_BINDINGS)
+        # Central registry of running background tasks (file ops today; the seam
+        # for future queued / non-modal tasks + a task-management UI).
+        self.tasks = TaskManager()
         # Shared copy/move/delete engine (confirm dialogs + threaded progress),
-        # used by both this view and the directory diff viewer.
-        self._fileops = FileOperationService(self.config)
+        # used by both this view and the directory diff viewer; submits through
+        # the shared task manager.
+        self._fileops = FileOperationService(self.config, self.tasks)
         # Persistent cross-session state (window layout, pane dirs, cursor
         # positions, recent dirs). Injectable so tests can supply a temp-db
         # manager instead of touching ~/.tfm/state.db.
@@ -2260,6 +2265,8 @@ class TfmApp:
                 summary += f", {result['skipped']} skipped (exists)"
             if result["failed"]:
                 summary += f", {result['failed']} failed"
+            if result.get("cancelled"):
+                summary += " (cancelled)"
             self.log_info(summary)
             self.panel.render()
 
@@ -2283,6 +2290,8 @@ class TfmApp:
             summary = f"Delete: {result['done']} removed"
             if result["failed"]:
                 summary += f", {result['failed']} failed"
+            if result.get("cancelled"):
+                summary += " (cancelled)"
             self.log_info(summary)
             self.panel.render()
 

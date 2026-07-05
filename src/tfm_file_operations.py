@@ -1,39 +1,40 @@
-"""tfm_file_operations — shared copy / move / delete engine + progress dialog.
+"""tfm_file_operations — shared copy / move / delete engine for the PuiKit port.
 
-Both the main file-manager view (:class:`tfm.TfmApp`) and the directory diff
-viewer (:class:`tfm_directory_diff_viewer.DirectoryDiffView`) run their file
-operations through a single :class:`FileOperationService`, so the confirmation
-policy (``CONFIRM_COPY`` / ``CONFIRM_MOVE`` / ``CONFIRM_DELETE``), the conflict
-prompt, the background worker, and the animated modal progress dialog are
-written once and shared rather than reimplemented per view.
+Both the main view (:class:`tfm.TfmApp`) and the directory diff viewer run their
+file operations through one :class:`FileOperationService`, so the confirmation
+policy (``CONFIRM_*``), conflict resolution, threading, and progress are written
+once. The service is view-agnostic: it takes a list of ``Path`` targets + a
+destination directory and reports a summary through ``on_complete``.
 
-The service is deliberately view-agnostic: it operates on an explicit list of
-``Path`` targets plus a destination directory, and reports back through an
-``on_complete`` callback (each view refreshes itself its own way — the panes
-reload, the diff viewer rescans). A large operation runs on a worker thread and
-drives a :class:`~tfm_progress_manager.ProgressManager`; a per-frame animation
-tick reads that state on the main thread and repaints the :class:`ProgressDialog`
-— the same worker + ``request_animation_ticks`` pattern the app uses for async
-directory listings. Pass ``background=False`` (tests) to run inline and skip the
-dialog, so an operation completes deterministically within the call.
+An operation runs as a single **linear** :class:`~tfm_task.Task` worker (no state
+machine): it counts recursively, resolves each conflict by *asking the main
+thread* through the task's blocking UI bridge, then copies/moves/deletes
+file-by-file with byte-level progress — all off the UI thread, driving a
+:class:`~tfm_progress_manager.ProgressManager` that the modal
+:class:`~tfm_task.ProgressDialog` reads each frame. The initial ``CONFIRM_*``
+prompt stays a plain main-thread message box before the task starts.
+
+Pass ``background=False`` (tests) to run the operation inline and resolve
+conflicts headlessly (skip existing) — deterministic, no dialog, no thread.
 """
 
 from __future__ import annotations
 
-import threading
+import shutil
 from typing import Any, Callable, Optional
 
-from puikit.backend import DEFAULT_STYLE, Style, TextAttribute
+from puikit.backend import Style, TextAttribute
 from puikit.event import Event, EventType
-from puikit.widgets import ProgressBar, show_message_box
+from puikit.focus import FocusContainer, move_focus
+from puikit.widgets import Button, Checkbox, show_message_box
 from puikit.widgets.base import Widget
 
+from tfm_dialog_geometry import draw_title_bar
 from tfm_path import Path
 from tfm_progress_manager import OperationType, ProgressManager
-from tfm_str_format import format_size
+from tfm_task import Cancelled, Task, TaskManager
 
-
-#: Operation kind -> (button/label verb, progress-manager op type).
+#: Operation kind -> (verb label, progress-manager op type).
 _VERB = {"copy": "Copy", "move": "Move", "delete": "Delete"}
 _OP_TYPE = {
     "copy": OperationType.COPY,
@@ -41,11 +42,16 @@ _OP_TYPE = {
     "delete": OperationType.DELETE,
 }
 
+#: Copy in 1 MiB chunks; files at least this large are chunk-copied so the byte
+#: bar advances and cancellation can interrupt mid-file (smaller files copy in one
+#: shot — instant, no byte bar).
+_CHUNK = 1024 * 1024
+_BYTE_BAR_MIN = 1024 * 1024
+
 
 def recursive_delete(entry: Path) -> None:
-    """Delete a file or directory through the storage-agnostic Path API,
-    recursing into directories (``copy_to`` / ``move_to`` handle their own
-    recursion, but delete has no single primitive)."""
+    """Delete a file or directory (recursing into directories) through the
+    storage-agnostic Path API."""
     if entry.is_dir() and not entry.is_symlink():
         for child in entry.iterdir():
             recursive_delete(child)
@@ -54,14 +60,36 @@ def recursive_delete(entry: Path) -> None:
         entry.unlink()
 
 
+def _unique_dest(dest_dir: Path, name: str) -> Path:
+    """First free ``dest_dir/name`` variant for a "keep both" resolution: insert
+    ` (N)` before the extension for a file (``foo (1).txt``), or append it for a
+    directory / extension-less name (``foo (1)``), incrementing ``N`` until free."""
+    candidate = dest_dir / name
+    if not candidate.exists():
+        return candidate
+    stem, dot, ext = name.partition(".")
+    if not dot:  # no extension (or a dotfile with no further ext) -> append
+        stem, ext_suffix = name, ""
+    else:
+        ext_suffix = dot + ext
+    n = 1
+    while True:
+        candidate = dest_dir / f"{stem} ({n}){ext_suffix}"
+        if not candidate.exists():
+            return candidate
+        n += 1
+
+
 class FileOperationService:
     """Runs copy / move / delete for any view. Construct once per owner (bound to
-    that owner's ``config``); each call takes the ``panel`` to draw dialogs on and
-    a ``z`` so a full-window modal (the diff viewer) can stack its dialogs above
-    itself. One operation runs at a time per service instance."""
+    its ``config`` and a :class:`~tfm_task.TaskManager`); each call takes the
+    ``panel`` to draw on and a ``z`` so a full-window modal (the diff viewer) can
+    stack its dialogs above itself."""
 
-    def __init__(self, config: Any):
+    def __init__(self, config: Any, tasks: Optional[TaskManager] = None):
         self.config = config
+        #: Central task registry — shared with the app when passed, else private.
+        self.tasks = tasks if tasks is not None else TaskManager()
 
     # --- public API ----------------------------------------------------------
 
@@ -70,237 +98,440 @@ class FileOperationService:
              log: Optional[Callable[[str], None]] = None,
              z: int = 70, background: bool = True) -> None:
         """Copy ``targets`` into ``dest_dir`` (each becomes ``dest_dir/name``),
-        prompting per ``CONFIRM_COPY`` and on conflicts."""
-        self._transfer(panel, "copy", targets, dest_dir, on_complete, log, z, background)
+        confirming per ``CONFIRM_COPY`` then resolving conflicts per file."""
+        self._start(panel, "copy", targets, dest_dir, on_complete, log, z, background)
 
     def move(self, panel: Any, targets: list, dest_dir: Path, *,
              on_complete: Optional[Callable[[dict], None]] = None,
              log: Optional[Callable[[str], None]] = None,
              z: int = 70, background: bool = True) -> None:
-        """Move ``targets`` into ``dest_dir``, prompting per ``CONFIRM_MOVE`` and
-        on conflicts."""
-        self._transfer(panel, "move", targets, dest_dir, on_complete, log, z, background)
+        """Move ``targets`` into ``dest_dir``, confirming per ``CONFIRM_MOVE``."""
+        self._start(panel, "move", targets, dest_dir, on_complete, log, z, background)
 
     def delete(self, panel: Any, targets: list, *,
                on_complete: Optional[Callable[[dict], None]] = None,
                log: Optional[Callable[[str], None]] = None,
                z: int = 70, background: bool = True) -> None:
-        """Delete ``targets`` (directories recursively), prompting per
-        ``CONFIRM_DELETE`` (which defaults its confirm button to Cancel)."""
+        """Delete ``targets`` (directories recursively), confirming per
+        ``CONFIRM_DELETE`` (whose confirm button defaults to Cancel)."""
+        self._start(panel, "delete", targets, None, on_complete, log, z, background)
+
+    # --- confirm + submit ----------------------------------------------------
+
+    def _start(self, panel: Any, kind: str, targets: list, dest_dir: Optional[Path],
+               on_complete, log, z: int, background: bool) -> None:
+        """Show the initial ``CONFIRM_*`` prompt (main thread), then submit the
+        operation as a linear task. The prompt is skipped when its config flag is
+        off; conflicts are *not* mentioned here — they are detected and resolved
+        inside the task."""
         if not targets:
-            return
-        names = ", ".join(t.name for t in targets[:3])
-        if len(targets) > 3:
-            names += f", … ({len(targets)} total)"
-
-        def run() -> None:
-            self._run(panel, "delete", targets, None, False, on_complete, log, z, background)
-
-        if getattr(self.config, "CONFIRM_DELETE", True):
-            def on_result(label: str) -> None:
-                if label == "Delete":
-                    run()
-                else:
-                    panel.render()
-            show_message_box(
-                panel, f"Delete {len(targets)} item(s)?\n{names}\nThis cannot be undone.",
-                title="Delete", icon="warning", buttons=("Delete", "Cancel"),
-                default=1, cancel=1, on_result=on_result, z=z)
-            panel.render()
-        else:
-            run()
-
-    # --- confirm flow --------------------------------------------------------
-
-    def _transfer(self, panel: Any, kind: str, targets: list, dest_dir: Path,
-                  on_complete, log, z: int, background: bool) -> None:
-        """Shared copy/move confirm flow: detect conflicts, prompt (honouring the
-        ``CONFIRM_*`` flag), then hand the run off to :meth:`_run`. A conflict
-        always prompts (never silently overwrite) even when confirm is disabled;
-        the buttons then choose the overwrite policy."""
-        if not targets:
+            if log is not None:
+                log(f"No file to {kind}")
             return
         verb = _VERB[kind]
-        conflicts = [t for t in targets if (dest_dir / t.name).exists()]
-        message = f"{verb} {len(targets)} item(s) to {dest_dir}?"
-        if conflicts:
-            message += f"\n{len(conflicts)} already exist there."
 
-        def run(overwrite: bool) -> None:
-            self._run(panel, kind, targets, dest_dir, overwrite, on_complete, log, z, background)
+        def go() -> None:
+            self._submit(panel, kind, targets, dest_dir, on_complete, log, z, background)
 
         confirm = getattr(self.config, f"CONFIRM_{verb.upper()}", True)
-        if conflicts:
-            def on_result(label: str) -> None:
-                if label == "Cancel":
-                    panel.render()
-                else:
-                    run(overwrite=(label == "Overwrite"))
-            show_message_box(
-                panel, message, title=verb, icon="warning",
-                buttons=("Overwrite", "Skip existing", "Cancel"),
-                default=2, cancel=2, on_result=on_result, z=z)
-            panel.render()
-        elif confirm:
-            def on_result(label: str) -> None:
-                if label == verb:
-                    run(overwrite=False)
-                else:
-                    panel.render()
-            show_message_box(
-                panel, message, title=verb, icon="info",
-                buttons=(verb, "Cancel"), default=0, cancel=1, on_result=on_result, z=z)
-            panel.render()
-        else:
-            run(overwrite=False)
-
-    # --- execution -----------------------------------------------------------
-
-    def _run(self, panel: Any, kind: str, targets: list, dest_dir: Optional[Path],
-             overwrite: bool, on_complete, log, z: int, background: bool) -> None:
-        """Execute the (already-confirmed) operation. In background mode the work
-        runs on a daemon thread driving a :class:`ProgressManager`, and a per-frame
-        tick pops the :class:`ProgressDialog` and fires ``on_complete`` on the main
-        thread when it finishes. In synchronous mode (tests) the work runs inline
-        and ``on_complete`` fires immediately — no dialog, no thread."""
-        verb = _VERB[kind]
-        progress = ProgressManager(self.config)
-        progress.start_operation(_OP_TYPE[kind], len(targets), description="")
-        result = {"done": 0, "skipped": 0, "failed": 0}
-        cancel = threading.Event()
-
-        def work() -> None:
-            # Copy/move materialises the destination directory first (it may be a
-            # mirrored subpath that doesn't exist yet on the other side); a no-op
-            # when it already exists, as in the main view's other-pane case.
-            if kind != "delete" and dest_dir is not None:
-                try:
-                    dest_dir.mkdir(parents=True, exist_ok=True)
-                except Exception:  # noqa: BLE001 — per-target copy will surface it
-                    pass
-            for t in targets:
-                if cancel.is_set():
-                    break
-                progress.update_progress(t.name)
-                try:
-                    if kind == "delete":
-                        recursive_delete(t)
-                        result["done"] += 1
-                        continue
-                    dest = dest_dir / t.name
-                    if dest.exists() and not overwrite:
-                        result["skipped"] += 1
-                        continue
-                    if kind == "copy":
-                        t.copy_to(dest, overwrite=overwrite,
-                                  progress_callback=progress.update_file_byte_progress)
-                    else:
-                        t.move_to(dest, overwrite=overwrite)
-                    result["done"] += 1
-                except Exception as exc:  # noqa: BLE001 — report, keep going
-                    result["failed"] += 1
-                    progress.increment_errors()
-                    if log is not None:
-                        log(f"{verb} failed for {t.name}: {exc}")
-            progress.finish_operation()
-
-        if not background:
-            work()
-            if on_complete is not None:
-                on_complete(result)
+        if not confirm:
+            go()
             return
 
-        dialog = ProgressDialog(progress, f"{verb}…", on_cancel=cancel.set)
-        dialog.show(panel, z=z)
-        finished = threading.Event()
+        if kind == "delete":
+            names = ", ".join(t.name for t in targets[:3])
+            if len(targets) > 3:
+                names += f", … ({len(targets)} total)"
+            message = f"Delete {len(targets)} item(s)?\n{names}\nThis cannot be undone."
+            buttons, icon, default = ("Delete", "Cancel"), "warning", 1
+        else:
+            message = f"{verb} {len(targets)} item(s) to {dest_dir}?"
+            buttons, icon, default = (verb, "Cancel"), "info", 0
+        ok_label = buttons[0]
 
-        def worker() -> None:
-            try:
-                work()
-            finally:
-                finished.set()
-
-        threading.Thread(target=worker, name=f"tfm-op-{kind}", daemon=True).start()
-
-        def tick() -> bool:
-            # Main thread: repaint the live dialog; when the worker is done, pop it
-            # and hand the summary back to the caller (so on_complete's UI work —
-            # pane refresh / rescan / render — runs on the main thread).
-            if not finished.is_set():
+        def on_result(label: str) -> None:
+            if label == ok_label:
+                go()
+            else:
                 panel.render()
-                return True
-            dialog.close()
-            if on_complete is not None:
-                on_complete(result)
-            return False
 
-        panel.request_animation_ticks(tick)
+        show_message_box(panel, message, title=verb, icon=icon, buttons=buttons,
+                         default=default, cancel=1, on_result=on_result, z=z)
+        panel.render()
+
+    def _submit(self, panel: Any, kind: str, targets: list, dest_dir: Optional[Path],
+                on_complete, log, z: int, background: bool) -> None:
+        task = Task(f"{_VERB[kind]}…", config=self.config, kind=kind)
+        task.progress.start_operation(_OP_TYPE[kind], 0, description="")
+
+        def run(task: Task) -> dict:
+            return self._run(task, kind, targets, dest_dir, panel, log, z)
+
+        self.tasks.submit(task, panel, run=run, on_done=on_complete, z=z,
+                          background=background)
+
+    # --- the linear worker (runs on the task thread) -------------------------
+
+    def _run(self, task: Task, kind: str, targets: list, dest_dir: Optional[Path],
+             panel: Any, log, z: int) -> dict:
+        """Prepare → resolve → execute, top to bottom. `Cancelled` from a checkpoint
+        or a "Cancel" conflict choice unwinds here into a clean partial summary."""
+        result = {"done": 0, "skipped": 0, "failed": 0, "cancelled": False}
+        prog = task.progress
+        try:
+            # Resolve conflicts first (cheap existence checks; may prompt), so the
+            # recursive count only covers what will actually be processed.
+            if kind == "delete":
+                plan = [(t, None, False) for t in targets]
+            else:
+                plan, result["skipped"] = self._resolve(task, targets, dest_dir, z, panel)
+
+            if dest_dir is not None:
+                try:
+                    dest_dir.mkdir(parents=True, exist_ok=True)
+                except Exception:  # noqa: BLE001 — per-target op will surface it
+                    pass
+
+            total_items, _total_bytes = self._count(task, kind, dest_dir,
+                                                    [p[0] for p in plan])
+            prog.update_operation_total(total_items)
+
+            for target, dest_base, overwrite in plan:
+                task.checkpoint()
+                try:
+                    self._execute_one(task, kind, target, dest_base, overwrite, dest_dir, prog)
+                    result["done"] += 1
+                except Cancelled:
+                    raise
+                except Exception as exc:  # noqa: BLE001 — report, keep going
+                    result["failed"] += 1
+                    prog.increment_errors()
+                    if log is not None:
+                        log(f"{_VERB[kind]} failed for {target.name}: {exc}")
+        except Cancelled:
+            result["cancelled"] = True
+        finally:
+            prog.finish_operation()
+        return result
+
+    def _resolve(self, task: Task, targets: list, dest_dir: Path, z: int,
+                 panel: Any) -> tuple[list, int]:
+        """Detect top-level conflicts and resolve each, file-by-file, through the
+        task's UI bridge (TTK flow). Returns ``(plan, skipped)`` where plan is a
+        list of ``(target, dest_base, overwrite)`` for the survivors."""
+        conflicts = [t for t in targets if (dest_dir / t.name).exists()]
+        total = len(conflicts)
+        plan: list = []
+        skipped = 0
+        apply_all: Optional[str] = None
+        idx = 0
+        for t in targets:
+            dest = dest_dir / t.name
+            if not dest.exists():
+                plan.append((t, dest, False))
+                continue
+            idx += 1
+            action = apply_all
+            if action is None:
+                action, apply = task.ask(
+                    _conflict_prompt(t.name, idx, total, z),
+                    headless=("skip", False))
+                if apply:
+                    apply_all = action
+            if action == "cancel":
+                raise Cancelled()
+            if action == "skip":
+                skipped += 1
+            elif action == "keep_both":
+                plan.append((t, _unique_dest(dest_dir, t.name), False))
+            else:  # overwrite
+                plan.append((t, dest, True))
+        return plan, skipped
+
+    def _count(self, task: Task, kind: str, dest_dir: Optional[Path],
+               targets: list) -> tuple[int, int]:
+        """Recursively count the nodes (files + dirs) and total bytes to process,
+        so the primary bar is determinate. A same-storage move is one atomic
+        rename, so it counts as a single node (its subtree is never walked)."""
+        items = 0
+        bytes_ = 0
+        for t in targets:
+            if _is_atomic_move(kind, t, dest_dir):
+                items += 1
+                task.counted = items
+                continue
+            n, b = self._count_node(task, t, items)
+            items += n
+            bytes_ += b
+            task.counted = items
+        return items, bytes_
+
+    def _count_node(self, task: Task, path: Path, base: int) -> tuple[int, int]:
+        task.checkpoint()
+        if path.is_dir() and not path.is_symlink():
+            items, bytes_ = 1, 0
+            for child in path.iterdir():
+                n, b = self._count_node(task, child, base + items)
+                items += n
+                bytes_ += b
+                task.counted = base + items
+            return items, bytes_
+        try:
+            size = 0 if path.is_symlink() else path.stat().st_size
+        except Exception:  # noqa: BLE001 — unreadable stat shouldn't abort counting
+            size = 0
+        return 1, size
+
+    def _execute_one(self, task: Task, kind: str, target: Path,
+                     dest_base: Optional[Path], overwrite: bool,
+                     dest_dir: Optional[Path], prog: ProgressManager) -> None:
+        if kind == "delete":
+            self._delete_tree(task, target, prog)
+        elif kind == "move" and _is_atomic_move(kind, target, dest_dir):
+            prog.update_progress(target.name)
+            target.move_to(dest_base, overwrite=overwrite)
+        else:
+            # Copy, or a cross-storage move (copy the tree, then drop the source).
+            self._copy_tree(task, target, dest_base, overwrite, prog)
+            if kind == "move":
+                self._delete_tree(task, target, prog=None)
+
+    # --- per-node IO ---------------------------------------------------------
+
+    def _copy_tree(self, task: Task, src: Path, dest: Path, overwrite: bool,
+                   prog: ProgressManager) -> None:
+        task.checkpoint()
+        prog.update_progress(src.name)
+        if src.is_dir() and not src.is_symlink():
+            dest.mkdir(parents=True, exist_ok=True)
+            for child in src.iterdir():
+                self._copy_tree(task, child, dest / child.name, overwrite, prog)
+        else:
+            self._copy_file(task, src, dest, overwrite, prog)
+
+    def _copy_file(self, task: Task, src: Path, dest: Path, overwrite: bool,
+                   prog: ProgressManager) -> None:
+        if dest.exists() and not overwrite:
+            return  # inner collision under a non-overwrite dir — leave it
+        try:
+            size = 0 if src.is_symlink() else src.stat().st_size
+        except Exception:  # noqa: BLE001
+            size = 0
+        same = src.get_scheme() == dest.get_scheme()
+        local = same and src.get_scheme() == "file"
+        if not src.is_symlink() and (not same or size >= _BYTE_BAR_MIN):
+            self._copy_bytes(task, src, dest, size, overwrite, local, prog)
+        else:
+            src.copy_to(dest, overwrite=overwrite)
+
+    def _copy_bytes(self, task: Task, src: Path, dest: Path, size: int,
+                    overwrite: bool, local: bool, prog: ProgressManager) -> None:
+        """Copy a large / cross-storage file while driving the byte bar. Local
+        files are streamed in chunks here (so ``shutil`` doesn't hide progress);
+        cross-storage copies delegate to ``Path.copy_to``'s own progress callback."""
+        if not local:
+            src.copy_to(dest, overwrite=overwrite,
+                        progress_callback=prog.update_file_byte_progress)
+            return
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        copied = 0
+        prog.update_file_byte_progress(0, size)
+        try:
+            with open(str(src), "rb") as fi, open(str(dest), "wb") as fo:
+                while True:
+                    task.checkpoint()
+                    chunk = fi.read(_CHUNK)
+                    if not chunk:
+                        break
+                    fo.write(chunk)
+                    copied += len(chunk)
+                    prog.update_file_byte_progress(copied, size)
+            shutil.copystat(str(src), str(dest))
+        except Cancelled:
+            try:
+                dest.unlink()  # drop the partial file so a cancel leaves no stub
+            except Exception:  # noqa: BLE001
+                pass
+            raise
+
+    def _delete_tree(self, task: Task, path: Path,
+                     prog: Optional[ProgressManager]) -> None:
+        task.checkpoint()
+        if path.is_dir() and not path.is_symlink():
+            for child in list(path.iterdir()):
+                self._delete_tree(task, child, prog)
+            if prog is not None:
+                prog.update_progress(path.name)
+            path.rmdir()
+        else:
+            if prog is not None:
+                prog.update_progress(path.name)
+            path.unlink()
 
 
-class ProgressDialog(Widget):
-    """Modal progress dialog for a running file operation. Renders the operation
-    verb, a determinate :class:`~puikit.widgets.progress_bar.ProgressBar`, the
-    item count, and the current item; ``Esc`` requests cancellation. Construct via
-    :meth:`show` (sizes and pushes the layer, centred with a shadow like a
-    message box). The owning service repaints it each frame and pops it on
-    completion."""
+def _is_atomic_move(kind: str, target: Path, dest_dir: Optional[Path]) -> bool:
+    """A move within one storage backend is a single rename — no per-file walk,
+    no byte bar. (A cross-storage move copies the tree then deletes the source.)"""
+    return (kind == "move" and dest_dir is not None
+            and target.get_scheme() == dest_dir.get_scheme())
+
+
+# --- conflict dialog ---------------------------------------------------------
+
+#: (action id, button label) for the conflict dialog, in row order.
+_CONFLICT_ACTIONS = (
+    ("overwrite", "Overwrite"),
+    ("skip", "Skip"),
+    ("keep_both", "Keep both"),
+    ("cancel", "Cancel"),
+)
+
+
+def _conflict_prompt(name: str, index: int, total: int, z: int):
+    """Return a ``show_fn(panel, deliver)`` for ``Task.ask``: it pushes a
+    :class:`ConflictDialog` whose result ``(action, apply_to_all)`` is handed to
+    ``deliver``. The dialog stacks just above the progress dialog (``z + 5``)."""
+    def show(panel: Any, deliver: Callable[[Any], None]) -> None:
+        dialog = ConflictDialog(name, index, total, on_result=deliver)
+        dialog.show(panel, z=z + 5)
+        panel.render()
+    return show
+
+
+class ConflictDialog(FocusContainer, Widget):
+    """Per-conflict resolution modal: names the colliding file (``i of N``), a row
+    of actions (Overwrite / Skip / Keep both / Cancel), and an "apply to all
+    remaining" checkbox. Reports ``(action, apply_to_all)`` through ``on_result``.
+    Keyboard: ``o/s/k/c`` shortcuts, ``a``/Space toggles the checkbox, Tab moves
+    focus, Enter activates the focused button, Esc cancels."""
 
     focusable = True
+    focus_stop_when_empty = True
 
-    def __init__(self, progress: ProgressManager, title: str,
-                 on_cancel: Optional[Callable[[], None]] = None):
-        self.progress = progress
-        self.title = title
-        self._on_cancel = on_cancel
-        self._bar = ProgressBar()
+    def __init__(self, name: str, index: int, total: int,
+                 on_result: Callable[[tuple[str, bool]], None]):
+        self.name = name
+        self.title = f"File exists ({index} of {total})" if total > 1 else "File exists"
+        self.on_result = on_result
         self._panel: Any = None
+        self._size = (0.0, 0.0)
+        self._checkbox = Checkbox("Apply to all remaining", checked=False)
+        self._buttons = [
+            Button(label, variant=("primary" if action == "overwrite" else "secondary"),
+                   on_click=(lambda a=action: self._resolve(a)))
+            for action, label in _CONFLICT_ACTIONS
+        ]
+        self._focused: Any = self._buttons[1]  # default focus = Skip (safe)
+        self._child_rects: list[tuple[Any, tuple[float, float, float, float]]] = []
 
-    def show(self, panel: Any, z: int = 70) -> None:
+    # --- focus ---------------------------------------------------------------
+
+    def focus_children(self) -> list[Any]:
+        return [self._checkbox, *self._buttons]
+
+    # --- lifecycle -----------------------------------------------------------
+
+    def show(self, panel: Any, z: int = 75) -> None:
         self._panel = panel
         sw, _sh = panel.backend.size_units
-        w = float(max(40, min(64, int(sw) - 4)))
-        h = 6.0
+        w = float(max(48, min(72, int(sw) - 4)))
+        h = 8.0
         panel.push_layer(self, z=z, hints={"shadow": True, "w": w, "h": h})
         panel.animate(self, hints={"transition": "fade", "duration_ms": 120})
 
-    def close(self) -> None:
+    def _resolve(self, action: str) -> None:
+        apply_all = self._checkbox.checked
         panel = self._panel
         if panel is not None and panel.has_layers and panel._layers[-1].widget is self:
             panel.pop_layer()
+        if self.on_result is not None:
+            self.on_result((action, apply_all))
+
+    # --- drawing -------------------------------------------------------------
 
     def draw(self, ctx) -> None:
         self._panel = ctx.panel
+        self._size = ctx.size_units
         theme = ctx.theme
-        box_style = (Style(bg=theme.popup_bg, fg=theme.popup_border)
-                     if theme is not None else DEFAULT_STYLE)
         surface_bg = theme.popup_bg if theme is not None else None
+        border = theme.popup_border if theme is not None else None
+        box_style = Style(bg=surface_bg, fg=border)
         box_w, box_h = ctx.size_units
         ctx.draw_box(0, 0, box_w, box_h, box_style, hints={"fill": True})
-        title_style = Style(bg=surface_bg, attr=TextAttribute.BOLD)
-        text_style = Style(bg=surface_bg)
-        ctx.draw_text(2, 0.5, self.title, title_style)
-        # Determinate bar spanning the box, one row up from the status line.
-        self._bar.value = self.progress.get_progress_percentage() / 100.0
-        ctx.draw_child(self._bar, 2, box_h - 2.5, max(1.0, box_w - 4), 1.0)
-        ctx.draw_text(2, box_h - 1.4, self._status_line(int(box_w) - 4), text_style)
+        y = draw_title_bar(ctx, self.title, surface_bg=surface_bg, border=border, y=1.0)
 
-    def _status_line(self, max_width: int) -> str:
-        """One-line readout: ``processed/total`` plus the current item (with byte
-        progress for a large file), elided to the box width."""
-        op = self.progress.get_current_operation()
-        if not op:
-            return ""
-        line = f"{op['processed_items']}/{op['total_items']}"
-        item = op.get("current_item")
-        if item:
-            line += f"  {item}"
-        bc, bt = op.get("file_bytes_copied", 0), op.get("file_bytes_total", 0)
-        if bt > 1024 * 1024 and bc > 0:
-            line += f"  [{format_size(bc, compact=True)}/{format_size(bt, compact=True)}]"
-        return line[:max_width] if max_width > 0 else ""
+        text_style = Style(bg=surface_bg)
+        name = self.name
+        if ctx.measure_text(name) > box_w - 4:
+            name = name[: max(1, int(box_w) - 5)] + "…"
+        ctx.draw_text(2, y, name, Style(bg=surface_bg, attr=TextAttribute.BOLD))
+        ctx.draw_text(2, y + 1, "already exists in the destination.", text_style)
+
+        self._child_rects = []
+        cb_y = y + 2.5
+        ctx.draw_child(self._checkbox, 2, cb_y, box_w - 4, 1.0,
+                       hints={"focused": self._focused is self._checkbox})
+        self._child_rects.append((self._checkbox, (2.0, box_w - 2.0, cb_y, cb_y + 1.0)))
+
+        # Button row along the bottom, left to right with a gap.
+        lc = ctx.layout_context()
+        bh = self._buttons[0].measure(lc, "y", 0.0).preferred
+        by = box_h - bh - 0.5
+        bx = 2.0
+        for btn in self._buttons:
+            bw = btn.measure(lc, "x", bh).preferred
+            ctx.draw_child(btn, bx, by, bw, bh, hints={"focused": self._focused is btn})
+            self._child_rects.append((btn, (bx, bx + bw, by, by + bh)))
+            bx += bw + 1.0
+
+    # --- events --------------------------------------------------------------
 
     def handle_event(self, event: Event) -> bool:
-        if event.type is EventType.KEY and event.key == "escape":
-            if self._on_cancel is not None:
-                self._on_cancel()
-        return True  # modal: swallow everything else
+        if event.type is EventType.KEY:
+            self._on_key(event)
+            return True
+        if event.type in (EventType.MOUSE_DOWN, EventType.MOUSE_UP,
+                          EventType.MOUSE_CLICK):
+            self._on_mouse(event)
+            return True
+        return True  # modal: swallow the rest
+
+    def _on_key(self, event: Event) -> None:
+        key = event.key
+        char = (event.char or "").lower()
+        if key == "escape":
+            self._resolve("cancel")
+        elif key == "tab":
+            move_focus(self, -1 if "shift" in event.modifiers else 1, wrap=True)
+            self._render()
+        elif key == "enter":
+            if self._focused is self._checkbox:
+                self._checkbox.toggle()
+                self._render()
+            else:
+                self._focused.on_click()
+        elif char == "a" or key == "space":
+            self._checkbox.toggle()
+            self._render()
+        else:
+            for action, _label in _CONFLICT_ACTIONS:
+                if char == action[0]:  # o / s / k / c
+                    self._resolve(action)
+                    return
+
+    def _on_mouse(self, event: Event) -> None:
+        if event.x is None:
+            return
+        if event.type is EventType.MOUSE_CLICK:
+            for widget, (x0, x1, y0, y1) in self._child_rects:
+                if x0 <= event.x < x1 and y0 <= event.y < y1:
+                    if widget is self._checkbox:
+                        self._checkbox.toggle()
+                        self._render()
+                    else:
+                        widget.on_click()
+                    return
+
+    def _render(self) -> None:
+        if self._panel is not None:
+            self._panel.render()
