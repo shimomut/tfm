@@ -87,7 +87,10 @@ def test_copy_tree_and_large_file(tmp_path, svc):
     (src / "sub").mkdir()
     (src / "sub" / "big.bin").write_bytes(b"x" * (2 * 1024 * 1024))  # chunked path
     res = _run_sync(svc, svc.copy, [_P(src / "a.txt"), _P(src / "sub")], _P(dst))
-    assert res == {"done": 2, "skipped": 0, "failed": 0, "cancelled": False}
+    assert res["done"] == 2 and res["skipped"] == 0 and res["failed"] == 0
+    assert res["cancelled"] is False and res["errors"] == []
+    # 2 top-level items but 3 entries processed (a.txt, sub/, sub/big.bin).
+    assert res["items"] == 3
     assert (dst / "a.txt").read_text() == "hello"
     assert (dst / "sub" / "big.bin").stat().st_size == 2 * 1024 * 1024
 
@@ -245,6 +248,41 @@ def test_count_atomic_move_is_one_item(tmp_path, svc):
     task = Task("Move…")
     items, _ = svc._count(task, "move", _P(tmp_path), [_P(root)])
     assert items == 1  # same-storage move = one atomic rename
+
+
+def test_failure_is_collected_in_errors(tmp_path, svc):
+    # Copy a source that vanishes before it is read -> the per-target op raises,
+    # recorded in result["errors"] rather than only logged.
+    dst = tmp_path / "d"
+    dst.mkdir()
+    missing = _P(tmp_path / "gone.txt")  # never created
+    res = _run_sync(svc, svc.copy, [missing], _P(dst))
+    assert res["failed"] == 1 and res["done"] == 0
+    assert len(res["errors"]) == 1
+    name, msg = res["errors"][0]
+    assert name == "gone.txt" and msg  # carries a non-empty reason
+
+
+def test_op_summary_wording():
+    from tfm_file_operations import format_op_summary
+    # Flat, all done -> no top-level/total clutter.
+    assert format_op_summary(
+        "Copy", {"done": 3, "skipped": 0, "failed": 0, "items": 3, "errors": []}
+    ) == "Copy: 3 done"
+    # Nested with a failure -> clarifies top-level vs. total entries.
+    s = format_op_summary(
+        "Copy", {"done": 10, "skipped": 0, "failed": 1, "items": 247, "errors": []})
+    assert s == "Copy: 10 done, 1 failed (11 top-level items, 247 items total)"
+
+
+def test_op_errors_body_and_none():
+    from tfm_file_operations import format_op_errors
+    assert format_op_errors("Copy", {"errors": []}) is None
+    body = format_op_errors(
+        "Copy", {"errors": [("a.txt", "Permission denied"), ("b.txt", "No space")]})
+    assert "**Copy** failed for 2 item(s):" in body
+    assert "- `a.txt` — Permission denied" in body
+    assert "- `b.txt` — No space" in body
 
 
 def test_cancelled_before_run_reports_cancelled(tmp_path, svc):

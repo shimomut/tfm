@@ -184,7 +184,12 @@ class FileOperationService:
              panel: Any, log, z: int) -> dict:
         """Prepare → resolve → execute, top to bottom. `Cancelled` from a checkpoint
         or a "Cancel" conflict choice unwinds here into a clean partial summary."""
-        result = {"done": 0, "skipped": 0, "failed": 0, "cancelled": False}
+        # ``done`` / ``skipped`` / ``failed`` count **top-level** targets (what the
+        # user selected); ``items`` is the total individual entries actually
+        # processed (recursive); ``errors`` collects (name, message) per failed
+        # target so the caller can show them rather than bury them in the log.
+        result = {"done": 0, "skipped": 0, "failed": 0, "cancelled": False,
+                  "items": 0, "errors": []}
         prog = task.progress
         try:
             # Resolve conflicts first (cheap existence checks; may prompt), so the
@@ -214,12 +219,16 @@ class FileOperationService:
                     raise
                 except Exception as exc:  # noqa: BLE001 — report, keep going
                     result["failed"] += 1
+                    result["errors"].append((target.name, str(exc)))
                     prog.increment_errors()
                     if log is not None:
                         log(f"{_VERB[kind]} failed for {target.name}: {exc}")
         except Cancelled:
             result["cancelled"] = True
         finally:
+            op = prog.get_current_operation()
+            if op is not None:
+                result["items"] = op.get("processed_items", 0)
             prog.finish_operation()
         return result
 
@@ -386,6 +395,41 @@ class FileOperationService:
                 prog.update_progress(path.name)
             path.unlink()
             _log_del(log, path)
+
+
+def format_op_summary(verb: str, result: dict) -> str:
+    """One-line status for a finished file op. ``done`` / ``skipped`` / ``failed``
+    count the **top-level** selected items; when a target expands to more than that
+    (directories), also show the total number of individual entries processed — so
+    "11 done" for 11 folders of many files isn't read as 11 files."""
+    parts = [f"{result['done']} done"]
+    if result.get("skipped"):
+        parts.append(f"{result['skipped']} skipped")
+    if result.get("failed"):
+        parts.append(f"{result['failed']} failed")
+    summary = f"{verb}: {', '.join(parts)}"
+    top = result["done"] + result.get("skipped", 0) + result.get("failed", 0)
+    items = result.get("items", 0)
+    if items > top:  # nested targets — clarify top-level vs. total entries
+        summary += f" ({top} top-level items, {items} items total)"
+    if result.get("cancelled"):
+        summary += " — cancelled"
+    return summary
+
+
+def format_op_errors(verb: str, result: dict, limit: int = 12) -> Optional[str]:
+    """Markdown body naming the items that failed (and why) for a message box, or
+    ``None`` when nothing failed — so a failure in a large batch is shown, not
+    buried among the per-file log lines."""
+    errors = result.get("errors") or []
+    if not errors:
+        return None
+    shown = errors[:limit]
+    lines = [f"**{verb}** failed for {len(errors)} item(s):", ""]
+    lines += [f"- `{name}` — {msg}" for name, msg in shown]
+    if len(errors) > len(shown):
+        lines.append(f"- …and {len(errors) - len(shown)} more")
+    return "\n".join(lines)
 
 
 def _log_op(log, verb: str, src: Path, dest: Path) -> None:

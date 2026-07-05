@@ -63,7 +63,8 @@ from tfm_state_manager import get_state_manager  # noqa: E402
 from tfm_batch_rename_dialog import show_batch_rename  # noqa: E402
 from tfm_diff_viewer import show_diff_viewer  # noqa: E402
 from tfm_directory_diff_viewer import show_directory_diff_viewer  # noqa: E402
-from tfm_file_operations import FileOperationService  # noqa: E402
+from tfm_file_operations import (FileOperationService, format_op_errors,  # noqa: E402
+                                 format_op_summary)
 from tfm_task import TaskManager  # noqa: E402
 from tfm_text_dialog import show_markdown  # noqa: E402
 from tfm_text_viewer import show_text_viewer  # noqa: E402
@@ -2230,6 +2231,14 @@ class TfmApp:
         pane's directory (the 'M' key, when a selection exists)."""
         self._transfer("move")
 
+    def _report_op_failures(self, verb: str, result: dict, z: int = 70) -> None:
+        """Pop a message box naming the items that failed (and why), so a failure
+        buried in a long run of per-file log lines isn't missed."""
+        body = format_op_errors(verb, result)
+        if body is not None:
+            show_message_box(self.panel, body, title=f"{verb} — errors",
+                             icon="warning", buttons=("OK",), markdown=True, z=z)
+
     def _transfer(self, kind: str) -> None:
         """Resolve the copy/move targets and destination from the panes, apply the
         pane-specific guards, then hand the run off to the shared
@@ -2260,14 +2269,8 @@ class TfmApp:
             if kind == "move":
                 self.flm.refresh_files(src_pane)
             src_pane["selected_files"].clear()
-            summary = f"{verb}: {result['done']} done"
-            if result["skipped"]:
-                summary += f", {result['skipped']} skipped (exists)"
-            if result["failed"]:
-                summary += f", {result['failed']} failed"
-            if result.get("cancelled"):
-                summary += " (cancelled)"
-            self.log_info(summary)
+            self.log_info(format_op_summary(verb, result))
+            self._report_op_failures(verb, result)
             self.panel.render()
 
         op = self._fileops.copy if kind == "copy" else self._fileops.move
@@ -2287,12 +2290,8 @@ class TfmApp:
         def on_complete(result: dict) -> None:
             pane["selected_files"].clear()
             self._refresh(pane)
-            summary = f"Delete: {result['done']} removed"
-            if result["failed"]:
-                summary += f", {result['failed']} failed"
-            if result.get("cancelled"):
-                summary += " (cancelled)"
-            self.log_info(summary)
+            self.log_info(format_op_summary("Delete", result))
+            self._report_op_failures("Delete", result)
             self.panel.render()
 
         self._fileops.delete(self.panel, targets, on_complete=on_complete, log=self.log_info)
