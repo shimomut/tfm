@@ -204,6 +204,72 @@ staircase if a 1–2px hairline `>` is enough. Decide with a small spike.
 Reserve the same marker-column width so the label origin (`label_x`) and the
 expander hit region are unchanged; only the mark's rendering swaps.
 
+### 2.7 Directory Diff Viewer — add content margins
+Everything in the viewer is drawn **flush to the edges**, so text hugs the window
+border and the centre gutter with no breathing room. Add consistent insets. In
+`tfm_directory_diff_viewer.py` `draw` / the column geometry:
+- **left / right window margins** — the left column starts at `_left_x = 0.0` and
+  header paths / details / footer all `draw_text` at `x = 0`; the right column
+  runs up to the scrollbar. Inset the content from both edges.
+- **inner gutter padding** — column text abuts the `_GUTTER_W` splitter band on
+  both sides; add a small pad between the left column's text and the gutter, and
+  between the gutter and the right column's text.
+- (Optional) a top/bottom pad between the header/footer chrome bars and the body.
+
+The real work is **threading one margin constant through all the geometry and
+hit-testing consistently**, not the draw calls themselves: `_left_x`, `_right_x`,
+`_left_w`, `_right_w`, `_sep_x`, `_avail`, the split clamp (`_MIN_PANE`), the
+scrollbar x, the body child rect, and the pointer hit-tests / gutter-drag band
+(`_hit`, `in_gutter`, `_drag_offset`) all derive from the current flush layout and
+must shift together, or the split drag and row clicks will land off by the margin.
+Keep it a single named constant (e.g. `_MARGIN`) so it's tunable in one place.
+
+### 2.8 Help dialogs for all viewers (Markdown widget)
+Give every viewer a consistent, discoverable help overlay built on PuiKit's
+`MarkdownView`, via the existing `show_markdown(panel, source, title=, z=)` helper
+(`tfm_text_dialog.py`) — the same one the app's main `show_help` (`tfm.py:2768`)
+already uses, so the chrome, scrolling, and dismissal match.
+
+Current state per viewer:
+- **Directory Diff Viewer** — has help (`_show_help`, bound to `?`) but renders a
+  **plain-text** keys table through `show_message_box`. **Convert** it to
+  `show_markdown` (a Markdown table / definition list), keeping the dynamic key
+  labels it already derives from `KEY_BINDINGS` via `_keys_label`.
+- **Text Viewer** (`tfm_text_viewer.py`) and **File Diff Viewer**
+  (`tfm_diff_viewer.py`) — **no help at all**. Add a `?` case in `handle_event`
+  and a `_show_help` that pushes `show_markdown` with that viewer's key map
+  (scroll / search / navigation / next-diff / close, etc.).
+
+Notes:
+- Author each help as **Markdown** (headings + a key/description table) rather
+  than space-padded monospace columns, so it lays out as rich text.
+- Push the dialog above the viewer's own modal layer (the dir-diff viewer already
+  passes `z=self._child_z`); do the same for the others so the overlay stacks on
+  top of the full-window viewer.
+- Prefer deriving key labels from the configured keymap (the `_keys_label` /
+  `get_keys_for_action` pattern) wherever a viewer's keys are user-rebindable, so
+  help stays truthful — same spirit as §2.3.
+
+### 2.9 Markdown for file-operation confirmation dialogs
+The copy / move / delete confirm prompts in `tfm_file_operations.py` are built as
+**plain text** with filenames and paths inlined, so the names don't stand out
+from the surrounding prose:
+- `delete` — `f"Delete {len(targets)} item(s)?\n{names}\nThis cannot be undone."`
+  (`names` = comma-joined `t.name`).
+- `_transfer` (copy / move + the conflict prompt) —
+  `f"{verb} {len(targets)} item(s) to {dest_dir}?"` + a conflict-count line.
+
+`show_message_box` already takes `markdown=True` (the archive create / extract
+dialogs use it, e.g. ``f"Extract `{entry.name}` to `{target}`?"``). Do the same
+here: pass `markdown=True` and rewrite the messages as Markdown so the **file
+names** and **destination path** render as code spans (``` `name` ```), counts /
+"cannot be undone" as bold/emphasis, and the multi-name preview as a bullet list
+instead of a comma run. Keep it consistent with the archive dialogs' style.
+
+Caveat: names can contain Markdown-special characters (`_ * [ ]` and backticks).
+Code spans neutralise most, but a name containing a backtick needs escaping —
+add a small helper (or reuse one) to wrap a filename safely as inline code.
+
 ---
 
 ## 3. Reference — PuiKit keyboard contract
