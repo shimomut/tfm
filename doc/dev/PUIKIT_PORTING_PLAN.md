@@ -306,6 +306,41 @@ To build:
   choice + "apply to all remaining"), so keep-both is one of the per-conflict
   options, not only a batch-wide one.
 
+### 2.12 Filepath TAB completion in input dialogs
+Complete paths with TAB in the text-input prompts. `jump_to_path` in `tfm.py`
+even notes it: *"(TAB path completion is a later phase.)"* — the primary target,
+with the save-as / name prompts (`create_file`, `create_directory`,
+`create_archive`, `rename`) as secondary consumers.
+
+Today: `show_input` / `InputDialog` (`tfm_input_dialog.py`) wraps PuiKit's
+`TextEdit`; `handle_event` intercepts only `enter` / `escape` and forwards
+everything else (including `tab`) to the field, which ignores it. There is **no
+completion hook**.
+
+Reference: the ttk `tfm_single_line_text_edit.py` (now under `legacy/src/`) had a
+pluggable `Completer` + `handle_tab_completion` — insert the **longest common
+prefix** of the matches, and show a **candidate list** on TAB (repeated TAB to
+keep going). Reuse that design.
+
+To build:
+- A `completer` / `on_tab` hook on `InputDialog` (and a `show_input` parameter):
+  given `(text, caret)`, return the completed text + new caret + candidate list.
+  Intercept `tab` in `InputDialog.handle_event` (like `enter` / `escape`) so it
+  no longer falls through to the field.
+- A **path completer**: resolve the partial path with the same `~` / relative /
+  absolute logic `jump_to_path.resolve` already uses, list the parent directory's
+  matching entries, insert their longest common prefix, and append `/` when the
+  completion is a unique directory (so descent continues — matches the
+  trailing-separator prefill). A mode flag: **directories only** for jump,
+  **files + dirs** for the save-as prompts.
+- Render candidates when ambiguous — an extra row / small list under the field in
+  the dialog (grows the modal), or cycle on repeated TAB; pick one (the ttk list
+  behaviour is the reference).
+- Keep it **local-first** and bounded so completion never blocks on a slow mount
+  (the listing is synchronous inside the keystroke); case sensitivity per the
+  platform.
+- Remove the "later phase" note from `jump_to_path` once wired.
+
 ---
 
 ## 3. Reference — PuiKit keyboard contract
