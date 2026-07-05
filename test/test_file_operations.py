@@ -294,6 +294,30 @@ def test_op_summary_wording():
     assert s == "Copy: 10 done, 1 failed (11 top-level items, 247 items total)"
 
 
+def test_code_wraps_markdown_specials():
+    from tfm_file_operations import _code
+    assert _code("photo.png") == "`photo.png`"
+    assert _code("a_b*c[1].txt") == "`a_b*c[1].txt`"          # specials kept literal
+    assert _code("weird`name") == "``weird`name``"            # longer fence for backtick
+    assert _code("`edge`") == "`` `edge` ``"                  # pad when starts/ends with `
+
+
+def test_conflict_dialog_renders_message_checkbox_and_buttons():
+    """Regression: the 'apply to all' checkbox must render (a Checkbox clips at a
+    fractional grid row), alongside the code-formatted name and all four buttons."""
+    backend = MemoryBackend(width=76, height=24, capabilities=PROFILE_GUI_DESKTOP)
+    panel = Panel(backend)
+    ConflictDialog = __import__("tfm_file_operations").ConflictDialog
+    dlg = ConflictDialog("report.final.pdf", 2, 5, on_result=lambda a: None)
+    dlg.show(panel)
+    panel.render()
+    text = "\n".join(backend.snapshot())
+    assert "report.final.pdf" in text                 # the message / filename
+    assert "Apply to all remaining" in text           # the checkbox
+    for label in ("Overwrite", "Skip", "Keep both", "Cancel"):
+        assert label in text
+
+
 def test_op_errors_body_and_none():
     from tfm_file_operations import format_op_errors
     assert format_op_errors("Copy", {"errors": []}) is None

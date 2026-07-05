@@ -21,13 +21,14 @@ conflicts headlessly (skip existing) — deterministic, no dialog, no thread.
 from __future__ import annotations
 
 import os
+import re
 import shutil
 from typing import Any, Callable, Optional
 
-from puikit.backend import Style, TextAttribute
+from puikit.backend import Style
 from puikit.event import Event, EventType
 from puikit.focus import FocusContainer, move_focus
-from puikit.widgets import Button, Checkbox, show_message_box
+from puikit.widgets import Button, Checkbox, MarkdownView, show_message_box
 from puikit.widgets.base import Widget
 
 from tfm_dialog_geometry import draw_title_bar
@@ -86,6 +87,27 @@ def _unique_dest(dest_dir: Path, name: str, *, is_dir: bool = False) -> Path:
         if not candidate.exists():
             return candidate
         n += 1
+
+
+def _code(text: str) -> str:
+    """Wrap ``text`` as CommonMark inline code so a filename / path with Markdown
+    specials (``_ * [ ] `` …) renders literally as a code span. The fence is a run
+    of backticks longer than any inside ``text``, with a pad space when the content
+    itself begins or ends with a backtick (the CommonMark rule)."""
+    longest = max((len(r) for r in re.findall(r"`+", text)), default=0)
+    fence = "`" * (longest + 1)
+    if not text or text.startswith("`") or text.endswith("`"):
+        return f"{fence} {text} {fence}"
+    return f"{fence}{text}{fence}"
+
+
+def _item_list_md(targets: list, limit: int = 6) -> list:
+    """Markdown bullet lines naming the targets (as code spans), capped with an
+    "…and N more" tail — the shared item preview for the confirm dialogs."""
+    lines = [f"- {_code(t.name)}" for t in targets[:limit]]
+    if len(targets) > limit:
+        lines.append(f"- …and {len(targets) - limit} more")
+    return lines
 
 
 class FileOperationService:
@@ -147,14 +169,15 @@ class FileOperationService:
             return
 
         if kind == "delete":
-            names = ", ".join(t.name for t in targets[:3])
-            if len(targets) > 3:
-                names += f", … ({len(targets)} total)"
-            message = f"Delete {len(targets)} item(s)?\n{names}\nThis cannot be undone."
+            lines = [f"Delete **{len(targets)}** item(s)?", ""]
+            lines += _item_list_md(targets)
+            lines += ["", "**This cannot be undone.**"]
             buttons, icon, default = ("Delete", "Cancel"), "warning", 1
         else:
-            message = f"{verb} {len(targets)} item(s) to {dest_dir}?"
+            lines = [f"{verb} **{len(targets)}** item(s) to {_code(str(dest_dir))}?", ""]
+            lines += _item_list_md(targets)
             buttons, icon, default = (verb, "Cancel"), "info", 0
+        message = "\n".join(lines)
         ok_label = buttons[0]
 
         def on_result(label: str) -> None:
@@ -164,7 +187,7 @@ class FileOperationService:
                 panel.render()
 
         show_message_box(panel, message, title=verb, icon=icon, buttons=buttons,
-                         default=default, cancel=1, on_result=on_result, z=z)
+                         default=default, cancel=1, on_result=on_result, z=z, markdown=True)
         panel.render()
 
     def _submit(self, panel: Any, kind: str, targets: list, dest_dir: Optional[Path],
@@ -494,7 +517,7 @@ def format_op_errors(verb: str, result: dict, limit: int = 12) -> Optional[str]:
         return None
     shown = errors[:limit]
     lines = [f"**{verb}** failed for {len(errors)} item(s):", ""]
-    lines += [f"- `{name}` — {msg}" for name, msg in shown]
+    lines += [f"- {_code(name)} — {msg}" for name, msg in shown]
     if len(errors) > len(shown):
         lines.append(f"- …and {len(errors) - len(shown)} more")
     return "\n".join(lines)
@@ -565,6 +588,9 @@ class ConflictDialog(FocusContainer, Widget):
         self.on_result = on_result
         self._panel: Any = None
         self._size = (0.0, 0.0)
+        # The filename renders as a Markdown `code` span so it stands out from the
+        # prose (matching the confirm dialogs). Display-only — not a focus child.
+        self._msg = MarkdownView(f"{_code(name)} already exists in the destination.")
         self._checkbox = Checkbox("Apply to all remaining", checked=False)
         self._buttons = [
             Button(label, variant=("primary" if action == "overwrite" else "secondary"),
@@ -585,7 +611,7 @@ class ConflictDialog(FocusContainer, Widget):
         self._panel = panel
         sw, _sh = panel.backend.size_units
         w = float(max(48, min(72, int(sw) - 4)))
-        h = 8.0
+        h = 9.0  # title + message (may wrap 2 rows) + checkbox + button row
         panel.push_layer(self, z=z, hints={"shadow": True, "w": w, "h": h})
         panel.animate(self, hints={"transition": "fade", "duration_ms": 120})
 
@@ -609,24 +635,24 @@ class ConflictDialog(FocusContainer, Widget):
         box_w, box_h = ctx.size_units
         ctx.draw_box(0, 0, box_w, box_h, box_style, hints={"fill": True})
         y = draw_title_bar(ctx, self.title, surface_bg=surface_bg, border=border, y=1.0)
-
-        text_style = Style(bg=surface_bg)
-        name = self.name
-        if ctx.measure_text(name) > box_w - 4:
-            name = name[: max(1, int(box_w) - 5)] + "…"
-        ctx.draw_text(2, y, name, Style(bg=surface_bg, attr=TextAttribute.BOLD))
-        ctx.draw_text(2, y + 1, "already exists in the destination.", text_style)
-
         self._child_rects = []
-        cb_y = y + 2.5
+
+        # Button row along the bottom; the checkbox sits one row above it, snapped
+        # to an integer grid row (a Checkbox clips at a fractional y on the
+        # character grid). The message fills the gap between title and checkbox.
+        lc = ctx.layout_context()
+        bh = self._buttons[0].measure(lc, "y", 0.0).preferred
+        by = box_h - bh - 1.0  # a full row of bottom padding (clear of the border)
+        cb_y = float(int(by) - 1)
+
+        # Markdown message (the filename as a `code` span), on the popup surface.
+        self._msg.style = Style(bg=surface_bg)
+        ctx.draw_child(self._msg, 2, y, max(1.0, box_w - 4), max(1.0, cb_y - y - 0.25))
+
         ctx.draw_child(self._checkbox, 2, cb_y, box_w - 4, 1.0,
                        hints={"focused": self._focused is self._checkbox})
         self._child_rects.append((self._checkbox, (2.0, box_w - 2.0, cb_y, cb_y + 1.0)))
 
-        # Button row along the bottom, left to right with a gap.
-        lc = ctx.layout_context()
-        bh = self._buttons[0].measure(lc, "y", 0.0).preferred
-        by = box_h - bh - 0.5
         bx = 2.0
         for btn in self._buttons:
             bw = btn.measure(lc, "x", bh).preferred
