@@ -29,6 +29,7 @@ from __future__ import annotations
 import itertools
 import queue
 import threading
+import time
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from enum import Enum
@@ -308,10 +309,20 @@ def _recursive_delete(entry: Path) -> None:
 
 #: Foreground for a node that differs (only-one-side / content-different).
 _DIFF_FG = (222, 120, 110)
-#: Faint fill for the blank side of an only-left / only-right row.
-_EMPTY_BG = (32, 32, 34)
 #: Horizontal base units reserved per tree depth level (the connector column).
 _INDENT = 2
+#: Minimum width (base units) either pane may be shrunk to by the split drag.
+_MIN_PANE = 8
+#: Width (base units) of the centre gutter / splitter band holding the verdict
+#: glyphs. Wide enough to read as a bar, not a hairline.
+_GUTTER_W = 3
+#: Max seconds between two clicks on the same row to count as a double-click.
+_DOUBLE_CLICK_S = 0.4
+
+
+def _mix(a: tuple, b: tuple, t: float) -> tuple:
+    """Linear blend of two RGB colors, ``t`` in [0, 1] toward ``b``."""
+    return tuple(int(round(a[i] + (b[i] - a[i]) * t)) for i in range(3))
 
 
 class DirectoryDiffView(Widget):
@@ -339,6 +350,16 @@ class DirectoryDiffView(Widget):
         self.active = "left"
         self._view_h = 1
         self._body_widget: Optional[_ScrollBody] = None
+        # Movable centre split: fraction of the content width given to the left
+        # pane. Draggable by the gutter; nudged by ``[`` / ``]``.
+        self._split_ratio = 0.5
+        self._resizable = False       # set each draw once geometry is known
+        self._dragging_split = False
+        self._drag_offset = 0.0       # pointer offset within the grabbed band
+        self._avail = 2               # content width (excludes gutter/scrollbar)
+        # Double-click bookkeeping (no backend click-count; detect by time+row).
+        self._last_click_row = -1
+        self._last_click_t = 0.0
         # Nested modals (confirm boxes, the per-file diff) must sit *above* this
         # full-window layer; show_directory_diff_viewer raises it to (push z + 10).
         self._child_z = 90
@@ -935,6 +956,8 @@ class DirectoryDiffView(Widget):
             "Enter                        open dir · diff file\n"
             "n / N                        next / prev difference\n"
             "Tab                          switch active side\n"
+            "[ / ]                        move centre split (drag gutter too)\n"
+            "Click / double-click         focus side · open dir/diff\n"
             "c                            copy focused → other side\n"
             "x / Del                      delete focused (active side)\n"
             "r                            rescan\n"
@@ -948,44 +971,72 @@ class DirectoryDiffView(Widget):
         theme = ctx.theme
         w, h = ctx.width, ctx.height
         wu = ctx.size_units[0]
-        bg = getattr(theme, "popup_bg", None) if theme is not None else None
         accent = theme.accent if theme is not None else (0, 122, 204)
         muted = theme.muted_text if theme is not None else (150, 150, 150)
-        self._bg = bg
-        self._text_fg = theme.text if theme is not None else (212, 212, 212)
+        # Surfaces: chrome (header/footer) sits on the lighter popup surface; the
+        # content body sits on the app's darker editor surface (so the viewer
+        # reads as part of TFM, not a floating menu). The gutter spine is a small
+        # lift off the content so the centre split is visible on its own.
+        text_fg = theme.text if theme is not None else (212, 212, 212)
+        chrome_bg = getattr(theme, "popup_bg", None) if theme is not None else (37, 37, 38)
+        content_bg = (30, 30, 38)
+        if theme is not None and getattr(theme, "surfaces", None):
+            content_bg = theme.surfaces.get("content", content_bg)
+        self._chrome_bg = chrome_bg
+        self._bg = content_bg
+        self._gutter_bg = _mix(content_bg, text_fg, 0.14)
+        self._empty_bg = _mix(content_bg, (0, 0, 0), 0.4)
+        self._divider = getattr(theme, "divider_color", muted) if theme else muted
+        bg = content_bg
+        self._text_fg = text_fg
         self._muted = muted
         self._accent = accent
         self._sel_active = getattr(theme, "selection_active_bg", accent) if theme else accent
         self._sel_inactive = getattr(theme, "selection_inactive_bg", muted) if theme else muted
-        ctx.fill_rect(0, 0, wu, ctx.size_units[1], Style(bg=bg))
+        # Content fills the whole widget; the chrome bars are painted over it.
+        ctx.fill_rect(0, 0, wu, ctx.size_units[1], Style(bg=content_bg))
+        ctx.fill_rect(0, 0, wu, 1.0, Style(bg=chrome_bg))            # header bar
+        ctx.fill_rect(0, h - 2, wu, 2.0, Style(bg=chrome_bg))        # footer bars
 
-        # Column geometry: [left tree] [ sep ] [right tree] [scrollbar].
+        # Column geometry: [left tree] [ gutter ] [right tree] [scrollbar]. The
+        # split is user-movable and *pixel-smooth* — the split position is a
+        # fractional base-unit x (not a whole cell), so a GUI drag glides rather
+        # than snapping column-by-column. Clamped so neither pane collapses;
+        # too-narrow windows fall back to an even split.
         reserve = 1 if self.visible else 0
-        avail = max(2, w - 3 - reserve)
-        right_w = avail // 2
-        left_w = avail - right_w
-        self._left_x = 0
-        self._sep_x = left_w
-        self._right_x = left_w + 3
-        self._left_w = left_w
-        self._right_w = right_w
-
-        # Header: the two directory paths, active side in accent.
-        left_head = Style(fg=accent if self.active == "left" else self._text_fg, bg=bg,
-                          attr=TextAttribute.BOLD)
-        right_head = Style(fg=accent if self.active == "right" else self._text_fg, bg=bg,
-                           attr=TextAttribute.BOLD)
-        ctx.draw_text(0, 0, truncate_to_width(str(self.left_path), left_w), left_head)
-        # A hairline column divider between the two header paths (a stroke on GUI,
-        # a │ glyph on grid); the Panel layer picks which. Centerline at the
-        # middle of the gap column.
-        ctx.draw_hairline(self._sep_x + 1.5, 0, 1.0, vertical=True, style=Style(fg=muted, bg=bg))
-        ctx.draw_text(self._right_x, 0, truncate_to_width(str(self.right_path), right_w),
-                      right_head)
+        avail = max(2, w - _GUTTER_W - reserve)
+        self._avail = avail
+        if avail >= 2 * _MIN_PANE:
+            split_x = avail * self._split_ratio
+            split_x = max(float(_MIN_PANE), min(avail - _MIN_PANE, split_x))
+            self._resizable = True
+        else:
+            split_x = avail / 2
+            self._resizable = False
+        self._left_x = 0.0
+        self._sep_x = split_x
+        self._right_x = split_x + _GUTTER_W
+        self._left_w = split_x
+        self._right_w = avail - split_x
 
         # Rows sit between the header (row 0) and a details row + footer at the
         # bottom two lines.
         self._view_h = max(1, h - 3)
+
+        # The splitter: a full-height band (header top → footer top, so it never
+        # leaves a gap below the last row) in its own tone. This *is* the divider
+        # — no separate hairline — and it's several pixels wide, not a stroke.
+        ctx.fill_rect(self._sep_x, 0, float(_GUTTER_W), h - 2.0, Style(bg=self._gutter_bg))
+
+        # Header: the two directory paths, active side in accent, on the chrome bar.
+        left_head = Style(fg=accent if self.active == "left" else self._text_fg, bg=chrome_bg,
+                          attr=TextAttribute.BOLD)
+        right_head = Style(fg=accent if self.active == "right" else self._text_fg, bg=chrome_bg,
+                           attr=TextAttribute.BOLD)
+        ctx.draw_text(0, 0, truncate_to_width(str(self.left_path), int(self._left_w)), left_head)
+        ctx.draw_text(self._right_x, 0,
+                      truncate_to_width(str(self.right_path), int(self._right_w)), right_head)
+
         self._clamp_scroll()
 
         if not self.visible:
@@ -999,9 +1050,26 @@ class DirectoryDiffView(Widget):
                                    max(0.0, min(1.0, self.top / denom if denom else 0.0)), ratio)
 
         ctx.draw_text(0, h - 2, self._details_line()[:w],
-                      Style(fg=self._text_fg, bg=bg))
+                      Style(fg=self._text_fg, bg=chrome_bg))
         ctx.draw_text(0, h - 1, self._footer()[:w],
-                      Style(fg=muted, bg=bg, attr=TextAttribute.DIM))
+                      Style(fg=muted, bg=chrome_bg, attr=TextAttribute.DIM))
+        self._update_cursor(ctx, h)
+
+    def _update_cursor(self, ctx, h: int) -> None:
+        """Claim the pointer shape every frame. This is a full-window modal, so
+        without an explicit request the resize cursor of a widget *underneath*
+        (the app's pane Splitter) leaks through at its fixed centre. We show
+        ``col-resize`` only over our own gutter (or mid-drag) and reset to the
+        default everywhere else — always overriding whatever drew below."""
+        over = self._dragging_split
+        if not over and self._resizable:
+            panel = getattr(ctx, "panel", None)
+            p = panel.pointer if panel is not None else None
+            if p is not None:
+                sx, sy, _sw, _sh = ctx.screen_rect
+                lx, ly = p[0] - sx, p[1] - sy
+                over = self._sep_x <= lx < self._right_x and 0 <= ly < h - 2
+        ctx.set_cursor("col-resize" if over else None)
 
     def _draw_status_screen(self, ctx, w: int, h: int, muted, bg) -> None:
         if self._scanning:
@@ -1028,7 +1096,7 @@ class DirectoryDiffView(Widget):
                     f"{queued} queued · esc cancel ")
         diffs = sum(1 for n in self.visible if n.difference_type in _IS_DIFF)
         return (f" {len(self.visible)} nodes · {diffs} differences · "
-                "n/N jump · ←/→ expand · tab side · enter diff · q close ")
+                "n/N jump · ←/→ expand · [ ] resize · tab side · enter diff · q close ")
 
     def _details_line(self) -> str:
         """The focused node's size on each side (the details pane, condensed to a
@@ -1087,7 +1155,7 @@ class DirectoryDiffView(Widget):
                 fg = (255, 255, 255)
                 ctx.fill_rect(x, y, col_w, 1.0, Style(bg=row_bg))
             elif path is None:
-                ctx.fill_rect(x, y, col_w, 1.0, Style(bg=_EMPTY_BG))
+                ctx.fill_rect(x, y, col_w, 1.0, Style(bg=self._empty_bg))
             if vector:
                 self._draw_side_vector(ctx, x, col_w, node, flags, path, y,
                                        fg, row_bg, suffix)
@@ -1095,16 +1163,19 @@ class DirectoryDiffView(Widget):
                 self._draw_side_grid(ctx, x, col_w, node, path, y, fg, row_bg, suffix)
 
         side(self._left_x, self._left_w, node.left_path, self.active == "left")
+        # The verdict glyph rides on the full-height splitter band (painted once
+        # in draw()); its bg matches so the band stays continuous behind it.
         sep = _SEPARATOR.get(verdict, " ! ")
         sep_fg = _DIFF_FG if is_diff else self._muted
         ctx.draw_text(self._sep_x, y, sep,
-                      Style(fg=sep_fg, bg=bg, attr=TextAttribute.BOLD, font=MONO))
+                      Style(fg=sep_fg, bg=self._gutter_bg, attr=TextAttribute.BOLD, font=MONO))
         side(self._right_x, self._right_w, node.right_path, self.active == "right")
 
     def _draw_side_grid(self, ctx, x, col_w, node, path, y, fg, row_bg, suffix) -> None:
         """Terminal / character-grid tree column: box-drawing connectors in the
         cell grid (monospace, so ├ └ │ align and column-count truncation is
         exact)."""
+        col_w = int(col_w)  # a fractional split width still slices whole cells
         if path is None:
             lines = self._tree_lines(node, branch=False)
             if lines:
@@ -1153,6 +1224,88 @@ class DirectoryDiffView(Widget):
 
     # --- events --------------------------------------------------------------
 
+    # --- mouse ---------------------------------------------------------------
+
+    def _row_at(self, y: float) -> Optional[int]:
+        """Visible-list index under widget-local ``y`` (header is row 0, body
+        starts at row 1), or None if the click is outside the row area."""
+        if y < 1 or y >= 1 + self._view_h:
+            return None
+        ri = int(self.top + (y - 1.0))
+        return ri if 0 <= ri < len(self.visible) else None
+
+    def _side_at(self, x: float) -> Optional[str]:
+        """Which pane column ``x`` falls in ('left'/'right'), or None for the
+        gutter / scrollbar."""
+        if self._left_x <= x < self._left_x + self._left_w:
+            return "left"
+        if self._right_x <= x < self._right_x + self._right_w:
+            return "right"
+        return None
+
+    def _set_split_from_x(self, x: float) -> None:
+        # Keep the fractional pointer position (no cell rounding) so the split
+        # tracks the cursor pixel-for-pixel on a GUI backend.
+        split_x = max(float(_MIN_PANE), min(self._avail - _MIN_PANE, x))
+        self._split_ratio = split_x / self._avail
+        self._render()
+
+    def _nudge_split(self, delta: float) -> None:
+        if not self._resizable:
+            return
+        lo, hi = _MIN_PANE / self._avail, 1.0 - _MIN_PANE / self._avail
+        self._split_ratio = max(lo, min(hi, self._split_ratio + delta))
+        self._render()
+
+    def _handle_mouse(self, event: Event) -> bool:
+        x = event.x if event.x is not None else 0.0
+        y = event.y if event.y is not None else 0.0
+        in_gutter = self._sep_x <= x < self._right_x
+        if event.type is EventType.MOUSE_DOWN:
+            if in_gutter and self._resizable:
+                self._dragging_split = True
+                self._drag_offset = x - self._sep_x  # grab point within the band
+                return True
+            # Click-to-select: move the cursor to the row and focus its side.
+            ri = self._row_at(y)
+            if ri is not None:
+                self.cursor = ri
+                side = self._side_at(x)
+                if side is not None:
+                    self.active = side
+                self._ensure_cursor_visible()
+                self._update_priorities()
+                self._render()
+            return True
+        if event.type is EventType.MOUSE_DRAG:
+            if self._dragging_split:
+                self._set_split_from_x(x - self._drag_offset)
+            return True
+        if event.type is EventType.MOUSE_UP:
+            self._dragging_split = False
+            return True
+        if event.type is EventType.MOUSE_CLICK:
+            # A release over the same widget the press began on. Double-click
+            # (two on the same row within the window) activates like Enter:
+            # expand/collapse a directory, or open a file's diff.
+            ri = self._row_at(y)
+            now = time.monotonic()
+            if (ri is not None and ri == self._last_click_row
+                    and now - self._last_click_t <= _DOUBLE_CLICK_S):
+                self.cursor = ri
+                node = self._current()
+                if node is not None and node.is_directory:
+                    self._toggle()
+                elif node is not None:
+                    self._open_file_diff()
+                self._last_click_row = -1
+                self._render()
+            else:
+                self._last_click_row = ri if ri is not None else -1
+                self._last_click_t = now
+            return True
+        return True
+
     def _close(self) -> None:
         self.cancel()
         panel = self._panel
@@ -1167,7 +1320,7 @@ class DirectoryDiffView(Widget):
             self._update_priorities()  # scan what scrolled into view first
             return True
         if event.type in self._MOUSE:
-            return True  # slice 4: click-to-focus row; display-only for now
+            return self._handle_mouse(event)
         if event.type is not EventType.KEY:
             return True
         key = event.key
@@ -1218,6 +1371,10 @@ class DirectoryDiffView(Widget):
             self._delete_focused()
         elif char == "r":
             self._restart_scan()
+        elif char == "[":
+            self._nudge_split(-0.05)
+        elif char == "]":
+            self._nudge_split(0.05)
         elif char == "?":
             self._show_help()
         self._update_priorities()  # bias scanning toward the new viewport
