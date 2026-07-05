@@ -235,11 +235,18 @@ the old menu and adds direction + content:
   relation holds (AND), and orphans are selected only with `include_missing`.
   `stat()` is called only on name-matches; content is a streaming byte compare
   that **short-circuits on a size mismatch**. `mtime` uses the ttk 1s tolerance.
-- **`tfm_compare_dialog.py`** (new) — the `CompareSelectDialog` modal: three
-  side-by-side radio columns (Size / Modified / Content), a "select missing"
-  checkbox, and a Selection mode (Replace / Add), built on the `ConflictDialog`
-  hand-layout pattern (flat Tab ring, translated-mouse forwarding, integer-row
-  snapping so grid backends don't round adjacent radio rows onto one cell).
+- **`tfm_compare_dialog.py`** (new) — the `CompareSelectDialog` modal: a compact,
+  keyboard-first list (no Tab, no buttons). Each attribute is a single-line
+  `ConditionRow` — a real PuiKit `Checkbox` (enable) plus a segmented relation
+  picker whose current segment is drawn with a filled highlight (`round_rect`: a
+  rounded pill on vector / a block on a grid) in **color only**, never a
+  font-weight change (which would reflow proportional text). **Space** toggles the
+  checkbox (`any` = off), **←/→** choose the relation; **Up/Down** move focus over
+  the three rows + a "Preserve current selection" checkbox (off = replace, on =
+  add); **Enter** accepts, **Esc** cancels. The box height is measured from the
+  rows and trimmed to fit (`_fit_height`) so there's no bottom slack on either
+  backend. Orphan selection (`include_missing`) is intentionally not exposed — the
+  engine still supports it.
 - **`tfm.py`** — `compare_selection` handler (dispatched from the keymap `W` and a
   new **Select ▸ Compare & Select…** menu item). Stat-only criteria run inline;
   a **content** relation reads files, so it routes through the `tfm_task.py`
@@ -248,8 +255,9 @@ the old menu and adds direction + content:
   pane's `selected_files` (replace or add) with a files/dirs summary log.
 
 Covered by `test/test_compare_selection.py` (engine relations, join, NFC,
-short-circuit) and `test/test_compare_dialog.py` (app-integration: dialog draw
-regression, replace/add, include-missing, cancel, the content task path).
+short-circuit) and `test/test_compare_dialog.py` (app-integration: the keyboard
+model — Up/Down focus, ←/→ options, Space toggle, Enter/Esc — plus
+replace/preserve, cancel, and the content task path).
 
 ### 2.10 Color theme brush-up (file types, cursor, syntax)
 The port's palette is thin in three places; brush them up into one coherent,

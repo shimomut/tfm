@@ -1,16 +1,21 @@
 """CompareSelectDialog — the modal that builds a :class:`~tfm_compare_selection.CompareCriteria`
 for the ``compare_selection`` action (ttk TFM's ``W`` key, rebuilt for PuiKit).
 
-Three side-by-side radio columns pick the relation the other pane's counterpart
-must satisfy for each attribute — **Size** (any/equal/differs), **Modified**
-(any/same/newer/older), **Content** (any/equal/differs) — plus a checkbox to also
-take items with no counterpart, and a **Selection** mode (replace vs. add to the
-current selection). It reports the assembled criteria through ``on_result`` (or
-``None`` on cancel); the engine and the app do the actual comparing and selecting.
+A compact, keyboard-first list (no Tab, no buttons):
 
-Layout is hand-placed in :meth:`draw` and focus is a flat Tab ring over the
-columns / checkbox / mode / buttons, mirroring :class:`ConflictDialog` — no nested
-layout view or popup layers, so it composes cleanly inside a pushed modal.
+- **Up / Down** move focus between rows — the three condition rows (Size /
+  Modified / Content) and the "Preserve current selection" toggle.
+- Each condition row is a real :class:`~puikit.widgets.Checkbox` (enable this
+  attribute) plus a segmented option picker: **Space** toggles the checkbox,
+  **Left / Right** choose the relation. The chosen segment is drawn with a filled
+  highlight — a rounded pill on a vector (GUI) backend, a background block on a
+  character grid — never a font-weight change (which would resize proportional
+  text). ``any`` = the checkbox is off, i.e. don't compare this attribute.
+- **Enter** accepts, **Esc** cancels.
+
+The selection folds into the active pane, replacing the current selection unless
+Preserve is on. (The engine still supports orphan selection; this dialog does not
+expose it.)
 """
 
 from __future__ import annotations
@@ -18,30 +23,120 @@ from __future__ import annotations
 import dataclasses
 from typing import Any, Callable, Optional
 
-from puikit.backend import Style, TextAttribute
+from puikit.backend import Style
 from puikit.event import Event, EventType
-from puikit.focus import FocusContainer, move_focus
-from puikit.widgets import Button, Checkbox, RadioGroup
+from puikit.focus import FocusContainer
+from puikit.layout import LayoutContext, SizeRequest
+from puikit.panel import Rect
+from puikit.theme import DEFAULT_THEME
+from puikit.widgets import Checkbox
 from puikit.widgets.base import Widget
-from puikit.widgets.checkbox import is_activate
 
 from tfm_compare_selection import CompareCriteria
 from tfm_dialog_geometry import draw_title_bar, pane_anchored_box
 
-# Each column: header + (label, value) options. Labels double as the radio rows;
-# values feed CompareCriteria. Defaults are all "any" (= legacy "by filename").
-_SIZE = ("Size", [("any", "any"), ("equal", "equal"), ("differs", "differs")])
-_MTIME = ("Modified", [("any", "any"), ("same", "same"),
-                       ("newer", "newer"), ("older", "older")])
-_CONTENT = ("Content", [("any", "any"), ("equal", "equal"), ("differs", "differs")])
-_MODE = ("Selection", [("Replace", "replace"), ("Add", "add")])
+# (label, relation options). The Checkbox is the on/off; the options are the real
+# relations (no "any" — that is the box being unchecked). Values are CompareCriteria's.
+_SIZE = ("Size", ["equal", "differs"])
+_MTIME = ("Modified", ["same", "newer", "older"])
+_CONTENT = ("Content", ["equal", "differs"])
+
+_OPT_GAP = 2.0  # base units between option segments
+
+
+class ConditionRow(Widget):
+    """One attribute on a single line: a :class:`Checkbox` (enable) + a segmented
+    relation picker. ``value`` is ``"any"`` while the box is unchecked, else the
+    chosen relation. Space toggles the box; Left/Right move the relation."""
+
+    focusable = True
+
+    #: x (base units) where the option run starts, set by the dialog so the rows
+    #: align their segments under a common gutter past the widest checkbox.
+    opt_x0 = 14.0
+
+    def __init__(self, label: str, options: list[str]):
+        self.checkbox = Checkbox(label, checked=False)
+        self.options = options
+        self.index = 0
+        self._cb_x = (1.0, 1.0)                       # checkbox hit range, set at draw
+        self._opt_hits: list[tuple[float, float, int]] = []
+
+    @property
+    def value(self) -> str:
+        return self.options[self.index] if self.checkbox.checked else "any"
+
+    def toggle(self) -> None:
+        self.checkbox.toggle()
+
+    def move(self, delta: int) -> None:
+        self.index = max(0, min(len(self.options) - 1, self.index + delta))
+
+    def set_index(self, i: int) -> None:
+        if 0 <= i < len(self.options):
+            self.index = i
+
+    def measure(self, ctx: LayoutContext, axis: str, available: float) -> SizeRequest:
+        if axis == "y":
+            return self.checkbox.measure(ctx, "y", available)  # match the checkbox height
+        return SizeRequest(min=self.opt_x0 + 6.0, preferred=self.opt_x0 + 24.0,
+                           max=float("inf"))
+
+    def draw(self, ctx) -> None:
+        theme = ctx.theme or DEFAULT_THEME
+        wu, hu = ctx.size_units
+        focused = ctx.focused
+        lc = ctx.layout_context()
+        # Row surface: the dialog filled it (via the draw_child "bg" hint) with the
+        # popup surface or, when focused, the hover tint. Text/marks must carry
+        # that bg explicitly — a bare bg=None resolves to the layer default (dark),
+        # which shows through as black on a grid backend.
+        row_bg = theme.hover_bg if focused else theme.popup_bg
+
+        active = self.checkbox.checked
+        cb_w = self.checkbox.measure(lc, "x", 0.0).preferred
+        ctx.draw_child(self.checkbox, 0.0, 0, cb_w, hu, hints={"focused": focused})
+        self._cb_x = (0.0, cb_w)
+
+        # Segments. The current one gets a filled highlight (a pill on vector, a
+        # block on a grid); selection/enabled state is color only — no bold, so a
+        # proportional font never reflows the row when it changes.
+        pad = 0.6 if ctx.vector_shapes else 0.0
+        line_h = ctx.line_height()
+        vy = max(0.0, (hu - line_h) / 2.0)
+        x = self.opt_x0
+        self._opt_hits = []
+        for i, opt in enumerate(self.options):
+            w = ctx.measure_text(opt)
+            current = i == self.index
+            if current:
+                seg_bg = theme.selection_active_bg if active else theme.selection_inactive_bg
+                ctx.round_rect(x - pad, vy - 0.1, w + 2 * pad, line_h + 0.2,
+                               Style(bg=seg_bg), radius=None, hints={"fill": True})
+                fg = theme.text
+            else:
+                seg_bg = row_bg
+                fg = theme.text if active else theme.muted_text
+            ctx.draw_text(x, vy, opt, Style(fg=fg, bg=seg_bg))
+            self._opt_hits.append((x - pad, x + w + pad, i))
+            x += w + _OPT_GAP
+
+    def handle_event(self, event: Event) -> bool:
+        if event.type is EventType.MOUSE_CLICK and event.x is not None:
+            if self._cb_x[0] <= event.x < self._cb_x[1]:
+                self.checkbox.toggle()
+                return True
+            for x0, x1, i in self._opt_hits:
+                if x0 <= event.x < x1:
+                    self.set_index(i)
+                    return True
+        return False
 
 
 def _layout_context(backend):
     """Build a ``LayoutContext`` for ``backend`` off-draw, so :meth:`show` can
-    measure child heights (and thus size the box) before there is a DrawContext.
+    measure row heights (and thus size the box) before a DrawContext exists.
     Mirrors ``DrawContext.layout_context`` — the same capability resolution."""
-    from puikit.layout import LayoutContext
     cw, ch = backend.base_size
     caps = backend.capabilities
     return LayoutContext(
@@ -63,86 +158,80 @@ class CompareSelectDialog(FocusContainer, Widget):
     focusable = True
     focus_stop_when_empty = True
 
+    _TITLE_ROWS = 3.0  # rows the title bar occupies when sizing (grid; vector is less)
+    _INTRO = "Select items that also exist in the other pane, matching:"
+    _HINT_COND = "←/→ choose · Space on/off · Enter select · Esc cancel"
+    _HINT_OTHER = "Space toggle · Enter select · Esc cancel"
+
     def __init__(self, on_result: Callable[[Optional[CompareCriteria]], None]):
         self.title = "Compare & Select"
         self.on_result = on_result
         self._panel: Any = None
+        self._region = None  # active-pane column span, for re-anchoring on re-fit
 
-        self._values = {}  # widget -> option value list, for reading the choice back
-        self._size = self._radio(_SIZE)
-        self._mtime = self._radio(_MTIME)
-        self._content = self._radio(_CONTENT)
-        self._mode = self._radio(_MODE)
-        self._missing = Checkbox("also select items missing in the other pane",
-                                 checked=False)
-        self._select_btn = Button("Select", variant="primary",
-                                  on_click=self._accept)
-        self._cancel_btn = Button("Cancel", variant="secondary",
-                                  on_click=lambda: self._finish(None))
+        self._size = ConditionRow(*_SIZE)
+        self._mtime = ConditionRow(*_MTIME)
+        self._content = ConditionRow(*_CONTENT)
+        self._conditions = [self._size, self._mtime, self._content]
+        self._preserve = Checkbox("Preserve current selection", checked=False)
 
-        self._columns = [self._size, self._mtime, self._content]
-        self._focused: Any = self._size  # start on the first comparison column
+        self._focused: Any = self._size
         self._child_rects: list[tuple[Any, tuple[float, float, float, float]]] = []
-
-    def _radio(self, spec) -> RadioGroup:
-        _header, options = spec
-        group = RadioGroup([label for label, _v in options])
-        self._values[group] = [v for _label, v in options]
-        return group
 
     # --- focus ---------------------------------------------------------------
 
     def focus_children(self) -> list[Any]:
-        return [self._size, self._mtime, self._content, self._missing, self._mode,
-                self._select_btn, self._cancel_btn]
+        return [self._size, self._mtime, self._content, self._preserve]
 
-    # --- layout --------------------------------------------------------------
+    def _move_focus(self, delta: int) -> None:
+        kids = self.focus_children()
+        i = kids.index(self._focused) if self._focused in kids else 0
+        self._focused = kids[(i + delta) % len(kids)]
 
-    #: Rows reserved for the title bar when sizing the box. On a grid backend
-    #: ``draw_title_bar`` returns exactly this; on vector it returns less (a thin
-    #: measured bar), so this is a safe upper bound — any slack lands as bottom pad.
-    _TITLE_ROWS = 3.0
+    # --- geometry ------------------------------------------------------------
 
-    def _flow(self, y0: float, band_h: float, cb_h: float,
-              mode_h: float, btn_h: float) -> dict:
-        """Vertical positions for one top-down pass from the title bottom ``y0``,
-        shared by :meth:`show` (to size the box) and :meth:`draw` (to place). Row
-        origins snap to integers so a radio group's unit-pitch rows never round two
-        options onto one grid cell; measured heights keep the taller vector pitch.
-        The Selection group and the button row share the bottom band."""
-        head_y = float(int(y0) + 2)              # blank row between intro and headers
-        band_top = head_y + 1.0
-        cb_y = float(int(band_top + band_h + 1.0))
-        sel_head_y = float(int(cb_y + cb_h + 1.0))
-        mode_y = sel_head_y + 1.0
-        band2_h = max(mode_h, btn_h)
-        btn_y = mode_y + max(0.0, band2_h - btn_h)  # bottom-align buttons with the mode group
-        bottom = mode_y + band2_h
-        return {"head_y": head_y, "band_top": band_top, "cb_y": cb_y,
-                "sel_head_y": sel_head_y, "mode_y": mode_y, "btn_y": btn_y,
-                "bottom": bottom}
+    def _hint_y(self, title_bottom: float, row_h: float) -> float:
+        """Row of the key-hint line for the top-down layout — the single source of
+        truth shared by :meth:`show` (sizing), :meth:`draw` (placement), and the
+        fit resize. Rows are ``row_h`` tall (a Checkbox — taller than a cell on
+        vector)."""
+        cond_top = float(int(title_bottom) + 2)   # blank row under the intro
+        preserve_y = cond_top + 3.0 * row_h + 1.0  # conditions + a gap
+        return preserve_y + row_h + 1.0            # preserve row + a gap
 
-    def _metrics(self, lc) -> tuple:
-        """Measured child heights (band = tallest column). Backend-aware via ``lc``,
-        so the vector pitch (mark box taller than a cell) is reflected."""
-        band_h = max(g.measure(lc, "y", 0.0).preferred for g in self._columns)
-        cb_h = self._missing.measure(lc, "y", 0.0).preferred
-        mode_h = self._mode.measure(lc, "y", 0.0).preferred
-        btn_h = self._select_btn.measure(lc, "y", 0.0).preferred
-        return band_h, cb_h, mode_h, btn_h
+    def _box_height(self, title_bottom: float, row_h: float) -> float:
+        return self._hint_y(title_bottom, row_h) + 2.0  # hint row + bottom border/pad
+
+    def _content_width(self, lc) -> float:
+        """Width of the widest content line (base units), so the box hugs its text
+        instead of a fixed span: the intro, the longest key hint, the Preserve
+        checkbox, and the widest condition row (its gutter + segments)."""
+        opt_x0 = max(r.checkbox.measure(lc, "x", 0.0).preferred
+                     for r in self._conditions) + 2.0
+        row_w = max(
+            opt_x0 + sum(lc.measure_text(o) for o in r.options)
+            + _OPT_GAP * (len(r.options) - 1) + 0.7  # trailing pill pad
+            for r in self._conditions)
+        return max(
+            lc.measure_text(self._INTRO),
+            lc.measure_text(self._HINT_COND),
+            self._preserve.measure(lc, "x", 0.0).preferred,
+            row_w,
+        )
 
     # --- lifecycle -----------------------------------------------------------
 
     def show(self, panel: Any, *, region=None, z: int = 70) -> None:
         self._panel = panel
+        self._region = region
         sw, sh = panel.backend.size_units
-        w = float(max(58, min(76, int(sw) - 4)))
-        # Height is measured, not guessed: the radio pitch is taller than a cell on
-        # vector backends, so size the box from the actual child heights and the
-        # shared top-down flow (+ a bottom pad), capped to the window.
+        # Initial size from an off-draw estimate; draw() re-fits both dimensions
+        # from live font metrics (a GUI backend can only measure proportional text
+        # accurately inside the draw cycle — before it, measure_text is monospace).
         lc = _layout_context(panel.backend)
-        flow = self._flow(self._TITLE_ROWS, *self._metrics(lc))
-        h = float(min(sh - 2.0, flow["bottom"] + 1.0))
+        w = float(min(int(sw) - 4, self._content_width(lc) + 4.0))  # +2 margin each side
+        row_h = self._size.measure(lc, "y", 0.0).preferred
+        h = float(min(sh - 2.0, self._box_height(self._TITLE_ROWS, row_h)))
         hints: dict[str, Any] = {"shadow": True, "w": w, "h": h}
         if region is not None:
             w, x = pane_anchored_box(w, sw, region)
@@ -163,11 +252,11 @@ class CompareSelectDialog(FocusContainer, Widget):
 
     def _criteria(self) -> CompareCriteria:
         return CompareCriteria(
-            size=self._values[self._size][self._size.selected],
-            mtime=self._values[self._mtime][self._mtime.selected],
-            content=self._values[self._content][self._content.selected],
-            include_missing=self._missing.checked,
-            mode=self._values[self._mode][self._mode.selected],
+            size=self._size.value,
+            mtime=self._mtime.value,
+            content=self._content.value,
+            include_missing=False,
+            mode=("add" if self._preserve.checked else "replace"),
         )
 
     # --- drawing -------------------------------------------------------------
@@ -178,63 +267,79 @@ class CompareSelectDialog(FocusContainer, Widget):
         surface_bg = theme.popup_bg if theme is not None else None
         border = theme.popup_border if theme is not None else None
         text_fg = theme.text if theme is not None else None
+        muted_fg = theme.muted_text if theme is not None else None
         box_style = Style(bg=surface_bg, fg=border)
         box_w, box_h = ctx.size_units
         ctx.draw_box(0, 0, box_w, box_h, box_style, hints={"fill": True})
         y = draw_title_bar(ctx, self.title, surface_bg=surface_bg, border=border, y=1.0)
         self._child_rects = []
-
-        head_style = Style(bg=surface_bg, fg=text_fg, attr=TextAttribute.BOLD)
-        body_style = Style(bg=surface_bg, fg=text_fg)
         lc = ctx.layout_context()
+        row_h = self._size.measure(lc, "y", 0.0).preferred
 
-        ctx.draw_text(2, y, "Select items here, compared with the same-named item "
-                            "in the other pane:", body_style)
+        ctx.draw_text(2, y, self._INTRO, Style(bg=surface_bg, fg=text_fg))
 
-        # A single top-down flow from the title bottom, using measured child
-        # heights (so the taller vector radio pitch is accounted for) — no
-        # bottom-anchoring, so any box slack is harmless bottom pad rather than a
-        # collision. Origins snap to integer rows so unit-pitch grid rows never
-        # round two options onto one cell.
-        band_h, cb_h, mode_h, btn_h = self._metrics(lc)
-        f = self._flow(y, band_h, cb_h, mode_h, btn_h)
+        # Align the segments under one gutter, past the widest checkbox.
+        opt_x0 = max(r.checkbox.measure(lc, "x", 0.0).preferred
+                     for r in self._conditions) + 2.0
 
-        # --- three comparison columns (header + radio group) ------------------
-        gap = 1.0
-        col_w = (box_w - 4.0 - 2.0 * gap) / 3.0
-        col_x = [2.0 + i * (col_w + gap) for i in range(3)]
-        specs = (_SIZE, _MTIME, _CONTENT)
-        for (header, _opts), group, gx in zip(specs, self._columns, col_x):
-            ctx.draw_text(gx, f["head_y"], header, head_style)
-            gh = group.measure(lc, "y", 0.0).preferred
-            ctx.draw_child(group, gx, f["band_top"], col_w, gh,
-                           hints={"focused": self._focused is group})
-            self._child_rects.append(
-                (group, (gx, gx + col_w, f["band_top"], f["band_top"] + gh)))
+        # Each row gets an explicit "bg" hint so its children inherit the popup
+        # surface (or the hover tint when focused) instead of the dark layer
+        # default — otherwise bg=None text shows through black on a grid backend.
+        hover_bg = theme.hover_bg if theme is not None else None
 
-        # --- "missing" checkbox ----------------------------------------------
-        cb_y = f["cb_y"]
-        ctx.draw_child(self._missing, 2, cb_y, box_w - 4, 1.0,
-                       hints={"focused": self._focused is self._missing})
-        self._child_rects.append((self._missing, (2.0, box_w - 2.0, cb_y, cb_y + 1.0)))
+        cond_top = float(int(y) + 2)
+        row_y = cond_top
+        for row in self._conditions:
+            row.opt_x0 = opt_x0
+            focused = self._focused is row
+            ctx.draw_child(row, 2, row_y, box_w - 4, row_h,
+                           hints={"focused": focused,
+                                  "bg": hover_bg if focused else surface_bg})
+            self._child_rects.append((row, (2.0, box_w - 2.0, row_y, row_y + row_h)))
+            row_y += row_h
 
-        # --- bottom band: Selection mode (left) + buttons (right) ------------
-        mode_w = 18.0
-        mode_top = f["mode_y"]
-        ctx.draw_text(2, f["sel_head_y"], _MODE[0], head_style)
-        ctx.draw_child(self._mode, 2, mode_top, mode_w, mode_h,
-                       hints={"focused": self._focused is self._mode})
-        self._child_rects.append((self._mode, (2.0, 2.0 + mode_w, mode_top, mode_top + mode_h)))
+        preserve_y = cond_top + 3.0 * row_h + 1.0
+        pfocus = self._focused is self._preserve
+        ctx.draw_child(self._preserve, 2, preserve_y, box_w - 4, row_h,
+                       hints={"focused": pfocus,
+                              "bg": hover_bg if pfocus else surface_bg})
+        self._child_rects.append(
+            (self._preserve, (2.0, box_w - 2.0, preserve_y, preserve_y + row_h)))
 
-        by = f["btn_y"]
-        buttons = [self._select_btn, self._cancel_btn]
-        widths = [b.measure(lc, "x", btn_h).preferred for b in buttons]
-        bh = btn_h
-        bx = box_w - 2.0 - sum(widths) - gap  # right-align the button row
-        for btn, bw in zip(buttons, widths):
-            ctx.draw_child(btn, bx, by, bw, bh, hints={"focused": self._focused is btn})
-            self._child_rects.append((btn, (bx, bx + bw, by, by + bh)))
-            bx += bw + gap
+        hint_y = self._hint_y(y, row_h)
+        ctx.draw_text(2, hint_y, self._hint(), Style(bg=surface_bg, fg=muted_fg))
+
+        # Fit the box to the measured content — width and height — now that font
+        # metrics are live (proportional on GUI), so there's no slack on either
+        # edge. A no-op on a grid backend (already exact from show()).
+        self._fit(self._content_width(lc) + 4.0, self._box_height(y, row_h))
+
+    def _hint(self) -> str:
+        return self._HINT_COND if isinstance(self._focused, ConditionRow) else self._HINT_OTHER
+
+    def _fit(self, needed_w: float, needed_h: float) -> None:
+        """Resize the layer to the measured content (width + height), keeping the
+        top edge and re-anchoring x over the pane. Corrects the off-draw estimate
+        once live font metrics are known; applied on the next render (a near no-op
+        on a grid backend, where the estimate is already exact)."""
+        panel = self._panel
+        if panel is None or not panel.has_layers:
+            return
+        slot = next((s for s in panel._layers if s.widget is self), None)
+        if slot is None:
+            return
+        sw, _sh = panel.backend.size_units
+        w = min(needed_w, sw - 4.0)
+        h = needed_h
+        if not panel.backend.capabilities.supports("pixel_layout"):
+            w, h = float(round(w)), float(round(h))
+        if abs(slot.rect.w - w) < 0.4 and abs(slot.rect.h - h) < 0.4:
+            return
+        if self._region is not None:
+            w, x = pane_anchored_box(w, sw, self._region)
+        else:
+            x = (sw - w) / 2.0
+        slot.rect = Rect(x, slot.rect.y, w, h)
 
     # --- events --------------------------------------------------------------
 
@@ -252,20 +357,23 @@ class CompareSelectDialog(FocusContainer, Widget):
         key = event.key
         if key == "escape":
             self._finish(None)
-        elif key == "tab":
-            move_focus(self, -1 if "shift" in event.modifiers else 1, wrap=True)
-            self._render()
-        elif key == "enter":
-            if self._focused is self._cancel_btn:
-                self._finish(None)
-            else:
-                self._accept()  # Enter accepts from anywhere except Cancel
-        elif key in ("up", "down") and isinstance(self._focused, RadioGroup):
-            self._focused.handle_event(event)
-            self._render()
-        elif is_activate(event) and self._focused is self._missing:
-            self._missing.toggle()
-            self._render()
+            return
+        if key == "enter":
+            self._accept()
+            return
+        if key == "up":
+            self._move_focus(-1)
+        elif key == "down":
+            self._move_focus(1)
+        elif key in ("left", "right") and isinstance(self._focused, ConditionRow):
+            self._focused.move(-1 if key == "left" else 1)
+        elif key == "space":
+            f = self._focused
+            if isinstance(f, ConditionRow):
+                f.toggle()
+            elif f is self._preserve:
+                self._preserve.toggle()
+        self._render()
 
     def _on_mouse(self, event: Event) -> None:
         if event.x is None or event.type is not EventType.MOUSE_CLICK:
@@ -273,14 +381,11 @@ class CompareSelectDialog(FocusContainer, Widget):
         for widget, (x0, x1, y0, y1) in self._child_rects:
             if x0 <= event.x < x1 and y0 <= event.y < y1:
                 self._focused = widget
-                if widget is self._missing:
-                    self._missing.toggle()
-                elif isinstance(widget, RadioGroup):
-                    # RadioGroup hit-tests in its own local coords.
+                if isinstance(widget, ConditionRow):
                     widget.handle_event(dataclasses.replace(
                         event, x=event.x - x0, y=event.y - y0))
-                elif isinstance(widget, Button):
-                    widget.on_click()
+                elif widget is self._preserve:
+                    self._preserve.toggle()
                 self._render()
                 return
 

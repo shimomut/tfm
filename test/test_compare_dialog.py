@@ -1,8 +1,7 @@
 """App-integration tests for Compare & Select: drives the real dialog through a
 MemoryBackend + TfmApp so the handler wiring (guards, dialog → criteria → applied
-selection, replace/add, the content task path) and the dialog's draw are covered.
-
-Complements test_compare_selection.py, which unit-tests the pure engine."""
+selection, replace/preserve, the content task path) and the keyboard model are
+covered. Complements test_compare_selection.py, which unit-tests the pure engine."""
 
 import os
 import sys
@@ -16,9 +15,13 @@ sys.path.insert(0, os.path.join(_HERE, "..", "src"))
 sys.path.insert(0, os.path.join(_HERE, ".."))
 
 import tfm  # noqa: E402
-from tfm_compare_dialog import CompareSelectDialog  # noqa: E402
+from tfm_compare_dialog import CompareSelectDialog, ConditionRow  # noqa: E402
 from puikit.backends import create_backend  # noqa: E402
 from puikit.event import Event, EventType  # noqa: E402
+
+
+def _key(k):
+    return Event(EventType.KEY, key=k)
 
 
 def _write(d, rel, data=b"x", mtime=None):
@@ -28,6 +31,12 @@ def _write(d, rel, data=b"x", mtime=None):
     if mtime is not None:
         os.utime(p, (mtime, mtime))
     return p
+
+
+def _enable(row, relation):
+    """Turn a condition row on and set its relation (as the keyboard would)."""
+    row.checkbox.checked = True
+    row.set_index(row.options.index(relation))
 
 
 class CompareDialogApp(unittest.TestCase):
@@ -65,42 +74,68 @@ class CompareDialogApp(unittest.TestCase):
     def _selected_names(self):
         return {os.path.basename(p) for p in self.app.active_pane()["selected_files"]}
 
-    def test_dialog_draws_all_radio_options(self):
-        # Regression: option rows must land on distinct integer grid rows (a
-        # fractional origin rounded x.5 pairs onto one cell, dropping options).
+    def _dialog_open(self):
+        layers = self.app.panel._layers
+        return bool(layers) and isinstance(layers[-1].widget, CompareSelectDialog)
+
+    # --- draw / layout -------------------------------------------------------
+
+    def test_dialog_draws_checkboxes_and_segments(self):
         self._open()
         self.app.panel.render()
         screen = "\n".join(self.b.snapshot())
-        for label in ("any", "equal", "differs", "same", "newer", "older",
-                      "Replace", "Add"):
-            self.assertIn(label, screen, f"missing radio option {label!r}")
+        for token in ("Size", "Modified", "Content", "Preserve current selection",
+                      "equal", "differs", "same", "newer", "older"):
+            self.assertIn(token, screen, f"missing {token!r}")
+        # each condition is a single line: label + its relations share one row
+        line = next(ln for ln in self.b.snapshot() if "Modified" in ln)
+        for opt in ("same", "newer", "older"):
+            self.assertIn(opt, line)
 
-    def test_mtime_newer_replace(self):
+    # --- applied selection ---------------------------------------------------
+
+    def test_all_off_is_filename_only(self):
         dlg = self._open()
-        dlg._mtime.selected = 2   # newer
-        dlg._mode.selected = 0    # replace
+        dlg._accept()  # nothing enabled -> every common name
+        self.assertEqual(self._selected_names(), {"same.txt", "newer.txt"})
+
+    def test_mtime_newer(self):
+        dlg = self._open()
+        _enable(dlg._mtime, "newer")
         dlg._accept()
         self.assertEqual(self._selected_names(), {"newer.txt"})
 
-    def test_include_missing_add_mode_unions(self):
-        pane = self.app.active_pane()
-        pane["selected_files"].add(os.path.join(self.left, "seed.marker"))  # pre-existing
+    def test_size_and_mtime_anded(self):
         dlg = self._open()
-        dlg._missing.checked = True   # also orphans
-        dlg._mode.selected = 1        # add (union, don't clear)
-        dlg._accept()
-        names = self._selected_names()
-        self.assertIn("same.txt", names)     # filename match
-        self.assertIn("newer.txt", names)
-        self.assertIn("orphan.txt", names)   # orphan via include_missing
-        self.assertIn("seed.marker", names)  # prior selection preserved (add mode)
+        _enable(dlg._size, "equal")
+        _enable(dlg._mtime, "newer")
+        dlg._accept()  # newer.txt is same size + newer; same.txt is neither
+        self.assertEqual(self._selected_names(), {"newer.txt"})
 
-    def test_replace_mode_clears_prior_selection(self):
+    def test_disabled_condition_is_any(self):
+        dlg = self._open()
+        dlg._mtime.set_index(dlg._mtime.options.index("newer"))  # index set but box OFF
+        self.assertFalse(dlg._mtime.checkbox.checked)
+        self.assertEqual(dlg._mtime.value, "any")
+        dlg._accept()
+        self.assertEqual(self._selected_names(), {"same.txt", "newer.txt"})
+
+    def test_preserve_adds_to_selection(self):
         pane = self.app.active_pane()
         pane["selected_files"].add(os.path.join(self.left, "seed.marker"))
         dlg = self._open()
-        dlg._mode.selected = 0        # replace
-        dlg._accept()                 # filename-only: all common names
+        dlg._preserve.checked = True          # union, don't clear
+        _enable(dlg._mtime, "newer")
+        dlg._accept()
+        names = self._selected_names()
+        self.assertIn("newer.txt", names)
+        self.assertIn("seed.marker", names)   # prior selection preserved
+
+    def test_replace_clears_prior_selection(self):
+        pane = self.app.active_pane()
+        pane["selected_files"].add(os.path.join(self.left, "seed.marker"))
+        dlg = self._open()                    # preserve off (default) -> replace
+        dlg._accept()
         names = self._selected_names()
         self.assertNotIn("seed.marker", names)
         self.assertEqual(names, {"same.txt", "newer.txt"})
@@ -109,70 +144,105 @@ class CompareDialogApp(unittest.TestCase):
         pane = self.app.active_pane()
         pane["selected_files"].add(os.path.join(self.left, "keep.marker"))
         dlg = self._open()
-        dlg._finish(None)             # cancel
+        dlg._finish(None)
         self.assertEqual(self._selected_names(), {"keep.marker"})
 
     def test_content_differs_runs_on_worker(self):
         dlg = self._open()
-        dlg._content.selected = 2     # differs -> content path -> task worker
-        dlg._mode.selected = 0        # replace
+        _enable(dlg._content, "differs")
         dlg._accept()
         deadline = time.time() + 5
         while self.app.tasks.has_active() and time.time() < deadline:
             self.b.run_animation_ticks()
             time.sleep(0.01)
         self.b.run_animation_ticks()
-        # same.txt has identical bytes; newer.txt differs at equal size.
         self.assertEqual(self._selected_names(), {"newer.txt"})
 
-    def test_tab_and_arrow_change_focus_and_selection(self):
+    # --- keyboard model (no Tab, no buttons) ---------------------------------
+
+    def test_up_down_move_focus_only(self):
         dlg = self._open()
+        order = dlg.focus_children()
+        self.assertEqual(order, [dlg._size, dlg._mtime, dlg._content, dlg._preserve])
         self.assertIs(dlg._focused, dlg._size)
-        dlg.handle_event(Event(EventType.KEY, key="tab"))    # -> mtime
+        dlg.handle_event(_key("down"))
         self.assertIs(dlg._focused, dlg._mtime)
-        dlg.handle_event(Event(EventType.KEY, key="down"))   # mtime: any -> same
-        self.assertEqual(dlg._mtime.selected, 1)
+        dlg.handle_event(_key("down"))
+        dlg.handle_event(_key("down"))
+        self.assertIs(dlg._focused, dlg._preserve)
+        dlg.handle_event(_key("down"))                 # wraps to the top
+        self.assertIs(dlg._focused, dlg._size)
+        before = dlg._focused
+        dlg.handle_event(_key("tab"))                  # Tab does nothing
+        self.assertIs(dlg._focused, before)
+
+    def test_space_toggles_condition(self):
+        dlg = self._open()                             # focus on Size, box off -> any
+        self.assertEqual(dlg._size.value, "any")
+        dlg.handle_event(_key("space"))               # on -> first relation
+        self.assertTrue(dlg._size.checkbox.checked)
+        self.assertEqual(dlg._size.value, "equal")
+        dlg.handle_event(_key("space"))               # off -> any
+        self.assertEqual(dlg._size.value, "any")
+
+    def test_left_right_choose_relation(self):
+        dlg = self._open()
+        dlg.handle_event(_key("space"))               # enable Size (equal)
+        self.assertEqual(dlg._size.value, "equal")
+        dlg.handle_event(_key("right"))
+        self.assertEqual(dlg._size.value, "differs")
+        dlg.handle_event(_key("left"))
+        self.assertEqual(dlg._size.value, "equal")
+        # left/right on the preserve row (not a condition) is ignored
+        for _ in range(3):
+            dlg.handle_event(_key("down"))            # -> preserve
+        self.assertIs(dlg._focused, dlg._preserve)
+        dlg.handle_event(_key("right"))
+        self.assertFalse(dlg._preserve.checked)
+
+    def test_space_toggles_preserve(self):
+        dlg = self._open()
+        for _ in range(3):
+            dlg.handle_event(_key("down"))            # -> preserve
+        dlg.handle_event(_key("space"))
+        self.assertTrue(dlg._preserve.checked)
+
+    def test_enter_accepts_escape_cancels(self):
+        dlg = self._open()
+        dlg.handle_event(_key("space"))               # enable Size = equal
+        dlg.handle_event(_key("enter"))               # accept -> closes
+        self.assertFalse(self._dialog_open())
+        self.assertEqual(self._selected_names(), {"same.txt", "newer.txt"})  # both equal-size
+
+        pane = self.app.active_pane()
+        pane["selected_files"].clear()
+        pane["selected_files"].add(os.path.join(self.left, "keep.marker"))
+        dlg = self._open()
+        dlg.handle_event(_key("escape"))
+        self.assertFalse(self._dialog_open())
+        self.assertEqual(self._selected_names(), {"keep.marker"})
 
 
-class CompareDialogFlow(unittest.TestCase):
-    """The vertical flow must never overlap, at any radio pitch. The memory backend
-    is a 1:1 grid, so it can't reproduce the taller vector pitch that caused the
-    real GUI overlap — assert the pure geometry (_flow) directly with grid- and
-    vector-scale measured heights."""
+class ConditionRowUnit(unittest.TestCase):
+    def test_value_is_any_until_enabled(self):
+        r = ConditionRow("Size", ["equal", "differs"])
+        self.assertEqual(r.value, "any")
+        r.move(1)                        # relation moves, but still off
+        self.assertEqual(r.value, "any")
+        r.toggle()                       # enable
+        self.assertEqual(r.value, "differs")
+        r.toggle()                       # disable -> any (relation remembered)
+        self.assertEqual(r.value, "any")
+        r.toggle()
+        self.assertEqual(r.value, "differs")
 
-    def _regions(self, f, band_h, cb_h, mode_h, btn_h):
-        return [
-            ("band", f["band_top"], f["band_top"] + band_h),
-            ("checkbox", f["cb_y"], f["cb_y"] + cb_h),
-            ("sel_header", f["sel_head_y"], f["sel_head_y"] + 1.0),
-            ("mode", f["mode_y"], f["mode_y"] + mode_h),
-            ("buttons", f["btn_y"], f["btn_y"] + btn_h),
-        ]
-
-    def _assert_no_overlap(self, band_h, cb_h, mode_h, btn_h, title_bottom):
-        dlg = CompareSelectDialog(on_result=lambda c: None)
-        f = dlg._flow(title_bottom, band_h, cb_h, mode_h, btn_h)
-        stacked = self._regions(f, band_h, cb_h, mode_h, btn_h)[:-1]  # single column
-        prev_bottom = title_bottom
-        for name, top, bottom in stacked:
-            self.assertGreaterEqual(top + 1e-6, prev_bottom,
-                                    f"{name} overlaps the element above it")
-            prev_bottom = bottom
-        # buttons share the bottom band with the mode group and must fit inside it
-        self.assertGreaterEqual(f["btn_y"] + 1e-6, f["mode_y"])
-        self.assertLessEqual(f["btn_y"] + btn_h, f["bottom"] + 1e-6)
-        # the reported box bottom encloses everything
-        self.assertGreaterEqual(f["bottom"] + 1e-6, f["mode_y"] + max(mode_h, btn_h))
-
-    def test_grid_pitch_no_overlap(self):
-        self._assert_no_overlap(4.0, 1.0, 2.0, 1.0, title_bottom=3.0)
-
-    def test_vector_pitch_no_overlap(self):
-        # radio pitch ~1.4/row (4-option band ~5.6), checkbox ~1.4, buttons ~1.6
-        self._assert_no_overlap(5.6, 1.4, 2.8, 1.6, title_bottom=2.3)
-
-    def test_taller_pitch_still_no_overlap(self):
-        self._assert_no_overlap(8.0, 2.0, 4.0, 2.4, title_bottom=2.0)
+    def test_move_clamps(self):
+        r = ConditionRow("Size", ["equal", "differs"])
+        r.checkbox.checked = True
+        r.move(-1)                       # already at first
+        self.assertEqual(r.value, "equal")
+        r.move(9)                        # past the end
+        self.assertEqual(r.value, "differs")
 
 
 if __name__ == "__main__":
