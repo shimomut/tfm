@@ -24,6 +24,7 @@ from puikit.panel import Rect
 from puikit.widgets import Splitter
 from puikit.widgets.base import Widget
 
+from tfm_text_dialog import keys_markdown, show_markdown
 from tfm_text_viewer import (MONO, _ScrollBody, _content_bg, _highlight, _read_lines,
                              draw_hscrollbar)
 
@@ -213,6 +214,7 @@ class DiffViewer(Widget):
         self.hl2 = _highlight(self.lines2, path2)
         self.rows, self.blocks = compute_diff(self.lines1, self.lines2)
         self._panel: Any = None
+        self._child_z = 90  # z for the help overlay; raised above this viewer in show_
         self.top = 0.0
         self.left = 0.0
         self._view_h = 1
@@ -357,8 +359,26 @@ class DiffViewer(Widget):
             self._step_block(1)
         elif event.char == "N":
             self._step_block(-1)
+        elif event.char == "?":
+            self._show_help()
         self._clamp()
         return True
+
+    def _show_help(self) -> None:
+        if self._panel is None:
+            return
+        rows = [
+            ("↑ / ↓", "scroll line"),
+            ("PgUp / PgDn", "scroll page"),
+            ("Home / End", "top / bottom"),
+            ("← / →", "scroll horizontally"),
+            ("n / N", "next / prev diff block"),
+            ("Drag gutter", "move centre split"),
+            ("?", "this help"),
+            ("q / Esc", "close"),
+        ]
+        show_markdown(self._panel, keys_markdown(rows),
+                      title="File Diff — Keys", z=self._child_z)
 
 
 def show_diff_viewer(panel: Any, path1, path2, z: int = 80) -> DiffViewer:
@@ -366,6 +386,7 @@ def show_diff_viewer(panel: Any, path1, path2, z: int = 80) -> DiffViewer:
     viewer = DiffViewer(path1, path2)
     sw, sh = panel.backend.size_units
     viewer._panel = panel
+    viewer._child_z = z + 10  # help overlay stacks above the viewer's own layer
     panel.push_layer(viewer, z=z, hints={"x": 0, "y": 0, "w": sw, "h": sh},
                      reflow=lambda sw, sh: Rect(0, 0, sw, sh))
     panel.animate(viewer, hints={"transition": "fade", "duration_ms": 120})

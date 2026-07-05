@@ -27,6 +27,8 @@ from puikit.font import Font
 from puikit.panel import Rect
 from puikit.widgets.base import Widget
 
+from tfm_text_dialog import keys_markdown, show_markdown
+
 try:
     from pygments.lexers import get_lexer_for_filename, get_lexer_by_name, TextLexer
     from pygments.util import ClassNotFound
@@ -206,6 +208,7 @@ class TextViewer(Widget):
         self.lines, self.is_error = _read_lines(path)
         self.highlighted = _highlight(self.lines, path)
         self._panel: Any = None
+        self._child_z = 90  # z for the help overlay; raised above this viewer in show_
         self.top = 0.0       # first visible display row (vertical scroll)
         self.left = 0.0      # horizontal scroll, columns — float for smooth pan
         self.wrap = False
@@ -478,8 +481,27 @@ class TextViewer(Widget):
             self._step_match(1)
         elif event.char == "N":
             self._step_match(-1)
+        elif event.char == "?":
+            self._show_help()
         self._clamp()
         return True
+
+    def _show_help(self) -> None:
+        if self._panel is None:
+            return
+        rows = [
+            ("↑ / ↓", "scroll line"),
+            ("PgUp / PgDn", "scroll page"),
+            ("Home / End", "top / bottom"),
+            ("← / →", "scroll horizontally (no-wrap)"),
+            ("w", "toggle line wrap"),
+            ("/", "search"),
+            ("n / N", "next / prev match"),
+            ("?", "this help"),
+            ("q / Esc", "close"),
+        ]
+        show_markdown(self._panel, keys_markdown(rows),
+                      title="Text Viewer — Keys", z=self._child_z)
 
     def _handle_search_key(self, event: Event) -> None:
         key = event.key
@@ -505,6 +527,7 @@ def show_text_viewer(panel: Any, path, z: int = 80) -> TextViewer:
     viewer = TextViewer(path)
     sw, sh = panel.backend.size_units
     viewer._panel = panel
+    viewer._child_z = z + 10  # help overlay stacks above the viewer's own layer
     panel.push_layer(viewer, z=z, hints={"x": 0, "y": 0, "w": sw, "h": sh},
                      reflow=lambda sw, sh: Rect(0, 0, sw, sh))
     panel.animate(viewer, hints={"transition": "fade", "duration_ms": 120})

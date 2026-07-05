@@ -371,7 +371,7 @@ class FilePane(Widget):
         else:
             basename, ext = self._split_name(entry.name, is_dir)
             name_elide = "end"
-        name = basename + ("/" if is_dir else "")
+        name = basename
         size = info["size_str"]
         date = info["date_str"] if show_date else ""
         name_text = elide(name, name_w, where=name_elide, measure=measure)

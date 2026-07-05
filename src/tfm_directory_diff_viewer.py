@@ -48,6 +48,7 @@ from tfm_path import Path
 from tfm_str_format import format_size
 from tfm_text_viewer import MONO, _ScrollBody
 from tfm_diff_viewer import show_diff_viewer
+from tfm_text_dialog import keys_markdown, show_markdown
 from tfm_config import KeyBindings
 from tfm_file_operations import FileOperationService
 
@@ -996,22 +997,24 @@ class DirectoryDiffView(Widget):
         move = self._keys_label("move_files", "M")
         delete = self._keys_label("delete_files", "K / Del")
         merge = self._keys_label("edit_file", "E")
-        show_message_box(
-            self._panel,
-            "↑/↓ · PgUp/PgDn · Home/End   move\n"
-            "→ / ←                        expand / collapse\n"
-            "Enter                        open dir · diff file\n"
-            "n / N                        next / prev difference\n"
-            "Tab                          switch active side\n"
-            "[ / ]                        move centre split (drag gutter too)\n"
-            "Click / double-click         focus side · open dir/diff\n"
-            f"{copy:<28} copy focused → other side\n"
-            f"{move:<28} move focused → other side\n"
-            f"{delete:<28} delete focused (active side)\n"
-            f"{merge:<28} merge sides in $TEXT_DIFF\n"
-            "r                            rescan\n"
-            "q / Esc                      close",
-            title="Directory Diff — Keys", icon="info", z=self._child_z)
+        rows = [
+            ("↑ / ↓ · PgUp/PgDn · Home/End", "move cursor"),
+            ("→ / ←", "expand / collapse"),
+            ("Enter", "open dir · diff file"),
+            ("n / N", "next / prev difference"),
+            ("Tab", "switch active side"),
+            ("[ / ]", "move centre split (drag gutter too)"),
+            ("Click / double-click", "focus side · open dir/diff"),
+            (copy, "copy focused → other side"),
+            (move, "move focused → other side"),
+            (delete, "delete focused (active side)"),
+            (merge, "merge sides in $TEXT_DIFF"),
+            ("r", "rescan"),
+            ("q / Esc", "close"),
+        ]
+        show_markdown(
+            self._panel, keys_markdown(rows),
+            title="Directory Diff — Keys", z=self._child_z)
 
     # --- drawing -------------------------------------------------------------
 

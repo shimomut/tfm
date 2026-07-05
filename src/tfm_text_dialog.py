@@ -207,6 +207,27 @@ def show_text(
     return dialog
 
 
+def keys_markdown(
+    rows: Sequence[tuple[str, str]], *, intro: str = "",
+) -> str:
+    """Build a Markdown source for a viewer's key-help overlay: an optional
+    ``intro`` line over a two-column ``| Key(s) | Action |`` table, with the key
+    cells rendered as ``code`` spans. ``|`` in either cell is escaped so a key
+    label or description containing a pipe can't break the table.
+
+    Shared by the viewers' ``_show_help`` so every help overlay reads as the same
+    rich-text table (matching the app's main help)."""
+    def esc(text: str) -> str:
+        return text.replace("|", "\\|")
+    lines = []
+    if intro:
+        lines += [intro, ""]
+    lines += ["| Key(s) | Action |", "| --- | --- |"]
+    for keys, desc in rows:
+        lines.append(f"| `{esc(keys)}` | {esc(desc)} |")
+    return "\n".join(lines)
+
+
 def show_markdown(
     panel: Any,
     source: str,

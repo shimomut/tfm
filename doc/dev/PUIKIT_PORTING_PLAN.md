@@ -1,7 +1,7 @@
 # TFM → PuiKit Port
 
 Status: **port essentially complete** — living document, tasks only.
-Branch: `puikit-port` · Last updated: 2026-07-04
+Branch: `puikit-port` · Last updated: 2026-07-05
 
 TFM's rendering/UI foundation has been moved off the in-repo **`ttk`** toolkit
 onto **[PuiKit](https://github.com/...)**, a capability-based framework that runs
@@ -96,31 +96,32 @@ executor design when building the items below, but the port does not import it.
 `tfm_progress_manager.py` / `tfm_progress_animator.py` remain live in `src/` but
 the operation path does not currently wire into them.
 
-Four capabilities the inline reimplementation dropped, to build back:
+Four capabilities the inline reimplementation dropped, to build back. **Three of
+the four (threading, progress UI, cancellation) landed for copy / move / delete
+in `tfm_file_operations.py` (the "Added progress dialog" commit); only conflict
+resolution remains, and archive operations are not yet wired through the same
+path.**
 
-- **Threading** — operations run synchronously on the UI thread today, so a large
-  copy / delete / archive freezes the app until it finishes. Move the work onto a
-  background worker (as the legacy executors did), keeping the `Path` calls but
-  driving them from a thread; marshal results back to the UI thread for the
-  refresh / summary.
-- **Progress UI** — no visible surface during an operation. Add a modal progress
-  dialog (pushed like other dialogs via the `push_layer` / `show_message_box`
-  pattern) built on PuiKit's `ProgressBar`: an overall determinate bar (items
-  processed / total), plus a second per-file byte bar for large / SSH copies,
-  falling back to an indeterminate `BusyIndicator` when no total is known. Reuse
-  `ProgressManager` for the accounting (item + byte progress, error count,
-  spinner, `get_progress_segments`) rather than rebuilding it. The dialog must
-  *read* the shared `ProgressManager` state during its own `draw`, never be
-  mutated from the worker.
-- **Cancellation** — none today. Add a Cancel button + `Esc` that set a
-  cooperative cancel flag the worker polls between items (the legacy
-  `BaseTask.request_cancellation()` / `is_cancelled()` pattern), showing a
-  "cancelling…" state until the worker unwinds, then popping the dialog.
-- **Conflict resolution** — the port collapses conflicts to a single up-front
-  three-button prompt (Overwrite / Skip existing / Cancel) applied to the whole
-  batch. Restore richer per-conflict resolution (overwrite / skip / rename, with
-  an "apply to all remaining" option), as the ttk `FileOperationUI` /
-  `ArchiveOperationUI` offered, interleaved with the background execution.
+- **Threading** — DONE for copy / move / delete: the work runs on a daemon
+  `tfm-op-*` thread driving a `ProgressManager`, and a per-frame tick pops the
+  dialog + fires `on_complete` on the main thread (`_run`). Tests keep the
+  synchronous inline path (`background=False`). *Archive create / extract still
+  run synchronously on the UI thread.*
+- **Progress UI** — DONE: `ProgressDialog` (`tfm_file_operations.py`) built on
+  PuiKit's `ProgressBar`, reading the shared `ProgressManager` state during its
+  own `draw` (item %, current item, byte progress via
+  `update_file_byte_progress`). *Not yet: a second dedicated per-file byte bar /
+  `BusyIndicator` fallback — currently the one determinate bar.*
+- **Cancellation** — DONE: a `threading.Event` cancel flag the worker polls
+  between items, set by `Esc` (`on_cancel=cancel.set`). *Not yet: a visible
+  "cancelling…" state / a Cancel button (only `Esc`).*
+- **Conflict resolution** — STILL the collapsed batch-wide three-button prompt
+  (Overwrite / Skip existing / Cancel → a single `overwrite` bool for the whole
+  batch, `_transfer`/`_run`). Restore richer per-conflict resolution (overwrite /
+  skip / rename, with an "apply to all remaining" option), as the ttk
+  `FileOperationUI` / `ArchiveOperationUI` offered, interleaved with the
+  background execution. **This is the main remaining §2.4 work; §2.13 (keep both)
+  folds into it.**
 
 ### 2.5 Make the Directory Diff Viewer scan more progressively (ttk parity) — DONE
 **Done.** `_scan_worker`'s two-phase full-walk was replaced with the
@@ -224,31 +225,20 @@ scrollbar x, the body child rect, and the pointer hit-tests / gutter-drag band
 must shift together, or the split drag and row clicks will land off by the margin.
 Keep it a single named constant (e.g. `_MARGIN`) so it's tunable in one place.
 
-### 2.8 Help dialogs for all viewers (Markdown widget)
-Give every viewer a consistent, discoverable help overlay built on PuiKit's
-`MarkdownView`, via the existing `show_markdown(panel, source, title=, z=)` helper
-(`tfm_text_dialog.py`) — the same one the app's main `show_help` (`tfm.py:2768`)
-already uses, so the chrome, scrolling, and dismissal match.
-
-Current state per viewer:
-- **Directory Diff Viewer** — has help (`_show_help`, bound to `?`) but renders a
-  **plain-text** keys table through `show_message_box`. **Convert** it to
-  `show_markdown` (a Markdown table / definition list), keeping the dynamic key
-  labels it already derives from `KEY_BINDINGS` via `_keys_label`.
-- **Text Viewer** (`tfm_text_viewer.py`) and **File Diff Viewer**
-  (`tfm_diff_viewer.py`) — **no help at all**. Add a `?` case in `handle_event`
-  and a `_show_help` that pushes `show_markdown` with that viewer's key map
-  (scroll / search / navigation / next-diff / close, etc.).
-
-Notes:
-- Author each help as **Markdown** (headings + a key/description table) rather
-  than space-padded monospace columns, so it lays out as rich text.
-- Push the dialog above the viewer's own modal layer (the dir-diff viewer already
-  passes `z=self._child_z`); do the same for the others so the overlay stacks on
-  top of the full-window viewer.
-- Prefer deriving key labels from the configured keymap (the `_keys_label` /
-  `get_keys_for_action` pattern) wherever a viewer's keys are user-rebindable, so
-  help stays truthful — same spirit as §2.3.
+### 2.8 Help dialogs for all viewers (Markdown widget) — DONE
+**Done.** All three viewers now push a consistent `MarkdownView` help overlay via
+`show_markdown(...)`, matching the app's main `show_help` chrome:
+- A shared `keys_markdown(rows, *, intro="")` helper in `tfm_text_dialog.py`
+  builds the two-column `| Key(s) | Action |` table (keys as `code` spans, `|`
+  escaped so a label/description with a pipe can't break the table).
+- **Directory Diff Viewer** — `_show_help` converted from the plain-text
+  `show_message_box` to `show_markdown`, keeping the dynamic `_keys_label` labels.
+- **Text Viewer** / **File Diff Viewer** — gained a `?` case in `handle_event`
+  and a `_show_help`; each carries a `_child_z = z + 10` (set in its `show_*`) so
+  the overlay stacks above the full-window viewer. Their keys are hardcoded (not
+  rebindable), so labels are static.
+Covered by `test_help_key_pushes_markdown_overlay` in
+`test/test_directory_diff_viewer.py` (both TUI + GUI backends).
 
 ### 2.9 Markdown for file-operation confirmation dialogs
 The copy / move / delete confirm prompts in `tfm_file_operations.py` are built as

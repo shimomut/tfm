@@ -188,6 +188,17 @@ def test_escape_closes(backend, trees):
     assert panel._layers == []
 
 
+def test_help_key_pushes_markdown_overlay(backend, trees):
+    panel = Panel(backend)
+    show_directory_diff_viewer(panel, *trees, background=False)
+    panel.render()
+    panel.dispatch_event(_key(None, "?"))
+    panel.render()  # must not raise
+    # A help overlay (Markdown) stacks above the viewer.
+    assert len(panel._layers) == 2
+    assert type(panel._layers[-1].widget).__name__ == "MarkdownDialog"
+
+
 def test_enter_on_differing_file_opens_file_diff(backend, trees):
     panel = Panel(backend)
     view = show_directory_diff_viewer(panel, *trees, background=False)
