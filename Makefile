@@ -7,7 +7,17 @@
 # fallback to a system python3 - run 'make venv' first to create the environment.
 # An absolute path is used so targets that change directories (e.g. "cd ttk && ...")
 # still resolve the same interpreter.
-PYTHON := $(abspath .venv/bin/python)
+# venv layout differs by platform: POSIX uses .venv/bin/, Windows uses .venv/Scripts/.
+# Detected via `uname -s` rather than $(OS) - MSYS2/Git-Bash make does not
+# reliably inherit the Windows OS environment variable.
+UNAME_S := $(shell uname -s 2>/dev/null)
+ifneq (,$(findstring MINGW,$(UNAME_S))$(findstring MSYS,$(UNAME_S))$(findstring CYGWIN,$(UNAME_S)))
+VENV_BINDIR := Scripts
+PYTHON := $(abspath .venv/$(VENV_BINDIR)/python.exe)
+else
+VENV_BINDIR := bin
+PYTHON := $(abspath .venv/$(VENV_BINDIR)/python)
+endif
 PIP := $(PYTHON) -m pip
 
 # PuiKit source checkout (sibling repo). Installed editable into .venv so edits
@@ -81,12 +91,12 @@ venv:
 	echo "Using $$best ($$($$best --version 2>&1)) to create .venv..."; \
 	"$$best" -m venv .venv
 	@echo "Upgrading pip..."
-	@.venv/bin/python -m pip install --upgrade pip
+	@.venv/$(VENV_BINDIR)/python -m pip install --upgrade pip
 	@echo "Installing dependencies from requirements.txt..."
-	@.venv/bin/python -m pip install -r requirements.txt
+	@.venv/$(VENV_BINDIR)/python -m pip install -r requirements.txt
 	@$(MAKE) install-puikit
 	@echo ""
-	@echo ".venv created successfully with $$(.venv/bin/python --version 2>&1)"
+	@echo ".venv created successfully with $$(.venv/$(VENV_BINDIR)/python --version 2>&1)"
 	@echo "Run 'make run' to launch TFM using the new environment."
 
 # Install PuiKit editable from its sibling checkout (PUIKIT_DIR). Run standalone
@@ -108,7 +118,7 @@ venv-clean:
 # Python-based target. Fails with a clear message instead of falling back to
 # system python.
 check-venv:
-	@if [ ! -x .venv/bin/python ]; then \
+	@if [ ! -x .venv/$(VENV_BINDIR)/python ]; then \
 		echo "Error: .venv not found. Run 'make venv' to create it first."; \
 		exit 1; \
 	fi
