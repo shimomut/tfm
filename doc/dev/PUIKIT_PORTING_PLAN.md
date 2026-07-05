@@ -120,60 +120,10 @@ path.**
   batch, `_transfer`/`_run`). Restore richer per-conflict resolution (overwrite /
   skip / rename, with an "apply to all remaining" option), as the ttk
   `FileOperationUI` / `ArchiveOperationUI` offered, interleaved with the
-  background execution. **This is the main remaining §2.4 work; §2.13 (keep both)
+  background execution. **This is the main remaining §2.4 work; §2.11 (keep both)
   folds into it.**
 
-### 2.5 Make the Directory Diff Viewer scan more progressively (ttk parity) — DONE
-**Done.** `_scan_worker`'s two-phase full-walk was replaced with the
-breadth-first, queue-driven progressive scan described below:
-`_scan_coordinator` seeds the roots' top level (items appear at once), then a
-`_scanner_worker` pulls directory levels off a `_scan_q` priority queue and
-inserts nodes into the shared tree as they're discovered (`_insert_children_locked`
-/ `_reclassify_self_and_ancestors_locked`); a decoupled `_comparator_worker`
-resolves file-content verdicts off a `_cmp_q`. `_update_priorities` re-enqueues
-on-screen two-sided directories at `_PRIO_VISIBLE` on scroll / expand / collapse;
-one-sided branches are scanned lazily on expand (`_PRIO_IMMEDIATE` / `_lazy_scan`).
-The footer reports scan/compare queue depth + percentage. The `background=False`
-synchronous full-build path is retained for tests, and the existing
-`_lock` / `_dirty` / `_tick` / `request_animation_ticks` redraw loop is reused
-unchanged. Covered by new tests in `test/test_directory_diff_viewer.py`
-(breadth-first convergence, empty-dir classification, lazy one-sided scan,
-`scan_level`, queue-progress footer).
-
-*Original problem statement (for reference):* the ported viewer was threaded, but
-its progressive model was **coarser** than the ttk original. `_scan_worker`:
-scans the **whole** left tree, then the **whole** right tree, builds the entire
-tree in one shot (`DiffEngine(...).build_tree()`), and only then compares files
-sequentially. So on a large / slow tree the user sees only `Scanning… (N items)`
-and the tree **appears all at once** after both full walks — no live top-down
-growth, and no bias toward what's on screen.
-
-**What ttk did (restore this feel)** — `legacy/src/tfm_directory_diff_viewer.py`
-is queue-driven and incremental:
-- `_queue_initial_scan_tasks` seeds a `scan_queue`; `_directory_scanner_worker`
-  pulls one directory level, scans it, enqueues child dirs (breadth-first), and
-  calls `_update_tree_node` to **insert nodes into the tree as they're
-  discovered** — the tree grows level-by-level, live.
-- A separate `comparison_queue` + comparator worker resolves file-content
-  verdicts, decoupled from scanning.
-- `ScanPriority` + `_update_priorities` push **visible / expanded** nodes to the
-  front, so what the user is looking at fills in first.
-- The status bar reports queue depth + a percentage (`scan_queue.qsize()` /
-  `comparison_queue.qsize()` vs. their initial sizes).
-
-**Scope of the change:**
-- Replace the two-phase `_scan_worker` with the breadth-first, queue-driven
-  scan + incremental `_update_tree_node` insertion (this machinery was earmarked
-  "reuse" in `DIRECTORY_DIFF_PORT_PLAN.md` §2.1 but got simplified away).
-- Split comparison onto its own queue; add visible-first prioritisation
-  (re-prioritise on scroll / expand / collapse).
-- Reuse the **existing** main-thread redraw loop as-is — the `_lock` /
-  `_dirty` flag, `_tick`, and `panel.request_animation_ticks` wiring already
-  work; only the worker/queue structure and the incremental tree mutation
-  change. Keep the `background=False` synchronous path for tests.
-- Surface scan/compare queue depth (+ %) in the status/progress line.
-
-### 2.6 Draw the tree disclosure indicator as a vector chevron in GUI
+### 2.5 Draw the tree disclosure indicator as a vector chevron in GUI
 The expand/collapse indicator on tree rows is a **glyph** today — `▸` (collapsed)
 / `▾` (expanded), drawn as text in both backends. In GUI it should instead be a
 **line-drawn chevron** (a `>` that rotates to `⌄` when open), rendered with vector
@@ -205,7 +155,7 @@ staircase if a 1–2px hairline `>` is enough. Decide with a small spike.
 Reserve the same marker-column width so the label origin (`label_x`) and the
 expander hit region are unchanged; only the mark's rendering swaps.
 
-### 2.7 Directory Diff Viewer — add content margins
+### 2.6 Directory Diff Viewer — add content margins
 Everything in the viewer is drawn **flush to the edges**, so text hugs the window
 border and the centre gutter with no breathing room. Add consistent insets. In
 `tfm_directory_diff_viewer.py` `draw` / the column geometry:
@@ -225,22 +175,7 @@ scrollbar x, the body child rect, and the pointer hit-tests / gutter-drag band
 must shift together, or the split drag and row clicks will land off by the margin.
 Keep it a single named constant (e.g. `_MARGIN`) so it's tunable in one place.
 
-### 2.8 Help dialogs for all viewers (Markdown widget) — DONE
-**Done.** All three viewers now push a consistent `MarkdownView` help overlay via
-`show_markdown(...)`, matching the app's main `show_help` chrome:
-- A shared `keys_markdown(rows, *, intro="")` helper in `tfm_text_dialog.py`
-  builds the two-column `| Key(s) | Action |` table (keys as `code` spans, `|`
-  escaped so a label/description with a pipe can't break the table).
-- **Directory Diff Viewer** — `_show_help` converted from the plain-text
-  `show_message_box` to `show_markdown`, keeping the dynamic `_keys_label` labels.
-- **Text Viewer** / **File Diff Viewer** — gained a `?` case in `handle_event`
-  and a `_show_help`; each carries a `_child_z = z + 10` (set in its `show_*`) so
-  the overlay stacks above the full-window viewer. Their keys are hardcoded (not
-  rebindable), so labels are static.
-Covered by `test_help_key_pushes_markdown_overlay` in
-`test/test_directory_diff_viewer.py` (both TUI + GUI backends).
-
-### 2.9 Markdown for file-operation confirmation dialogs
+### 2.7 Markdown for file-operation confirmation dialogs
 The copy / move / delete confirm prompts in `tfm_file_operations.py` are built as
 **plain text** with filenames and paths inlined, so the names don't stand out
 from the surrounding prose:
@@ -260,7 +195,7 @@ Caveat: names can contain Markdown-special characters (`_ * [ ]` and backticks).
 Code spans neutralise most, but a name containing a backtick needs escaping —
 add a small helper (or reuse one) to wrap a filename safely as inline code.
 
-### 2.10 Archive virtual-directory browsing
+### 2.8 Archive virtual-directory browsing
 Let the user **enter an archive** (Enter on a `.zip` / `.tar.*`) and browse its
 contents in the pane as if it were a directory — navigate in/out, view files,
 extract out — rather than only create/extract as a whole (§2.4 / `create_archive`
@@ -293,7 +228,7 @@ Wire it on top of the existing **virtual-pane** mechanism (the same
 - Guard the write-side ops the way virtual panes already do (a virtual pane isn't
   a writable destination — see the `_transfer` virtual guard).
 
-### 2.11 "Compare and select" (ttk `W` key)
+### 2.9 "Compare and select" (ttk `W` key)
 Port the ttk **compare-selection** feature. The binding already exists —
 `_config.py:147` `'compare_selection': ['W']` — but there is **no handler** in
 `tfm.py` for it. Legacy behavior (`show_compare_selection` in
@@ -315,7 +250,7 @@ Port shape:
 - Guard when the other pane is virtual (search results / archive) — no real
   listing to compare against — as the other cross-pane ops do.
 
-### 2.12 Color theme brush-up (file types, cursor, syntax)
+### 2.10 Color theme brush-up (file types, cursor, syntax)
 The port's palette is thin in three places; brush them up into one coherent,
 light/dark-aware scheme.
 
@@ -347,7 +282,7 @@ Cross-cutting:
   terminal specifically (suspected 256-color / palette quantization differs from
   Terminal.app); test there, not only in Terminal.app.
 
-### 2.13 Conflict resolution: "keep both" (auto-rename to a free name)
+### 2.11 Conflict resolution: "keep both" (auto-rename to a free name)
 Add a conflict-resolution choice that writes the source under a new,
 non-colliding name (`foo (1).txt`, then `foo (2).txt`, …) instead of overwriting
 or skipping. Refines §2.4's conflict-resolution bullet.
