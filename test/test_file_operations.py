@@ -102,6 +102,47 @@ def test_move_same_storage_is_atomic(tmp_path, svc):
     assert not (src / "m.txt").exists()
 
 
+def test_copy_logs_each_file_with_src_and_dest(tmp_path, svc):
+    src, dst = tmp_path / "s", tmp_path / "d"
+    src.mkdir(); dst.mkdir()
+    (src / "a.txt").write_text("x")
+    (src / "sub").mkdir()
+    (src / "sub" / "b.txt").write_text("y")
+    logs = []
+    svc.copy(None, [_P(src / "a.txt"), _P(src / "sub")], _P(dst),
+             on_complete=lambda r: None, log=logs.append, background=False)
+    # One line per leaf file (not per directory): the name once + src/dest dirs.
+    assert any("Copied 'a.txt'" in m and str(src) in m and str(dst) in m for m in logs)
+    assert any("Copied 'b.txt'" in m and str(dst / "sub") in m for m in logs)
+    # The full filename is not repeated in each path (compact form).
+    assert all(m.count("a.txt") <= 1 for m in logs if "Copied 'a.txt'" in m)
+
+
+def test_delete_logs_each_removal(tmp_path, svc):
+    d = tmp_path / "d"
+    (d / "sub").mkdir(parents=True)
+    (d / "sub" / "f.txt").write_text("x")
+    logs = []
+    svc.delete(None, [_P(d / "sub")], log=logs.append, background=False)
+    assert any("Deleted 'f.txt'" in m for m in logs)
+    assert any("Deleted 'sub'" in m for m in logs)
+
+
+def test_keep_both_log_shows_renamed_name(tmp_path, cfg, svc):
+    src, dst = tmp_path / "s", tmp_path / "d"
+    src.mkdir(); dst.mkdir()
+    (src / "c.txt").write_text("new")
+    (dst / "c.txt").write_text("old")
+    task = _scripted_task(cfg, [("keep_both", False)])
+    plan, _ = svc._resolve(task, [_P(src / "c.txt")], _P(dst), 70, None)
+    logs = []
+    task.progress.start_operation(F._OP_TYPE["copy"], 1)
+    svc._execute_one(task, "copy", plan[0][0], plan[0][1], plan[0][2],
+                     _P(dst), task.progress, logs.append)
+    # Both names shown (source → renamed), so the (1) result is visible.
+    assert any("'c.txt' → 'c (1).txt'" in m for m in logs)
+
+
 def test_delete_recurses(tmp_path, svc):
     d = tmp_path / "d"
     (d / "sub").mkdir(parents=True)

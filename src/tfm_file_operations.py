@@ -207,7 +207,8 @@ class FileOperationService:
             for target, dest_base, overwrite in plan:
                 task.checkpoint()
                 try:
-                    self._execute_one(task, kind, target, dest_base, overwrite, dest_dir, prog)
+                    self._execute_one(task, kind, target, dest_base, overwrite,
+                                      dest_dir, prog, log)
                     result["done"] += 1
                 except Cancelled:
                     raise
@@ -292,35 +293,42 @@ class FileOperationService:
 
     def _execute_one(self, task: Task, kind: str, target: Path,
                      dest_base: Optional[Path], overwrite: bool,
-                     dest_dir: Optional[Path], prog: ProgressManager) -> None:
+                     dest_dir: Optional[Path], prog: ProgressManager, log) -> None:
         if kind == "delete":
-            self._delete_tree(task, target, prog)
+            self._delete_tree(task, target, prog, log)
         elif kind == "move" and _is_atomic_move(kind, target, dest_dir):
             prog.update_progress(target.name)
             target.move_to(dest_base, overwrite=overwrite)
+            _log_op(log, "Moved", target, dest_base)  # atomic: one line per target
         else:
             # Copy, or a cross-storage move (copy the tree, then drop the source).
-            self._copy_tree(task, target, dest_base, overwrite, prog)
+            verb = "Moved" if kind == "move" else "Copied"
+            self._copy_tree(task, target, dest_base, overwrite, prog, log, verb)
             if kind == "move":
-                self._delete_tree(task, target, prog=None)
+                # The per-file "Moved" lines already covered it; don't re-log the
+                # source cleanup.
+                self._delete_tree(task, target, None, None)
 
     # --- per-node IO ---------------------------------------------------------
 
     def _copy_tree(self, task: Task, src: Path, dest: Path, overwrite: bool,
-                   prog: ProgressManager) -> None:
+                   prog: ProgressManager, log, verb: str) -> None:
         task.checkpoint()
         prog.update_progress(src.name)
         if src.is_dir() and not src.is_symlink():
             dest.mkdir(parents=True, exist_ok=True)
             for child in src.iterdir():
-                self._copy_tree(task, child, dest / child.name, overwrite, prog)
-        else:
-            self._copy_file(task, src, dest, overwrite, prog)
+                self._copy_tree(task, child, dest / child.name, overwrite, prog, log, verb)
+        elif self._copy_file(task, src, dest, overwrite, prog):
+            _log_op(log, verb, src, dest)  # one line per file, with the real dest
 
     def _copy_file(self, task: Task, src: Path, dest: Path, overwrite: bool,
-                   prog: ProgressManager) -> None:
+                   prog: ProgressManager) -> bool:
+        """Copy one file; return True if it was written, False if skipped (an inner
+        collision under a non-overwrite directory), so the caller logs only real
+        copies."""
         if dest.exists() and not overwrite:
-            return  # inner collision under a non-overwrite dir — leave it
+            return False  # inner collision under a non-overwrite dir — leave it
         try:
             size = 0 if src.is_symlink() else src.stat().st_size
         except Exception:  # noqa: BLE001
@@ -331,6 +339,7 @@ class FileOperationService:
             self._copy_bytes(task, src, dest, size, overwrite, local, prog)
         else:
             src.copy_to(dest, overwrite=overwrite)
+        return True
 
     def _copy_bytes(self, task: Task, src: Path, dest: Path, size: int,
                     overwrite: bool, local: bool, prog: ProgressManager) -> None:
@@ -363,18 +372,39 @@ class FileOperationService:
             raise
 
     def _delete_tree(self, task: Task, path: Path,
-                     prog: Optional[ProgressManager]) -> None:
+                     prog: Optional[ProgressManager], log) -> None:
         task.checkpoint()
         if path.is_dir() and not path.is_symlink():
             for child in list(path.iterdir()):
-                self._delete_tree(task, child, prog)
+                self._delete_tree(task, child, prog, log)
             if prog is not None:
                 prog.update_progress(path.name)
             path.rmdir()
+            _log_del(log, path)
         else:
             if prog is not None:
                 prog.update_progress(path.name)
             path.unlink()
+            _log_del(log, path)
+
+
+def _log_op(log, verb: str, src: Path, dest: Path) -> None:
+    """Log one copy/move compactly: the file name once, then the source and
+    destination *directories* (the name is not repeated in each full path). When
+    the name changed — a "keep both" / rename resolution — show both names so the
+    ` (N)` result is visible."""
+    if log is None:
+        return
+    if src.name == dest.name:
+        log(f"{verb} '{dest.name}': {src.parent} → {dest.parent}")
+    else:
+        log(f"{verb} '{src.name}' → '{dest.name}': {src.parent} → {dest.parent}")
+
+
+def _log_del(log, path: Path) -> None:
+    """Log one delete compactly: the name once, then its directory."""
+    if log is not None:
+        log(f"Deleted '{path.name}': {path.parent}")
 
 
 def _is_atomic_move(kind: str, target: Path, dest_dir: Optional[Path]) -> bool:
