@@ -27,9 +27,18 @@ from tfm_directory_diff_viewer import (
 )
 
 
+import _config
+
+
 def _sync_view(left, right, **kw):
     """A viewer scanned synchronously (deterministic for tests)."""
     return DirectoryDiffView(left, right, background=False, **kw)
+
+
+@pytest.fixture
+def config():
+    """A real Config so the viewer's file-op keys + shared engine are enabled."""
+    return _config.Config()
 
 
 @pytest.fixture
@@ -307,9 +316,9 @@ def test_cancel_stops_the_tick(trees):
 # --- file operations across sides (slice 4) ----------------------------------
 
 
-def test_copy_focused_creates_file_on_other_side(backend, trees):
+def test_copy_focused_creates_file_on_other_side(backend, trees, config):
     panel = Panel(backend)
-    view = show_directory_diff_viewer(panel, *trees, background=False)
+    view = show_directory_diff_viewer(panel, *trees, background=False, config=config)
     panel.render()
     node = _find(view.root, "only_left.txt")
     view.cursor = view.visible.index(node)
@@ -320,9 +329,37 @@ def test_copy_focused_creates_file_on_other_side(backend, trees):
     assert (trees[1] / "only_left.txt").exists()
 
 
-def test_delete_focused_removes_file(backend, trees):
+def test_copy_key_from_config_creates_file(backend, trees, config):
+    """The copy key comes from KEY_BINDINGS (C), not a hardcoded 'c' branch."""
     panel = Panel(backend)
-    view = show_directory_diff_viewer(panel, *trees, background=False)
+    view = show_directory_diff_viewer(panel, *trees, background=False, config=config)
+    panel.render()
+    node = _find(view.root, "only_left.txt")
+    view.cursor = view.visible.index(node)
+    view.active = "left"
+    panel.dispatch_event(_key("c"))      # 'C' binding → copy_files → confirm box
+    panel.dispatch_event(_key("enter"))  # default button is "Copy"
+    view.join()
+    assert (trees[1] / "only_left.txt").exists()
+
+
+def test_move_focused_moves_file_to_other_side(backend, trees, config):
+    panel = Panel(backend)
+    view = show_directory_diff_viewer(panel, *trees, background=False, config=config)
+    panel.render()
+    node = _find(view.root, "only_left.txt")
+    view.cursor = view.visible.index(node)
+    view.active = "left"
+    view._move_focused()
+    panel.dispatch_event(_key("enter"))  # default button is "Move"
+    view.join()
+    assert (trees[1] / "only_left.txt").exists()
+    assert not (trees[0] / "only_left.txt").exists()
+
+
+def test_delete_focused_removes_file(backend, trees, config):
+    panel = Panel(backend)
+    view = show_directory_diff_viewer(panel, *trees, background=False, config=config)
     panel.render()
     node = _find(view.root, "only_left.txt")
     view.cursor = view.visible.index(node)
@@ -334,9 +371,9 @@ def test_delete_focused_removes_file(backend, trees):
     assert not (trees[0] / "only_left.txt").exists()
 
 
-def test_delete_cancel_keeps_file(backend, trees):
+def test_delete_cancel_keeps_file(backend, trees, config):
     panel = Panel(backend)
-    view = show_directory_diff_viewer(panel, *trees, background=False)
+    view = show_directory_diff_viewer(panel, *trees, background=False, config=config)
     panel.render()
     node = _find(view.root, "only_left.txt")
     view.cursor = view.visible.index(node)

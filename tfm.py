@@ -63,6 +63,7 @@ from tfm_state_manager import get_state_manager  # noqa: E402
 from tfm_batch_rename_dialog import show_batch_rename  # noqa: E402
 from tfm_diff_viewer import show_diff_viewer  # noqa: E402
 from tfm_directory_diff_viewer import show_directory_diff_viewer  # noqa: E402
+from tfm_file_operations import FileOperationService  # noqa: E402
 from tfm_text_dialog import show_markdown  # noqa: E402
 from tfm_text_viewer import show_text_viewer  # noqa: E402
 
@@ -252,6 +253,9 @@ class TfmApp:
         self._log_copy_mod = "cmd" if type(backend).__name__ == "MacOSBackend" else "ctrl"
         self.config = _config.Config()
         self.keys = KeyBindings(self.config.KEY_BINDINGS)
+        # Shared copy/move/delete engine (confirm dialogs + threaded progress),
+        # used by both this view and the directory diff viewer.
+        self._fileops = FileOperationService(self.config)
         # Persistent cross-session state (window layout, pane dirs, cursor
         # positions, recent dirs). Injectable so tests can supply a temp-db
         # manager instead of touching ~/.tfm/state.db.
@@ -2169,7 +2173,7 @@ class TfmApp:
         left = self.pane("left")["path"]
         right = self.pane("right")["path"]
         show_directory_diff_viewer(self.panel, left, right,
-                                   show_hidden=self.flm.show_hidden)
+                                   show_hidden=self.flm.show_hidden, config=self.config)
         self.panel.render()
 
     # --- file operations (copy / move / delete) ------------------------------
@@ -2211,18 +2215,6 @@ class TfmApp:
         count = len(targets)
         self.log_info(f"Copied {count} {label}{'s' if count != 1 else ''} to clipboard")
 
-    @staticmethod
-    def _delete_path(entry) -> None:
-        """Delete a file or directory through the storage-agnostic Path API,
-        recursing into directories (``copy_to`` / ``move_to`` handle their own
-        recursion, but delete has no single primitive)."""
-        if entry.is_dir() and not entry.is_symlink():
-            for child in entry.iterdir():
-                TfmApp._delete_path(child)
-            entry.rmdir()
-        else:
-            entry.unlink()
-
     def copy_files(self) -> None:
         """Copy the active pane's selection (or cursor entry) into the other
         pane's directory (the 'C' key). Mirrors ttk TFM's copy-to-other-pane."""
@@ -2234,10 +2226,11 @@ class TfmApp:
         self._transfer("move")
 
     def _transfer(self, kind: str) -> None:
-        """Shared copy/move flow: resolve targets and destination, warn on
-        conflicts, confirm (honouring ``CONFIRM_COPY`` / ``CONFIRM_MOVE``), then
-        run the transfer through ``Path.copy_to`` / ``Path.move_to`` (which
-        recurse into directories and handle cross-storage transfers)."""
+        """Resolve the copy/move targets and destination from the panes, apply the
+        pane-specific guards, then hand the run off to the shared
+        :class:`~tfm_file_operations.FileOperationService` (which owns the confirm
+        dialog, conflict prompt, and threaded progress). ``on_complete`` refreshes
+        the panes and logs the summary."""
         verb = "Copy" if kind == "copy" else "Move"
         src_pane = self.active_pane()
         dst_pane = self.pm.get_inactive_pane()
@@ -2257,105 +2250,43 @@ class TfmApp:
             self.log_info(f"Cannot {kind}: source and destination are the same directory")
             return
 
-        conflicts = [t for t in targets if (dest_dir / t.name).exists()]
-        message = f"{verb} {len(targets)} item(s) to {dest_dir}?"
-        if conflicts:
-            message += f"\n{len(conflicts)} already exist there."
-
-        def run(overwrite: bool) -> None:
-            done = skipped = failed = 0
-            for t in targets:
-                dest = dest_dir / t.name
-                try:
-                    if dest.exists() and not overwrite:
-                        skipped += 1
-                        continue
-                    (t.copy_to if kind == "copy" else t.move_to)(dest, overwrite=overwrite)
-                    done += 1
-                except Exception as exc:
-                    failed += 1
-                    self.log_info(f"{verb} failed for {t.name}: {exc}")
+        def on_complete(result: dict) -> None:
             self.flm.refresh_files(dst_pane)
             if kind == "move":
                 self.flm.refresh_files(src_pane)
             src_pane["selected_files"].clear()
-            summary = f"{verb}: {done} done"
-            if skipped:
-                summary += f", {skipped} skipped (exists)"
-            if failed:
-                summary += f", {failed} failed"
+            summary = f"{verb}: {result['done']} done"
+            if result["skipped"]:
+                summary += f", {result['skipped']} skipped (exists)"
+            if result["failed"]:
+                summary += f", {result['failed']} failed"
             self.log_info(summary)
             self.panel.render()
 
-        confirm = getattr(self.config, f"CONFIRM_{verb.upper()}", True)
-        # A conflict always prompts (never silently overwrite), even if the plain
-        # confirm is disabled; the buttons then choose the overwrite policy.
-        if conflicts:
-            def on_result(label: str) -> None:
-                if label == "Cancel":
-                    self.panel.render()
-                else:
-                    run(overwrite=(label == "Overwrite"))
-            show_message_box(
-                self.panel, message, title=verb, icon="warning",
-                buttons=("Overwrite", "Skip existing", "Cancel"),
-                default=2, cancel=2, on_result=on_result)
-        elif confirm:
-            def on_result(label: str) -> None:
-                if label == verb:
-                    run(overwrite=False)
-                else:
-                    self.panel.render()
-            show_message_box(
-                self.panel, message, title=verb, icon="info",
-                buttons=(verb, "Cancel"), default=0, cancel=1, on_result=on_result)
-        else:
-            run(overwrite=False)
-            return
-        self.panel.render()
+        op = self._fileops.copy if kind == "copy" else self._fileops.move
+        op(self.panel, targets, dest_dir, on_complete=on_complete, log=self.log_info)
 
     def delete_files(self) -> None:
-        """Delete the active pane's selection (or cursor entry) after a confirm
-        (honouring ``CONFIRM_DELETE``). Directories are removed recursively."""
+        """Delete the active pane's selection (or cursor entry) via the shared
+        :class:`~tfm_file_operations.FileOperationService` (confirm honouring
+        ``CONFIRM_DELETE``, directories removed recursively); refresh the pane and
+        log the summary on completion."""
         pane = self.active_pane()
         targets = self._selected_or_focused(pane)
         if not targets:
             self.log_info("No file to delete")
             return
 
-        def run() -> None:
-            done = failed = 0
-            for t in targets:
-                try:
-                    self._delete_path(t)
-                    done += 1
-                except Exception as exc:
-                    failed += 1
-                    self.log_info(f"Delete failed for {t.name}: {exc}")
+        def on_complete(result: dict) -> None:
             pane["selected_files"].clear()
             self._refresh(pane)
-            summary = f"Delete: {done} removed"
-            if failed:
-                summary += f", {failed} failed"
+            summary = f"Delete: {result['done']} removed"
+            if result["failed"]:
+                summary += f", {result['failed']} failed"
             self.log_info(summary)
             self.panel.render()
 
-        if getattr(self.config, "CONFIRM_DELETE", True):
-            names = ", ".join(t.name for t in targets[:3])
-            if len(targets) > 3:
-                names += f", … ({len(targets)} total)"
-            def on_result(label: str) -> None:
-                if label == "Delete":
-                    run()
-                else:
-                    self.panel.render()
-            show_message_box(
-                self.panel, f"Delete {len(targets)} item(s)?\n{names}\nThis cannot be undone.",
-                title="Delete", icon="warning", buttons=("Delete", "Cancel"),
-                default=1, cancel=1, on_result=on_result)
-            self.panel.render()
-        else:
-            run()
+        self._fileops.delete(self.panel, targets, on_complete=on_complete, log=self.log_info)
 
     # --- archives (create / extract) -----------------------------------------
 

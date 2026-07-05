@@ -28,6 +28,8 @@ from __future__ import annotations
 
 import itertools
 import queue
+import shlex
+import subprocess
 import threading
 import time
 from collections.abc import Iterator
@@ -46,6 +48,8 @@ from tfm_path import Path
 from tfm_str_format import format_size
 from tfm_text_viewer import MONO, _ScrollBody
 from tfm_diff_viewer import show_diff_viewer
+from tfm_config import KeyBindings
+from tfm_file_operations import FileOperationService
 
 
 class DifferenceType(Enum):
@@ -294,17 +298,6 @@ def summarize_directory(node: TreeNode) -> DifferenceType:
     return DifferenceType.PENDING
 
 
-def _recursive_delete(entry: Path) -> None:
-    """Delete a file or directory through the storage-agnostic Path API,
-    recursing into directories (mirrors ``tfm.TfmApp._delete_path``)."""
-    if entry.is_dir() and not entry.is_symlink():
-        for child in entry.iterdir():
-            _recursive_delete(child)
-        entry.rmdir()
-    else:
-        entry.unlink()
-
-
 # --- rendering / interaction (PuiKit widget) ---------------------------------
 
 #: Foreground for a node that differs (only-one-side / content-different).
@@ -337,10 +330,19 @@ class DirectoryDiffView(Widget):
     })
 
     def __init__(self, left_path: Path, right_path: Path, show_hidden: bool = True,
-                 background: bool = True):
+                 background: bool = True, config: Any = None):
         self.left_path = left_path
         self.right_path = right_path
         self.show_hidden = show_hidden
+        self._config = config
+        # File-op keys resolve through the same config-driven KeyBindings the main
+        # file manager uses (C / M / K / DELETE / E / V), so bindings stay in one
+        # place; the copy/move/delete engine and progress dialog are the shared
+        # FileOperationService. ``background`` doubles as the ops' sync/async flag
+        # (tests construct with background=False → deterministic inline ops).
+        self._keys = KeyBindings(config.KEY_BINDINGS) if config is not None else None
+        self._fileops = FileOperationService(config) if config is not None else None
+        self._op_background = background
         self._panel: Any = None
         # An empty tree until the worker's first build; navigation state.
         self.root = TreeNode("", None, None, True, DifferenceType.PENDING, 0, True)
@@ -878,77 +880,122 @@ class DirectoryDiffView(Widget):
         if self._panel is not None:
             show_message_box(self._panel, message, title=title, icon="info", z=self._child_z)
 
-    def _copy_focused(self) -> None:
-        """Copy the focused node from the active side to the mirrored location on
-        the opposite side (creating parent directories), then rescan."""
+    def _mirror_dest_dir(self, node: TreeNode) -> Path:
+        """The directory on the opposite side that mirrors ``node``'s parent, so a
+        copy/move keeps the two trees aligned (``sub/a.txt`` on the active side
+        lands under ``sub/`` on the other side)."""
+        dest_root = self._opposite_root()
+        parent = node.parent
+        parent_rel = self._node_rel_path(parent) if parent is not None and parent.depth > 0 else ""
+        return (dest_root / parent_rel) if parent_rel else dest_root
+
+    def _on_op_complete(self, result: dict) -> None:
+        """Shared completion for a viewer file op: rescan (re-evaluates verdicts,
+        keeping the user's place) and surface any failures."""
+        if result.get("failed"):
+            self._notify(f"{result['failed']} item(s) failed.")
+        self._restart_scan()
+        self._render()
+
+    def _transfer_focused(self, kind: str) -> None:
+        """Copy or move the focused node from the active side to its mirrored
+        location on the opposite side, via the shared file-op service (which owns
+        the confirm dialog, conflict prompt, and progress)."""
         node = self._current()
-        if node is None or self._panel is None:
+        if node is None or self._panel is None or self._fileops is None:
             return
         src = self._active_side_path(node)
         if src is None:
             self._notify(f"'{node.name}' does not exist on the {self.active} side.")
             return
-        rel = self._node_rel_path(node)
-        dest_root = self._opposite_root()
-        parent = node.parent
-        parent_rel = self._node_rel_path(parent) if parent is not None and parent.depth > 0 else ""
-        dest_dir = (dest_root / parent_rel) if parent_rel else dest_root
-        dest = dest_dir / node.name
+        op = self._fileops.copy if kind == "copy" else self._fileops.move
+        op(self._panel, [src], self._mirror_dest_dir(node),
+           on_complete=self._on_op_complete, z=self._child_z,
+           background=self._op_background)
 
-        def result(label: str) -> None:
-            if label != "Copy":
-                self._render()
-                return
-            try:
-                if not dest_dir.exists():
-                    dest_dir.mkdir(parents=True, exist_ok=True)
-                src.copy_to(dest, overwrite=True)
-            except Exception as exc:
-                self._notify(f"Copy failed: {exc}")
-                return
-            self._restart_scan()
-            self._render()
+    def _copy_focused(self) -> None:
+        """Copy the focused node from the active side to the mirrored location on
+        the opposite side, then rescan."""
+        self._transfer_focused("copy")
 
-        show_message_box(
-            self._panel, f"Copy '{rel}' to the {self._other_side()} side?",
-            title="Copy", icon="info", buttons=("Copy", "Cancel"),
-            default=0, cancel=1, on_result=result, z=self._child_z)
+    def _move_focused(self) -> None:
+        """Move the focused node from the active side to the mirrored location on
+        the opposite side, then rescan."""
+        self._transfer_focused("move")
 
     def _delete_focused(self) -> None:
-        """Delete the focused node from the active side (recursively), then
-        rescan. Confirmation defaults to Cancel (destructive)."""
+        """Delete the focused node from the active side (recursively) via the
+        shared file-op service, then rescan."""
         node = self._current()
-        if node is None or self._panel is None:
+        if node is None or self._panel is None or self._fileops is None:
             return
         path = self._active_side_path(node)
         if path is None:
             self._notify(f"'{node.name}' does not exist on the {self.active} side.")
             return
-        rel = self._node_rel_path(node)
+        self._fileops.delete(self._panel, [path], on_complete=self._on_op_complete,
+                             z=self._child_z, background=self._op_background)
 
-        def result(label: str) -> None:
-            if label != "Delete":
-                self._render()
-                return
-            try:
-                _recursive_delete(path)
-            except Exception as exc:
-                self._notify(f"Delete failed: {exc}")
-                return
-            self._restart_scan()
-            self._render()
+    def _edit_merge(self) -> None:
+        """Launch the configured ``TEXT_DIFF`` tool (e.g. ``vimdiff`` / ``code
+        --diff``) on the focused file's two sides so the user can merge them,
+        handing the terminal over via the backend suspend/resume, then rescan (a
+        merged file's verdict flips ``!`` → ``=`` live). Two-sided local files
+        only."""
+        node = self._current()
+        if node is None or node.is_directory or self._panel is None:
+            return
+        if node.left_path is None or node.right_path is None:
+            self._notify("Merge needs the file present on both sides.")
+            return
+        if "://" in str(node.left_path) or "://" in str(node.right_path):
+            self._notify("Merge is only available for local files.")
+            return
+        tool = getattr(self._config, "TEXT_DIFF", None) if self._config is not None else None
+        if not tool:
+            self._notify("No TEXT_DIFF tool is configured.")
+            return
+        argv = (shlex.split(tool) if isinstance(tool, str) else list(tool))
+        argv = argv + [str(node.left_path), str(node.right_path)]
+        backend = getattr(self._panel, "backend", None)
+        try:
+            with backend.suspended():
+                subprocess.run(argv)
+        except FileNotFoundError:
+            self._notify(f"Command not found: {argv[0]}")
+            return
+        except Exception as exc:  # noqa: BLE001
+            self._notify(f"Merge tool failed: {exc}")
+            return
+        self._restart_scan()
+        self._render()
 
-        show_message_box(
-            self._panel, f"Delete '{rel}' from the {self.active} side?",
-            title="Delete", icon="warning", buttons=("Delete", "Cancel"),
-            default=1, cancel=1, on_result=result, z=self._child_z)
+    #: Config-driven actions the viewer handles (resolved through the shared
+    #: KeyBindings, so their keys match the main file manager) mapped to handlers.
+    def _file_op_handlers(self) -> dict:
+        return {
+            "copy_files": self._copy_focused,
+            "move_files": self._move_focused,
+            "delete_files": self._delete_focused,
+            "edit_file": self._edit_merge,
+            "view_file": self._open_file_diff,
+        }
 
-    def _other_side(self) -> str:
-        return "right" if self.active == "left" else "left"
+    def _keys_label(self, action: str, fallback: str) -> str:
+        """Display string for an action's configured key(s) (so the help matches
+        the user's KEY_BINDINGS), or ``fallback`` when no config is present."""
+        if self._keys is None:
+            return fallback
+        keys, _ = self._keys.get_keys_for_action(action)
+        return " / ".join(keys) if keys else fallback
 
     def _show_help(self) -> None:
         if self._panel is None:
             return
+        copy = self._keys_label("copy_files", "C")
+        move = self._keys_label("move_files", "M")
+        delete = self._keys_label("delete_files", "K / Del")
+        merge = self._keys_label("edit_file", "E")
         show_message_box(
             self._panel,
             "↑/↓ · PgUp/PgDn · Home/End   move\n"
@@ -958,8 +1005,10 @@ class DirectoryDiffView(Widget):
             "Tab                          switch active side\n"
             "[ / ]                        move centre split (drag gutter too)\n"
             "Click / double-click         focus side · open dir/diff\n"
-            "c                            copy focused → other side\n"
-            "x / Del                      delete focused (active side)\n"
+            f"{copy:<28} copy focused → other side\n"
+            f"{move:<28} move focused → other side\n"
+            f"{delete:<28} delete focused (active side)\n"
+            f"{merge:<28} merge sides in $TEXT_DIFF\n"
             "r                            rescan\n"
             "q / Esc                      close",
             title="Directory Diff — Keys", icon="info", z=self._child_z)
@@ -1338,6 +1387,18 @@ class DirectoryDiffView(Widget):
             return True
         key = event.key
         char = event.char
+        # File operations resolve through the shared, config-driven KeyBindings so
+        # their keys match the main file manager (C / M / K / DELETE / E / V). The
+        # focused node stands in for a selection — has_selection=True so the
+        # selection-gated copy/move/delete bindings fire; each handler then checks
+        # the active side itself and reports if the node is missing there.
+        if self._keys is not None:
+            action = self._keys.find_action_for_event(event, has_selection=True)
+            handler = self._file_op_handlers().get(action) if action else None
+            if handler is not None:
+                handler()
+                self._update_priorities()
+                return True
         if key in ("escape", "q") or char == "q":
             self._close()
         elif key == "down":
@@ -1376,12 +1437,6 @@ class DirectoryDiffView(Widget):
             self._step_diff(1)
         elif char == "N":
             self._step_diff(-1)
-        elif char == "d":
-            self._open_file_diff()
-        elif char == "c":
-            self._copy_focused()
-        elif char == "x" or key == "delete":
-            self._delete_focused()
         elif char == "r":
             self._restart_scan()
         elif char == "[":
@@ -1396,15 +1451,16 @@ class DirectoryDiffView(Widget):
 
 def show_directory_diff_viewer(panel: Any, left_path: Path, right_path: Path,
                                show_hidden: bool = True, background: bool = True,
-                               z: int = 80) -> DirectoryDiffView:
+                               z: int = 80, config: Any = None) -> DirectoryDiffView:
     """Push a full-window modal :class:`DirectoryDiffView` for two directories.
 
     Scanning runs in the background and repaints live via an animation tick (see
     the module docstring). On a still backend without animation ticks the tick
     simply never fires; the tree still fills in and repaints on the next user
-    event."""
+    event. Pass ``config`` to enable the config-driven file-operation keys and the
+    shared copy/move/delete engine (the main app supplies its ``Config``)."""
     viewer = DirectoryDiffView(left_path, right_path, show_hidden=show_hidden,
-                               background=background)
+                               background=background, config=config)
     viewer._child_z = z + 10
     sw, sh = panel.backend.size_units
     viewer._panel = panel
