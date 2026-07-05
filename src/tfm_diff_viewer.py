@@ -24,7 +24,8 @@ from puikit.panel import Rect
 from puikit.widgets import Splitter
 from puikit.widgets.base import Widget
 
-from tfm_text_viewer import MONO, _ScrollBody, _highlight, _read_lines, draw_hscrollbar
+from tfm_text_viewer import (MONO, _ScrollBody, _content_bg, _highlight, _read_lines,
+                             draw_hscrollbar)
 
 #: Whole-row tints by diff tag.
 _DEL_BG = (60, 30, 30)
@@ -122,7 +123,7 @@ class _DiffPane(Widget):
         v = self.v
         theme = ctx.theme
         w = ctx.width
-        bg = getattr(theme, "popup_bg", None) if theme is not None else None
+        bg = _content_bg(theme)  # sit on TFM's own pane background, not popup_bg
         accent = theme.accent if theme is not None else (0, 122, 204)
         self._bg = bg
         self._text_fg = theme.text if theme is not None else (212, 212, 212)
@@ -136,8 +137,10 @@ class _DiffPane(Widget):
 
         name = v.path1.name if self.side == "l" else v.path2.name
         ctx.draw_text(0, 0, f" {name}"[:w], Style(fg=accent, bg=bg, attr=TextAttribute.BOLD))
-        # Content below the filename header, clipped for smooth scroll.
-        ctx.draw_child(self._body, 0, 1, w, float(v._view_h))
+        # Content below the filename header, clipped for smooth scroll. Uses the
+        # parent's fractional body height so the last row reaches the footer flush
+        # with the pixel bottom (no whole-cell grid-snap gap).
+        ctx.draw_child(self._body, 0, 1, w, v._body_h)
 
     def _draw_rows(self, ctx) -> None:
         v = self.v
@@ -213,6 +216,7 @@ class DiffViewer(Widget):
         self.top = 0.0
         self.left = 0.0
         self._view_h = 1
+        self._body_h = 1.0   # fractional body height (panes read it, pixel-flush)
         self._max_line = max((len(line) for line in self.lines1 + self.lines2), default=0)
         self.left_pane = _DiffPane(self, "l")
         self.right_pane = _DiffPane(self, "r")
@@ -227,11 +231,12 @@ class DiffViewer(Widget):
         self.top = max(0.0, min(self.top, float(max(0, len(self.rows) - self._view_h))))
         self.left = max(0.0, min(self.left, float(max(0, self._max_line - 1))))
 
-    def _pane_columns(self, wu: float, gutter: int) -> tuple[float, int, float, int]:
+    def _pane_columns(self, wu: float, gutter: int) -> tuple[float, float, float, float]:
         """``(left_x, left_content_w, right_x, right_content_w)`` for the two panes'
         content regions (after the gutter; the right side reserves the scrollbar
         column). Uses the splitter's actual rects once it has drawn, falling back
-        to the fraction before the first draw."""
+        to the fraction before the first draw. Widths are kept *fractional* so the
+        h-scrollbar thumb reflects the exact sub-cell viewport."""
         fr, sr = self.splitter._first_rect, self.splitter._second_rect
         if fr.w > 0:
             lx, lw = fr.x, fr.w
@@ -240,8 +245,8 @@ class DiffViewer(Widget):
             frac = self.splitter.fraction
             lx, lw = 0.0, frac * wu
             rx, rw = lw, wu - lw
-        return (lx + gutter, max(1, int(lw) - gutter),
-                rx + gutter, max(1, int(rw) - gutter - 1))
+        return (lx + gutter, max(1.0, lw - gutter),
+                rx + gutter, max(1.0, rw - gutter - 1))
 
     def _step_block(self, delta: int) -> None:
         if not self.blocks:
@@ -260,10 +265,10 @@ class DiffViewer(Widget):
         self._panel = ctx.panel
         theme = ctx.theme
         w, h = ctx.width, ctx.height
-        wu = ctx.size_units[0]
-        bg = getattr(theme, "popup_bg", None) if theme is not None else None
+        wu, hu = ctx.size_units  # exact (sub-cell) extent — anchor chrome to it
+        bg = _content_bg(theme)  # sit on TFM's own pane background, not popup_bg
         muted = theme.muted_text if theme is not None else (150, 150, 150)
-        ctx.fill_rect(0, 0, wu, ctx.size_units[1], Style(bg=bg))
+        ctx.fill_rect(0, 0, wu, hu, Style(bg=bg))
 
         # Each pane gets its own horizontal scrollbar (the panes pan together by
         # self.left but have different widths). A row is reserved below the panes
@@ -274,32 +279,37 @@ class DiffViewer(Widget):
         gutter = self._gutter_w()
         lx, lcw, rx, rcw = self._pane_columns(wu, gutter)
         show_hbar = self._max_line > lcw or self._max_line > rcw
-        self._view_h = max(1, h - 2 - (1 if show_hbar else 0))
+        # Bottom chrome anchors to ``hu`` so the footer (and per-pane h-bars) sit
+        # flush with the pixel bottom; the panes fill the exact fractional gap.
+        foot_y = hu - 1
+        hbar_y = hu - 2
+        self._body_h = (hbar_y if show_hbar else foot_y) - 1
+        self._view_h = max(1, int(self._body_h))
         self._clamp()
 
         # Two panes + the draggable divider fill the area above the footer.
-        ctx.draw_child(self.splitter, 0, 0, wu, float(max(1, h - 1)))
+        ctx.draw_child(self.splitter, 0, 0, wu, max(1.0, foot_y))
 
-        # Shared vertical scrollbar over the right edge of the content.
+        # Shared vertical scrollbar over the right edge of the content. Thumb from
+        # the fractional visible height, so it matches the real viewport.
         if len(self.rows) > self._view_h:
             denom = len(self.rows) - self._view_h
-            ratio = self._view_h / len(self.rows)
-            ctx.draw_scrollbar(wu - 1, 1, self._view_h,
+            ratio = min(1.0, self._body_h / len(self.rows))
+            ctx.draw_scrollbar(wu - 1, 1, self._body_h,
                                max(0.0, min(1.0, self.top / denom if denom else 0.0)), ratio)
 
         # One horizontal scrollbar per pane, positioned from the now-current
         # splitter rects, in the reserved row below the content.
         if show_hbar:
             lx, lcw, rx, rcw = self._pane_columns(wu, gutter)
-            hy = 1 + self._view_h
             if self._max_line > lcw:
-                draw_hscrollbar(ctx, lx, hy, lcw, self.left, lcw, self._max_line)
+                draw_hscrollbar(ctx, lx, hbar_y, lcw, self.left, lcw, self._max_line)
             if self._max_line > rcw:
-                draw_hscrollbar(ctx, rx, hy, rcw, self.left, rcw, self._max_line)
+                draw_hscrollbar(ctx, rx, hbar_y, rcw, self.left, rcw, self._max_line)
 
         hint = (f" {len(self.rows)} rows · {len(self.blocks)} changes · "
                 "n/N jump · ←→ pan · drag divider · q close ")
-        ctx.draw_text(0, h - 1, hint[:w], Style(fg=muted, bg=bg, attr=TextAttribute.DIM))
+        ctx.draw_text(0, foot_y, hint[:w], Style(fg=muted, bg=bg, attr=TextAttribute.DIM))
 
     # --- events --------------------------------------------------------------
 

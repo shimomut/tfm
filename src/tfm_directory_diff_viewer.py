@@ -970,7 +970,13 @@ class DirectoryDiffView(Widget):
         self._panel = ctx.panel
         theme = ctx.theme
         w, h = ctx.width, ctx.height
-        wu = ctx.size_units[0]
+        wu, hu = ctx.size_units  # exact (sub-cell) extent — anchor chrome to it
+        # Number of whole rows (row count / scroll math), but the *bottom* chrome
+        # is anchored to ``hu`` so the footer sits flush with the pixel edge
+        # instead of floating a fractional row above it (grid-snap gap).
+        foot_y = hu - 1          # footer line, flush to the bottom
+        det_y = hu - 2           # details line, just above it
+        body_h = hu - 3          # header (1) + body + details + footer (2)
         accent = theme.accent if theme is not None else (0, 122, 204)
         muted = theme.muted_text if theme is not None else (150, 150, 150)
         # Surfaces: chrome (header/footer) sits on the lighter popup surface; the
@@ -994,9 +1000,9 @@ class DirectoryDiffView(Widget):
         self._sel_active = getattr(theme, "selection_active_bg", accent) if theme else accent
         self._sel_inactive = getattr(theme, "selection_inactive_bg", muted) if theme else muted
         # Content fills the whole widget; the chrome bars are painted over it.
-        ctx.fill_rect(0, 0, wu, ctx.size_units[1], Style(bg=content_bg))
+        ctx.fill_rect(0, 0, wu, hu, Style(bg=content_bg))
         ctx.fill_rect(0, 0, wu, 1.0, Style(bg=chrome_bg))            # header bar
-        ctx.fill_rect(0, h - 2, wu, 2.0, Style(bg=chrome_bg))        # footer bars
+        ctx.fill_rect(0, det_y, wu, hu - det_y, Style(bg=chrome_bg))  # footer bars
 
         # Column geometry: [left tree] [ gutter ] [right tree] [scrollbar]. The
         # split is user-movable and *pixel-smooth* — the split position is a
@@ -1004,7 +1010,10 @@ class DirectoryDiffView(Widget):
         # than snapping column-by-column. Clamped so neither pane collapses;
         # too-narrow windows fall back to an even split.
         reserve = 1 if self.visible else 0
-        avail = max(2, w - _GUTTER_W - reserve)
+        # Width is measured in the exact sub-cell extent (``wu``), so the split,
+        # the right pane, and the scrollbar reach the pixel edge instead of
+        # snapping to whole columns.
+        avail = max(2.0, wu - _GUTTER_W - reserve)
         self._avail = avail
         if avail >= 2 * _MIN_PANE:
             split_x = avail * self._split_ratio
@@ -1026,7 +1035,7 @@ class DirectoryDiffView(Widget):
         # The splitter: a full-height band (header top → footer top, so it never
         # leaves a gap below the last row) in its own tone. This *is* the divider
         # — no separate hairline — and it's several pixels wide, not a stroke.
-        ctx.fill_rect(self._sep_x, 0, float(_GUTTER_W), h - 2.0, Style(bg=self._gutter_bg))
+        ctx.fill_rect(self._sep_x, 0, float(_GUTTER_W), det_y, Style(bg=self._gutter_bg))
 
         # Header: the two directory paths, active side in accent, on the chrome bar.
         left_head = Style(fg=accent if self.active == "left" else self._text_fg, bg=chrome_bg,
@@ -1042,18 +1051,22 @@ class DirectoryDiffView(Widget):
         if not self.visible:
             self._draw_status_screen(ctx, w, h, muted, bg)
         else:
-            ctx.draw_child(self._body, 0, 1, w, float(self._view_h))
+            # The body clips to the exact fractional height, so the last row is a
+            # partial sliver that reaches the footer — no whole-cell gap above it.
+            ctx.draw_child(self._body, 0, 1, wu, body_h)
             if len(self.visible) > self._view_h:
                 denom = len(self.visible) - self._view_h
-                ratio = self._view_h / len(self.visible)
-                ctx.draw_scrollbar(wu - 1, 1, self._view_h,
+                # Thumb size from the *fractional* visible height, so it reflects
+                # the real viewport, not a whole-row-snapped count.
+                ratio = min(1.0, body_h / len(self.visible))
+                ctx.draw_scrollbar(wu - 1, 1, body_h,
                                    max(0.0, min(1.0, self.top / denom if denom else 0.0)), ratio)
 
-        ctx.draw_text(0, h - 2, self._details_line()[:w],
+        ctx.draw_text(0, det_y, self._details_line()[:w],
                       Style(fg=self._text_fg, bg=chrome_bg))
-        ctx.draw_text(0, h - 1, self._footer()[:w],
+        ctx.draw_text(0, foot_y, self._footer()[:w],
                       Style(fg=muted, bg=chrome_bg, attr=TextAttribute.DIM))
-        self._update_cursor(ctx, h)
+        self._update_cursor(ctx, hu)
 
     def _update_cursor(self, ctx, h: int) -> None:
         """Claim the pointer shape every frame. This is a full-window modal, so

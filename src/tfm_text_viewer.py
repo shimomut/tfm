@@ -38,6 +38,15 @@ except ImportError:
 MONO = Font(monospace=True)
 _TAB = 8
 
+
+def _content_bg(theme) -> tuple[int, int, int] | None:
+    """The file-pane content surface, so a full-window viewer sits on TFM's own
+    background instead of the lighter ``popup_bg`` (which reads as a floating
+    menu). Falls back to ``popup_bg`` for a theme without surface roles."""
+    if theme is None:
+        return None
+    return theme.surface_bg("content") or getattr(theme, "popup_bg", None)
+
 #: pygments token category → RGB (a VS Code-dark-ish palette). Categorised by
 #: substring of the token name, mirroring ttk TFM's ``get_syntax_color``.
 _SYNTAX = {
@@ -170,7 +179,7 @@ def draw_hscrollbar(ctx, x: float, y: float, w: float, left: float,
     ratio = min(1.0, content_w / max_line) if max_line > 0 else 1.0
     denom = max_line - content_w
     pos = max(0.0, min(1.0, left / denom)) if denom > 0 else 0.0
-    surface = getattr(ctx.theme, "popup_bg", None) if ctx.theme is not None else None
+    surface = _content_bg(ctx.theme)
     ctx.draw_scrollbar(x, y, w, pos, ratio, orientation="horizontal", surface=surface)
 
 
@@ -275,10 +284,9 @@ class TextViewer(Widget):
         self._panel = ctx.panel
         theme = ctx.theme
         w, h = ctx.width, ctx.height
-        bg = None
-        if theme is not None:
-            bg = getattr(theme, "popup_bg", None)
-        ctx.fill_rect(0, 0, ctx.size_units[0], ctx.size_units[1], Style(bg=bg))
+        wu, hu = ctx.size_units  # exact (sub-cell) extent — anchor chrome to it
+        bg = _content_bg(theme)  # sit on TFM's own pane background, not popup_bg
+        ctx.fill_rect(0, 0, wu, hu, Style(bg=bg))
 
         text_fg = theme.text if theme is not None else (212, 212, 212)
         muted = theme.muted_text if theme is not None else (150, 150, 150)
@@ -290,41 +298,48 @@ class TextViewer(Widget):
         header = f" {self.path.name}  ({total} lines)"
         ctx.draw_text(0, 0, header[:w], Style(fg=accent, bg=bg, attr=TextAttribute.BOLD))
         info = f"{pos}/{total}  {'WRAP' if self.wrap else ''} "
-        ctx.draw_text(max(0, ctx.size_units[0] - len(info)), 0, info, Style(fg=muted, bg=bg))
+        ctx.draw_text(max(0, wu - len(info)), 0, info, Style(fg=muted, bg=bg))
 
         gutter_w = self._gutter_w()
         self._gutter = gutter_w
         self._content_x = gutter_w
         self._content_w = max(1, w - gutter_w - 1)
+        # Fractional visible width for the h-scrollbar thumb (columns can be
+        # sub-cell); text still lays out on the whole-column ``_content_w``.
+        content_wf = max(1.0, wu - gutter_w - 1)
         self._bg, self._text_fg, self._muted = bg, text_fg, muted
         # A horizontal scrollbar (no-wrap only) steals a row when a line overruns
-        # the content width; the header and footer always take one each.
+        # the content width; the header and footer always take one each. The
+        # footer (and h-bar) anchor to ``hu`` so they sit flush with the pixel
+        # bottom, not a fractional row above it; the body fills the exact gap.
         show_hbar = not self.wrap and self._max_line > self._content_w
-        self._view_h = max(1, h - 2 - (1 if show_hbar else 0))
+        fy = hu - 1                              # footer, flush to the bottom
+        hbar_y = hu - 2                           # h-scrollbar, just above it
+        body_h = (hbar_y if show_hbar else fy) - 1
+        self._view_h = max(1, int(body_h))
         if self.wrap:
             self._rebuild_wrap(self._content_w)
         self._clamp()
 
         # Scrolling rows live in a clipped child so a fractional self.top renders
         # a partial top/bottom row (smooth GUI scroll) without touching the header.
-        ctx.draw_child(self._body, 0, 1, ctx.size_units[0], float(self._view_h))
+        ctx.draw_child(self._body, 0, 1, wu, body_h)
 
-        # Vertical scrollbar.
+        # Vertical scrollbar. Thumb from the fractional visible height.
         total_rows = self._total_rows()
         if total_rows > self._view_h:
-            ratio = self._view_h / total_rows
+            ratio = min(1.0, body_h / total_rows)
             denom = total_rows - self._view_h
             sbpos = self.top / denom if denom > 0 else 0.0
-            ctx.draw_scrollbar(ctx.size_units[0] - 1, 1, self._view_h,
+            ctx.draw_scrollbar(wu - 1, 1, body_h,
                                max(0.0, min(1.0, sbpos)), ratio)
 
         # Horizontal scrollbar, in the row between the content and the footer.
         if show_hbar:
-            draw_hscrollbar(ctx, self._content_x, 1 + self._view_h, self._content_w,
-                            self.left, self._content_w, self._max_line)
+            draw_hscrollbar(ctx, self._content_x, hbar_y, content_wf,
+                            self.left, content_wf, self._max_line)
 
         # Footer: search bar or hint.
-        fy = h - 1
         if self.searching or self.pattern:
             n = len(self.matches)
             here = (self.match_pos + 1) if n else 0
