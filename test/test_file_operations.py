@@ -54,15 +54,28 @@ def test_unique_dest_file_inserts_before_extension(tmp_path):
     assert _unique_dest(_P(tmp_path), "foo.txt").name == "foo (2).txt"
 
 
+def test_unique_dest_multiple_dots_in_stem(tmp_path):
+    # Only the last extension moves; dots in the stem stay put (the reported bug:
+    # "Screenshot … 5.36.02 PM.png" must not become "… 5 (1).36.02 PM.png").
+    name = "Screenshot 2026-06-27 at 5.36.02 PM.png"
+    (tmp_path / name).write_text("x")
+    assert _unique_dest(_P(tmp_path), name).name == "Screenshot 2026-06-27 at 5.36.02 PM (1).png"
+
+
 def test_unique_dest_directory_appends(tmp_path):
     (tmp_path / "bar").mkdir()
-    assert _unique_dest(_P(tmp_path), "bar").name == "bar (1)"
+    assert _unique_dest(_P(tmp_path), "bar", is_dir=True).name == "bar (1)"
 
 
-def test_unique_dest_tar_gz_double_extension(tmp_path):
-    (tmp_path / "a.tar.gz").write_text("x")
-    # partition on the first dot keeps the whole compound suffix.
-    assert _unique_dest(_P(tmp_path), "a.tar.gz").name == "a (1).tar.gz"
+def test_unique_dest_dotted_directory_appends(tmp_path):
+    # A dotted directory name is not an extension — append, don't split.
+    (tmp_path / "my.backup").mkdir()
+    assert _unique_dest(_P(tmp_path), "my.backup", is_dir=True).name == "my.backup (1)"
+
+
+def test_unique_dest_dotfile_appends(tmp_path):
+    (tmp_path / ".bashrc").write_text("x")
+    assert _unique_dest(_P(tmp_path), ".bashrc").name == ".bashrc (1)"
 
 
 # --- synchronous copy / move / delete ---------------------------------------

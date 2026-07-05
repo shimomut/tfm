@@ -20,6 +20,7 @@ conflicts headlessly (skip existing) — deterministic, no dialog, no thread.
 
 from __future__ import annotations
 
+import os
 import shutil
 from typing import Any, Callable, Optional
 
@@ -60,18 +61,25 @@ def recursive_delete(entry: Path) -> None:
         entry.unlink()
 
 
-def _unique_dest(dest_dir: Path, name: str) -> Path:
+def _unique_dest(dest_dir: Path, name: str, *, is_dir: bool = False) -> Path:
     """First free ``dest_dir/name`` variant for a "keep both" resolution: insert
-    ` (N)` before the extension for a file (``foo (1).txt``), or append it for a
-    directory / extension-less name (``foo (1)``), incrementing ``N`` until free."""
+    ` (N)` before the **last** extension for a file (``foo (1).txt``,
+    ``photo.2020 (1).jpg``), or append it for a directory / extension-less name
+    (``foo (1)``), incrementing ``N`` until free.
+
+    The split is on the last dot (``os.path.splitext``), so only the real
+    extension moves — a filename with dots in its stem (``… 5.36.02 PM.png``)
+    keeps them and gets ``… 5.36.02 PM (1).png``. Directories always append (a
+    dotted directory name is not an extension)."""
     candidate = dest_dir / name
     if not candidate.exists():
         return candidate
-    stem, dot, ext = name.partition(".")
-    if not dot:  # no extension (or a dotfile with no further ext) -> append
+    if is_dir:
         stem, ext_suffix = name, ""
     else:
-        ext_suffix = dot + ext
+        # Last-extension split. splitext ignores a leading dot, so a dotfile like
+        # ".bashrc" -> (".bashrc", "") and appends cleanly instead of moving.
+        stem, ext_suffix = os.path.splitext(name)
     n = 1
     while True:
         candidate = dest_dir / f"{stem} ({n}){ext_suffix}"
@@ -243,7 +251,7 @@ class FileOperationService:
             if action == "skip":
                 skipped += 1
             elif action == "keep_both":
-                plan.append((t, _unique_dest(dest_dir, t.name), False))
+                plan.append((t, _unique_dest(dest_dir, t.name, is_dir=t.is_dir()), False))
             else:  # overwrite
                 plan.append((t, dest, True))
         return plan, skipped
