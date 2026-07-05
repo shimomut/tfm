@@ -26,8 +26,8 @@ from typing import Any, Callable, Optional
 from puikit.backend import Style
 from puikit.event import Event, EventType
 from puikit.focus import FocusContainer
+from puikit.font import Font
 from puikit.layout import LayoutContext, SizeRequest
-from puikit.panel import Rect
 from puikit.theme import DEFAULT_THEME
 from puikit.widgets import Checkbox
 from puikit.widgets.base import Widget
@@ -42,6 +42,7 @@ _MTIME = ("Modified", ["same", "newer", "older"])
 _CONTENT = ("Content", ["equal", "differs"])
 
 _OPT_GAP = 2.0  # base units between option segments
+_CB_MARK = 4.0  # checkbox mark + gap gutter in base units (PuiKit "[ ] " label_x)
 
 
 class ConditionRow(Widget):
@@ -84,9 +85,8 @@ class ConditionRow(Widget):
 
     def draw(self, ctx) -> None:
         theme = ctx.theme or DEFAULT_THEME
-        wu, hu = ctx.size_units
+        hu = ctx.size_units[1]
         focused = ctx.focused
-        lc = ctx.layout_context()
         # Row surface: the dialog filled it (via the draw_child "bg" hint) with the
         # popup surface or, when focused, the hover tint. Text/marks must carry
         # that bg explicitly — a bare bg=None resolves to the layer default (dark),
@@ -94,7 +94,7 @@ class ConditionRow(Widget):
         row_bg = theme.hover_bg if focused else theme.popup_bg
 
         active = self.checkbox.checked
-        cb_w = self.checkbox.measure(lc, "x", 0.0).preferred
+        cb_w = _CB_MARK + ctx.measure_text(self.checkbox.label)  # proportional, matches render
         ctx.draw_child(self.checkbox, 0.0, 0, cb_w, hu, hints={"focused": focused})
         self._cb_x = (0.0, cb_w)
 
@@ -167,7 +167,6 @@ class CompareSelectDialog(FocusContainer, Widget):
         self.title = "Compare & Select"
         self.on_result = on_result
         self._panel: Any = None
-        self._region = None  # active-pane column span, for re-anchoring on re-fit
 
         self._size = ConditionRow(*_SIZE)
         self._mtime = ConditionRow(*_MTIME)
@@ -202,20 +201,27 @@ class CompareSelectDialog(FocusContainer, Widget):
     def _box_height(self, title_bottom: float, row_h: float) -> float:
         return self._hint_y(title_bottom, row_h) + 2.0  # hint row + bottom border/pad
 
-    def _content_width(self, lc) -> float:
+    def _opt_gutter(self, measure) -> float:
+        """x where the option segments start: past the widest checkbox (mark gutter
+        + label) + a gap. ``measure`` is a text-width function — pass the proportional
+        ``ctx.measure_text`` at draw so the gutter matches the rendered labels."""
+        return _CB_MARK + max(measure(r.checkbox.label) for r in self._conditions) + 2.0
+
+    def _content_width(self, measure) -> float:
         """Width of the widest content line (base units), so the box hugs its text
         instead of a fixed span: the intro, the longest key hint, the Preserve
-        checkbox, and the widest condition row (its gutter + segments)."""
-        opt_x0 = max(r.checkbox.measure(lc, "x", 0.0).preferred
-                     for r in self._conditions) + 2.0
+        checkbox, and the widest condition row (gutter + segments). ``measure`` must
+        be the *rendering* text measurer (proportional on GUI) — a LayoutContext's
+        monospace measure would over-size the box on a proportional backend."""
+        opt_x0 = self._opt_gutter(measure)
         row_w = max(
-            opt_x0 + sum(lc.measure_text(o) for o in r.options)
+            opt_x0 + sum(measure(o) for o in r.options)
             + _OPT_GAP * (len(r.options) - 1) + 0.7  # trailing pill pad
             for r in self._conditions)
         return max(
-            lc.measure_text(self._INTRO),
-            lc.measure_text(self._HINT_COND),
-            self._preserve.measure(lc, "x", 0.0).preferred,
+            measure(self._INTRO),
+            measure(self._HINT_COND),
+            _CB_MARK + measure(self._preserve.label),
             row_w,
         )
 
@@ -223,14 +229,17 @@ class CompareSelectDialog(FocusContainer, Widget):
 
     def show(self, panel: Any, *, region=None, z: int = 70) -> None:
         self._panel = panel
-        self._region = region
         sw, sh = panel.backend.size_units
-        # Initial size from an off-draw estimate; draw() re-fits both dimensions
-        # from live font metrics (a GUI backend can only measure proportional text
-        # accurately inside the draw cycle — before it, measure_text is monospace).
+        # Size to the content up front, measuring through the backend with the
+        # proportional UI font — the same face it renders in (a bare column count
+        # would over-size the box on a GUI backend). Grid backends ignore the font
+        # and count columns. This mirrors how show_message_box sizes itself, so no
+        # draw-time re-fit is needed.
+        prop = Style(font=Font())
+        measure = lambda t: panel.backend.measure_text(t, prop)  # noqa: E731
         lc = _layout_context(panel.backend)
-        w = float(min(int(sw) - 4, self._content_width(lc) + 4.0))  # +2 margin each side
         row_h = self._size.measure(lc, "y", 0.0).preferred
+        w = float(min(int(sw) - 4, self._content_width(measure) + 4.0))  # +2 margin/side
         h = float(min(sh - 2.0, self._box_height(self._TITLE_ROWS, row_h)))
         hints: dict[str, Any] = {"shadow": True, "w": w, "h": h}
         if region is not None:
@@ -278,9 +287,10 @@ class CompareSelectDialog(FocusContainer, Widget):
 
         ctx.draw_text(2, y, self._INTRO, Style(bg=surface_bg, fg=text_fg))
 
-        # Align the segments under one gutter, past the widest checkbox.
-        opt_x0 = max(r.checkbox.measure(lc, "x", 0.0).preferred
-                     for r in self._conditions) + 2.0
+        # Align the segments under one gutter, past the widest checkbox. Measured
+        # with ctx.measure_text (proportional on GUI) so it matches the rendered
+        # labels — a monospace measure would push the options too far right.
+        opt_x0 = self._opt_gutter(ctx.measure_text)
 
         # Each row gets an explicit "bg" hint so its children inherit the popup
         # surface (or the hover tint when focused) instead of the dark layer
@@ -309,37 +319,8 @@ class CompareSelectDialog(FocusContainer, Widget):
         hint_y = self._hint_y(y, row_h)
         ctx.draw_text(2, hint_y, self._hint(), Style(bg=surface_bg, fg=muted_fg))
 
-        # Fit the box to the measured content — width and height — now that font
-        # metrics are live (proportional on GUI), so there's no slack on either
-        # edge. A no-op on a grid backend (already exact from show()).
-        self._fit(self._content_width(lc) + 4.0, self._box_height(y, row_h))
-
     def _hint(self) -> str:
         return self._HINT_COND if isinstance(self._focused, ConditionRow) else self._HINT_OTHER
-
-    def _fit(self, needed_w: float, needed_h: float) -> None:
-        """Resize the layer to the measured content (width + height), keeping the
-        top edge and re-anchoring x over the pane. Corrects the off-draw estimate
-        once live font metrics are known; applied on the next render (a near no-op
-        on a grid backend, where the estimate is already exact)."""
-        panel = self._panel
-        if panel is None or not panel.has_layers:
-            return
-        slot = next((s for s in panel._layers if s.widget is self), None)
-        if slot is None:
-            return
-        sw, _sh = panel.backend.size_units
-        w = min(needed_w, sw - 4.0)
-        h = needed_h
-        if not panel.backend.capabilities.supports("pixel_layout"):
-            w, h = float(round(w)), float(round(h))
-        if abs(slot.rect.w - w) < 0.4 and abs(slot.rect.h - h) < 0.4:
-            return
-        if self._region is not None:
-            w, x = pane_anchored_box(w, sw, self._region)
-        else:
-            x = (sw - w) / 2.0
-        slot.rect = Rect(x, slot.rect.y, w, h)
 
     # --- events --------------------------------------------------------------
 
