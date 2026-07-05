@@ -209,26 +209,32 @@ class FileOperationService:
                                                     [p[0] for p in plan])
             prog.update_operation_total(total_items)
 
+            errors = result["errors"]
             for target, dest_base, overwrite in plan:
                 task.checkpoint()
+                before = len(errors)
                 try:
-                    self._execute_one(task, kind, target, dest_base, overwrite,
-                                      dest_dir, prog, log)
-                    result["done"] += 1
+                    ok = self._execute_one(task, kind, target, dest_base, overwrite,
+                                           dest_dir, prog, log, errors)
                 except Cancelled:
                     raise
-                except Exception as exc:  # noqa: BLE001 — report, keep going
-                    result["failed"] += 1
-                    result["errors"].append((target.name, str(exc)))
-                    prog.increment_errors()
+                except Exception as exc:  # noqa: BLE001 — unexpected; record + go on
+                    errors.append((str(target), str(exc)))
                     if log is not None:
                         log(f"{_VERB[kind]} failed for {target.name}: {exc}")
+                    ok = 0
+                result["items"] += ok
+                # A top-level target "done" if any of its entries succeeded;
+                # "failed" only if it produced nothing and did raise (a single bad
+                # file / an uncreatable dir). Inner file failures stay in ``errors``
+                # and don't sink the target.
+                if ok > 0 or len(errors) == before:
+                    result["done"] += 1
+                else:
+                    result["failed"] += 1
         except Cancelled:
             result["cancelled"] = True
         finally:
-            op = prog.get_current_operation()
-            if op is not None:
-                result["items"] = op.get("processed_items", 0)
             prog.finish_operation()
         return result
 
@@ -302,34 +308,66 @@ class FileOperationService:
 
     def _execute_one(self, task: Task, kind: str, target: Path,
                      dest_base: Optional[Path], overwrite: bool,
-                     dest_dir: Optional[Path], prog: ProgressManager, log) -> None:
+                     dest_dir: Optional[Path], prog: ProgressManager, log,
+                     errors: list) -> int:
+        """Process one top-level target, returning the count of individual entries
+        that succeeded and appending ``(path, reason)`` to ``errors`` for any that
+        failed. A single bad entry never aborts the rest of the target."""
         if kind == "delete":
-            self._delete_tree(task, target, prog, log)
-        elif kind == "move" and _is_atomic_move(kind, target, dest_dir):
+            return self._delete_tree(task, target, prog, log, errors)
+        if kind == "move" and _is_atomic_move(kind, target, dest_dir):
             prog.update_progress(target.name)
-            target.move_to(dest_base, overwrite=overwrite)
+            try:
+                target.move_to(dest_base, overwrite=overwrite)
+            except Cancelled:
+                raise
+            except Exception as exc:  # noqa: BLE001
+                errors.append((str(target), str(exc)))
+                return 0
             _log_op(log, "Moved", target, dest_base)  # atomic: one line per target
-        else:
-            # Copy, or a cross-storage move (copy the tree, then drop the source).
-            verb = "Moved" if kind == "move" else "Copied"
-            self._copy_tree(task, target, dest_base, overwrite, prog, log, verb)
-            if kind == "move":
-                # The per-file "Moved" lines already covered it; don't re-log the
-                # source cleanup.
-                self._delete_tree(task, target, None, None)
+            return 1
+        # Copy, or a cross-storage move (copy the tree, then drop the source).
+        verb = "Moved" if kind == "move" else "Copied"
+        before = len(errors)
+        ok = self._copy_tree(task, target, dest_base, overwrite, prog, log, verb, errors)
+        if kind == "move" and ok > 0 and len(errors) == before:
+            # Only remove the source once the whole tree copied cleanly — never
+            # drop files a partial copy left behind. Cleanup errors are ignored.
+            self._delete_tree(task, target, None, None, [])
+        return ok
 
     # --- per-node IO ---------------------------------------------------------
 
     def _copy_tree(self, task: Task, src: Path, dest: Path, overwrite: bool,
-                   prog: ProgressManager, log, verb: str) -> None:
+                   prog: ProgressManager, log, verb: str, errors: list) -> int:
+        """Copy one node (recursing into directories); return the number of entries
+        copied, collecting per-entry failures in ``errors`` and continuing."""
         task.checkpoint()
         prog.update_progress(src.name)
         if src.is_dir() and not src.is_symlink():
-            dest.mkdir(parents=True, exist_ok=True)
+            try:
+                dest.mkdir(parents=True, exist_ok=True)
+            except Cancelled:
+                raise
+            except Exception as exc:  # noqa: BLE001 — can't copy into it; skip children
+                errors.append((str(src), str(exc)))
+                return 0
+            ok = 1  # the directory itself
             for child in src.iterdir():
-                self._copy_tree(task, child, dest / child.name, overwrite, prog, log, verb)
-        elif self._copy_file(task, src, dest, overwrite, prog):
+                ok += self._copy_tree(task, child, dest / child.name,
+                                      overwrite, prog, log, verb, errors)
+            return ok
+        try:
+            copied = self._copy_file(task, src, dest, overwrite, prog)
+        except Cancelled:
+            raise
+        except Exception as exc:  # noqa: BLE001 — one bad file, keep going
+            errors.append((str(src), str(exc)))
+            return 0
+        if copied:
             _log_op(log, verb, src, dest)  # one line per file, with the real dest
+            return 1
+        return 0  # skipped (inner collision under a non-overwrite dir)
 
     def _copy_file(self, task: Task, src: Path, dest: Path, overwrite: bool,
                    prog: ProgressManager) -> bool:
@@ -381,37 +419,67 @@ class FileOperationService:
             raise
 
     def _delete_tree(self, task: Task, path: Path,
-                     prog: Optional[ProgressManager], log) -> None:
+                     prog: Optional[ProgressManager], log,
+                     errors: list) -> int:
+        """Delete one node (recursing, children first); return entries removed,
+        collecting per-entry failures in ``errors`` and continuing. A directory
+        whose children didn't all delete will fail its own ``rmdir`` (recorded)."""
         task.checkpoint()
         if path.is_dir() and not path.is_symlink():
+            ok = 0
             for child in list(path.iterdir()):
-                self._delete_tree(task, child, prog, log)
-            if prog is not None:
-                prog.update_progress(path.name)
-            path.rmdir()
+                ok += self._delete_tree(task, child, prog, log, errors)
+            try:
+                if prog is not None:
+                    prog.update_progress(path.name)
+                path.rmdir()
+            except Cancelled:
+                raise
+            except Exception as exc:  # noqa: BLE001
+                errors.append((str(path), str(exc)))
+                return ok
             _log_del(log, path)
-        else:
+            return ok + 1
+        try:
             if prog is not None:
                 prog.update_progress(path.name)
             path.unlink()
-            _log_del(log, path)
+        except Cancelled:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            errors.append((str(path), str(exc)))
+            return 0
+        _log_del(log, path)
+        return 1
 
 
 def format_op_summary(verb: str, result: dict) -> str:
     """One-line status for a finished file op. ``done`` / ``skipped`` / ``failed``
-    count the **top-level** selected items; when a target expands to more than that
-    (directories), also show the total number of individual entries processed — so
-    "11 done" for 11 folders of many files isn't read as 11 files."""
-    parts = [f"{result['done']} done"]
-    if result.get("skipped"):
-        parts.append(f"{result['skipped']} skipped")
-    if result.get("failed"):
-        parts.append(f"{result['failed']} failed")
-    summary = f"{verb}: {', '.join(parts)}"
-    top = result["done"] + result.get("skipped", 0) + result.get("failed", 0)
+    count the **top-level** selected items (``failed`` = a target that produced
+    nothing); when a target expands to more than that (directories) the total
+    entries processed is shown too — so "11 done" for 11 folders of many files
+    isn't read as 11 files — along with the count of individual files that failed
+    (bad files are skipped, not fatal to their folder)."""
+    done = result["done"]
+    skipped = result.get("skipped", 0)
+    failed = result.get("failed", 0)
     items = result.get("items", 0)
-    if items > top:  # nested targets — clarify top-level vs. total entries
-        summary += f" ({top} top-level items, {items} items total)"
+    n_err = len(result.get("errors") or [])
+    top = done + skipped + failed
+    parts = [f"{done} done"]
+    if skipped:
+        parts.append(f"{skipped} skipped")
+    if failed:
+        parts.append(f"{failed} failed")
+    summary = f"{verb}: {', '.join(parts)}"
+    extra = []
+    if items > top:  # nested — the counts above are top-level
+        extra.append(f"{top} top-level items")
+        extra.append(f"{items} items total")
+    if n_err > failed:  # per-file failures beyond any wholesale target failures
+        extra.append(f"{n_err} file{'s' if n_err != 1 else ''} failed")
+    if extra:
+        summary += f" ({', '.join(extra)})"
     if result.get("cancelled"):
         summary += " — cancelled"
     return summary

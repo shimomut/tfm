@@ -141,7 +141,7 @@ def test_keep_both_log_shows_renamed_name(tmp_path, cfg, svc):
     logs = []
     task.progress.start_operation(F._OP_TYPE["copy"], 1)
     svc._execute_one(task, "copy", plan[0][0], plan[0][1], plan[0][2],
-                     _P(dst), task.progress, logs.append)
+                     _P(dst), task.progress, logs.append, [])
     # Both names shown (source → renamed), so the (1) result is visible.
     assert any("'c.txt' → 'c (1).txt'" in m for m in logs)
 
@@ -251,7 +251,7 @@ def test_count_atomic_move_is_one_item(tmp_path, svc):
 
 
 def test_failure_is_collected_in_errors(tmp_path, svc):
-    # Copy a source that vanishes before it is read -> the per-target op raises,
+    # A top-level source that can't be copied -> counted as a wholesale failure,
     # recorded in result["errors"] rather than only logged.
     dst = tmp_path / "d"
     dst.mkdir()
@@ -259,8 +259,27 @@ def test_failure_is_collected_in_errors(tmp_path, svc):
     res = _run_sync(svc, svc.copy, [missing], _P(dst))
     assert res["failed"] == 1 and res["done"] == 0
     assert len(res["errors"]) == 1
-    name, msg = res["errors"][0]
-    assert name == "gone.txt" and msg  # carries a non-empty reason
+    path, msg = res["errors"][0]
+    assert path.endswith("gone.txt") and msg  # full path + a non-empty reason
+
+
+def test_inner_file_failure_is_skipped_not_fatal(tmp_path, svc):
+    """One bad file inside a folder is skipped (recorded), the rest still copy, and
+    the folder counts as done — not a wholesale failure."""
+    src, dst = tmp_path / "s", tmp_path / "d"
+    src.mkdir(); dst.mkdir()
+    folder = src / "folder"
+    folder.mkdir()
+    (folder / "good.txt").write_text("ok")
+    os.symlink(str(folder / "missing-target"), str(folder / "broken"))  # dangling
+    res = _run_sync(svc, svc.copy, [_P(folder)], _P(dst))
+    assert res["done"] == 1 and res["failed"] == 0        # folder still done
+    assert (dst / "folder" / "good.txt").read_text() == "ok"  # sibling copied
+    assert len(res["errors"]) == 1                        # the broken link
+    assert res["errors"][0][0].endswith("broken")
+    # Summary shows the per-file failure without sinking the folder.
+    from tfm_file_operations import format_op_summary
+    assert "1 file failed" in format_op_summary("Copy", res)
 
 
 def test_op_summary_wording():
