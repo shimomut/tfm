@@ -220,27 +220,36 @@ Wire it on top of the existing **virtual-pane** mechanism (the same
 - Guard the write-side ops the way virtual panes already do (a virtual pane isn't
   a writable destination — see the `_transfer` virtual guard).
 
-### 2.9 "Compare and select" (ttk `W` key)
-Port the ttk **compare-selection** feature. The binding already exists —
-`_config.py:147` `'compare_selection': ['W']` — but there is **no handler** in
-`tfm.py` for it. Legacy behavior (`show_compare_selection` in
-`legacy/src/tfm_list_dialog.py`): a small menu of three criteria —
-**By filename**, **By filename and size**, **By filename, size, and timestamp** —
-then it **marks** every active-pane entry that has a same-named, **same-type**
-(file-vs-dir) counterpart in the other pane matching the chosen criteria (size
-equal; mtime within 1s), after clearing the current selection, and logs a
-summary (files / dirs counts). Names are NFC-normalised before comparison and
-`stat()` is called only on name-matches (cheap).
+### 2.9 "Compare and select" (ttk `W` key) — DONE
+**Done**, and generalised past the ttk three-way menu. Instead of the legacy
+mutually-exclusive *filename / +size / +size+time* choices, each attribute is an
+independent **relation** the other pane's counterpart must satisfy, which subsumes
+the old menu and adds direction + content:
 
-Port shape:
-- Add a `compare_selection` handler dispatched from the keymap; open the ported
-  searchable list picker (the favorites/drives/programs/jump dialog) with the
-  three criteria.
-- On choice, run the comparison against the **inactive** pane's entries and set
-  the active pane's `selected_files` (the same selection set the file ops read);
-  `render()` + log the summary.
-- Guard when the other pane is virtual (search results / archive) — no real
-  listing to compare against — as the other cross-pane ops do.
+- **`tfm_compare_selection.py`** (new) — the pure, headless engine.
+  `CompareCriteria` (`size` any/equal/differs · `mtime` any/same/newer/older ·
+  `content` any/equal/differs · `include_missing` · `mode` replace/add) and
+  `compute_compare_selection(current, other, criteria)` → `CompareResult`
+  (`paths` + file/dir counts). Entries are joined on **NFC name + type** (a file
+  never matches a same-named dir); an item is selected when every non-`any`
+  relation holds (AND), and orphans are selected only with `include_missing`.
+  `stat()` is called only on name-matches; content is a streaming byte compare
+  that **short-circuits on a size mismatch**. `mtime` uses the ttk 1s tolerance.
+- **`tfm_compare_dialog.py`** (new) — the `CompareSelectDialog` modal: three
+  side-by-side radio columns (Size / Modified / Content), a "select missing"
+  checkbox, and a Selection mode (Replace / Add), built on the `ConflictDialog`
+  hand-layout pattern (flat Tab ring, translated-mouse forwarding, integer-row
+  snapping so grid backends don't round adjacent radio rows onto one cell).
+- **`tfm.py`** — `compare_selection` handler (dispatched from the keymap `W` and a
+  new **Select ▸ Compare & Select…** menu item). Stat-only criteria run inline;
+  a **content** relation reads files, so it routes through the `tfm_task.py`
+  worker with a cancellable progress dialog. Both panes must be real directories
+  (virtual/search-results panes are blocked); the result folds into the active
+  pane's `selected_files` (replace or add) with a files/dirs summary log.
+
+Covered by `test/test_compare_selection.py` (engine relations, join, NFC,
+short-circuit) and `test/test_compare_dialog.py` (app-integration: dialog draw
+regression, replace/add, include-missing, cancel, the content task path).
 
 ### 2.10 Color theme brush-up (file types, cursor, syntax)
 The port's palette is thin in three places; brush them up into one coherent,

@@ -61,11 +61,14 @@ from tfm_pane_manager import PaneManager  # noqa: E402
 from tfm_path import Path  # noqa: E402
 from tfm_state_manager import get_state_manager  # noqa: E402
 from tfm_batch_rename_dialog import show_batch_rename  # noqa: E402
+from tfm_compare_dialog import show_compare_select  # noqa: E402
+from tfm_compare_selection import compute_compare_selection  # noqa: E402
+from tfm_progress_manager import OperationType  # noqa: E402
 from tfm_diff_viewer import show_diff_viewer  # noqa: E402
 from tfm_directory_diff_viewer import show_directory_diff_viewer  # noqa: E402
 from tfm_file_operations import (FileOperationService, format_op_errors,  # noqa: E402
                                  format_op_summary)
-from tfm_task import TaskManager  # noqa: E402
+from tfm_task import Task, TaskManager  # noqa: E402
 from tfm_text_dialog import show_markdown  # noqa: E402
 from tfm_text_viewer import show_text_viewer  # noqa: E402
 
@@ -1102,6 +1105,9 @@ class TfmApp:
         elif action == "jump_to_path":
             self.jump_to_path()
             return False
+        elif action == "compare_selection":
+            self.compare_selection()
+            return False
         elif action == "view_file":
             self.view_file()
             return False
@@ -1225,6 +1231,8 @@ class TfmApp:
             MenuItem("Select All Items", on_select=lambda: self._menu("select_all")),
             MenuItem("Clear Selection", on_select=lambda: self._menu("unselect_all"),
                      enabled=lambda: bool(self.active_pane()["selected_files"])),
+            MenuItem("Compare & Select…", on_select=self.compare_selection,
+                     enabled=has_files, shortcut="W"),
             SEPARATOR,
             MenuItem("Compare Selected Files…", on_select=self.diff_files, shortcut="="),
             MenuItem("Compare Directories…", on_select=self.diff_directories,
@@ -2694,6 +2702,89 @@ class TfmApp:
                    region=self._active_pane_region())
         self.panel.render()
 
+    def compare_selection(self) -> None:
+        """W: open the Compare & Select dialog, then mark items in the active pane
+        by comparing each with the same-named item in the other pane. Blocked when
+        either pane is a virtual (search-results) view — there's no real listing to
+        compare against."""
+        pane = self.active_pane()
+        other = self.pm.get_inactive_pane()
+        if pane.get("virtual") or other.get("virtual"):
+            self.log_info("Compare & select needs two real directories")
+            return
+        if not pane["files"]:
+            self.log_info("No items to compare")
+            return
+
+        def on_result(criteria) -> None:
+            if criteria is None:
+                self.log_info("Compare & select cancelled")
+            elif criteria.needs_content:
+                self._compare_with_content(pane, other, criteria)
+                return  # the task drives its own redraw
+            else:
+                result = compute_compare_selection(
+                    pane["files"], other["files"], criteria)
+                self._apply_compare_result(pane, criteria, result)
+            self.panel.render()
+
+        show_compare_select(self.panel, region=self._active_pane_region(),
+                            on_result=on_result)
+        self.panel.render()
+
+    def _compare_with_content(self, pane: dict, other: dict, criteria) -> None:
+        """Content-comparison path: reads files, so it runs on the task worker with
+        a cancellable progress dialog. Snapshots the pane feeds up front (the worker
+        must not touch the panel) and applies the result on the main thread."""
+        current_files = list(pane["files"])
+        other_files = list(other["files"])
+        task = Task("Comparing contents", config=self.config, kind="compare")
+
+        def run(t: Task) -> dict:
+            prog = t.progress
+            prog.start_operation(OperationType.COPY, len(current_files),
+                                 description="Comparing")
+            prog.update_operation_total(len(current_files))  # leave the counting phase
+            processed = [0]
+
+            def advance(entry) -> None:
+                processed[0] += 1
+                prog.update_progress(entry.name, processed[0])
+
+            result = compute_compare_selection(
+                current_files, other_files, criteria,
+                checkpoint=t.checkpoint, on_advance=advance)
+            return {"result": result, "cancelled": t.cancelled()}
+
+        def on_done(res: dict) -> None:
+            if res.get("cancelled"):
+                self.log_info("Compare & select cancelled")
+            elif res.get("result") is not None:
+                self._apply_compare_result(pane, criteria, res["result"])
+            self.panel.render()
+
+        self.tasks.submit(task, self.panel, run=run, on_done=on_done)
+
+    def _apply_compare_result(self, pane: dict, criteria, result) -> None:
+        """Fold the compared selection into the pane (replace or add) and log a
+        file/dir summary."""
+        if criteria.mode == "replace":
+            pane["selected_files"] = set(result.paths)
+        else:
+            pane["selected_files"].update(result.paths)
+
+        if result.total == 0:
+            self.log_info("Compare & select: no matching items")
+            return
+        parts = []
+        if result.files:
+            parts.append(f"{result.files} file{'s' if result.files != 1 else ''}")
+        if result.dirs:
+            parts.append(f"{result.dirs} director{'ies' if result.dirs != 1 else 'y'}")
+        verb = "Selected" if criteria.mode == "replace" else "Added"
+        self.log_info(f"{verb} {result.total} item{'s' if result.total != 1 else ''} "
+                      f"({' and '.join(parts)})")
+
     #: Help layout: (section title, [(action, description)]). Only actions the
     #: PuiKit port actually handles are listed, so the help never promises a
     #: feature that isn't wired yet.
@@ -2722,6 +2813,7 @@ class TfmApp:
             ("select_all_items", "Toggle all items"),
             ("select_all", "Select every item"),
             ("unselect_all", "Clear selection"),
+            ("compare_selection", "Compare & select vs. other pane"),
         )),
         ("File Operations", (
             ("create_directory", "Create new directory"),
