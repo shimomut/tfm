@@ -186,8 +186,15 @@ def _highlight(lines: list[str], path) -> list[list[tuple[str, Any]]]:
                 current.append((value, fg))
         if current:
             result.append(current)
-        # pygments appends a trailing newline; keep the row count aligned.
-        return result[:len(lines)] if result else plain
+        if not result:
+            return plain
+        # Keep exactly one row per source line: pygments' token stream ends at
+        # the last real newline, so a file ending in blank line(s) yields fewer
+        # rows than splitlines() — pad with empty rows (drawing bounds line_idx
+        # by self.lines, then indexes self.highlighted, so a short list crashes).
+        result = result[:len(lines)]
+        result += [[] for _ in range(len(lines) - len(result))]
+        return result
     except Exception:
         return plain
 
