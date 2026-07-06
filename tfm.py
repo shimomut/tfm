@@ -33,7 +33,7 @@ from pathlib import Path as _StdPath
 
 sys.path.insert(0, str(_StdPath(__file__).parent / "src"))
 
-from puikit import EventType, Item, Panel, Style, TextAttribute, Theme, VSplit, derive_theme  # noqa: E402
+from puikit import EventType, Font, Item, Panel, Style, TextAttribute, Theme, VSplit, derive_theme  # noqa: E402
 from puikit.backends import create_backend  # noqa: E402
 from puikit.menu import Menu, MenuItem, SEPARATOR  # noqa: E402
 from puikit.text import elide  # noqa: E402
@@ -3046,6 +3046,23 @@ def main() -> None:
     # The GUI backend persists and restores the window's position and size via
     # the native NSWindow frame-autosave feature; the curses backend ignores it.
     backend_kwargs = {"frame_autosave_name": "TFMMainWindow"} if backend_name == "gui" else {}
+    # Ground the GUI base (grid) font in the user's config: the base unit — hence
+    # the on-screen text size — is derived from this font's glyph box, so
+    # DESKTOP_MONO_FONT_NAME and DESKTOP_FONT_SIZE take effect here. The base font
+    # must be monospaced. Curses has one terminal font and no base_font parameter,
+    # so this is GUI-only. (The proportional UI-font default is a later step.)
+    if backend_name == "gui":
+        cfg = get_config()
+        backend_kwargs["base_font"] = Font(
+            family=cfg.DESKTOP_MONO_FONT_NAME,
+            size=float(cfg.DESKTOP_FONT_SIZE),
+            monospace=True,
+        )
+        # The default proportional face that PuiKit's widgets (markdown, message
+        # boxes, text fields) — and TFM's own proportional draws — resolve to via
+        # an unnamed Font(). family=None lets PuiKit fall back to the OS UI font;
+        # size comes from base_font (both share DESKTOP_FONT_SIZE).
+        backend_kwargs["ui_font"] = Font(family=cfg.DESKTOP_UI_FONT_NAME)
     backend = create_backend(backend_name, **backend_kwargs)
     with backend:
         TfmApp(
