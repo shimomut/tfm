@@ -383,7 +383,7 @@ Then run the existing `macos_app/README.md` / `doc/dev/MACOS_APP_TESTING.md`
 smoke tests against the rebuilt bundle, and update both docs + `build.sh`'s inline
 comments (they still describe copying ttk).
 
-### 2.14 Wire the GUI base font from config
+### 2.14 Wire GUI fonts from config — proportional UI default + mono
 `DESKTOP_FONT_NAME` / `DESKTOP_FONT_SIZE` (`src/_config.py`) are **dormant**: they
 are declared and validated (`tfm_config.ConfigManager.validate_config`, itself only
 ever called from tests), but nothing feeds them to the backend. `main` (`tfm.py`)
@@ -392,27 +392,78 @@ back to its default base font — `Font(size=14.0, monospace=True)`, i.e. the sy
 mono face (SF Mono) at 14pt — and the config values never take effect. Today's GUI
 is **not** running the configured Menlo 12.
 
-PuiKit takes a **single** base-font family (no cascade list; missing glyphs use the
-OS's native font substitution — see `puikit/docs/font_system.md` §2). `DESKTOP_FONT_NAME`
-was accordingly narrowed from a fallback list to one string, so it now maps 1:1 onto
-`puikit.Font.family`.
+PuiKit grounds the layout grid in a **base font that must be monospaced**, and
+expresses per-widget faces through `Style.font` (a `puikit.Font`): `font=None` or an
+unnamed `Font(monospace=True)` render on that grid, while a `Font(family=…)` renders
+**proportionally** on the flow path (`puikit/docs/font_system.md` §6/§9). Missing
+glyphs use the OS's native substitution — one family per font, no cascade list.
+
+**Config shape (decided): two GUI fonts + one size.**
+- `DESKTOP_UI_FONT_NAME` — **proportional**; TFM's **default** text face (file names,
+  labels, prompts, dialog chrome).
+- `DESKTOP_MONO_FONT_NAME` — **monospaced**; used where alignment matters (file
+  size/date columns, the text viewer, diff / dir-diff). It is *also* the backend **base
+  font**, so it must be monospaced.
+- `DESKTOP_FONT_SIZE` — one size applied to **both**: the base unit is derived from the
+  mono font at this size, and the UI font renders at the same size within those rows.
+
+This supersedes the earlier single-`DESKTOP_FONT_NAME` plan; that key splits into the
+two above (each still one family).
+
+**The load-bearing constraint:** the base font (grid grounding) *cannot* be the
+proportional one — a proportional base would make the grid path force every glyph into
+a fixed base-unit cell. So "default proportional" is a **drawing convention**, not a
+base-font swap: the mono font stays the invisible grid grounding, and TFM draws general
+text with `Style(font=UI)` (flow / proportional) while reserving the bare `Style()` /
+base grid font for aligned content. PuiKit's default `Style()` is a *grid* style, so
+**every default-text draw must carry the UI font explicitly** — this is the bulk of the
+work, not the wiring.
+
+**TUI has no font feature:** curses has one terminal font; family and size are ignored
+and everything folds to the grid. Gate all of this on the `gui` backend.
 
 To build:
-- Load the config in `main` (it does not read it at all today) via `ConfigManager`,
-  then for the `gui` backend build
-  `Font(family=config.DESKTOP_FONT_NAME, size=config.DESKTOP_FONT_SIZE, monospace=True)`
-  and pass it as `base_font` in `backend_kwargs`. The macOS and Windows backend
-  constructors already accept `base_font`; **curses does not** (`__init__(self,
+- **Base (mono) font.** The config is now loaded via `get_config()` in
+  `TfmApp.__init__`, but the backend is created earlier in `main` — so `main` must
+  also `get_config()` (cheap; the singleton is cached) to build, for the `gui`
+  backend, `Font(family=config.DESKTOP_MONO_FONT_NAME, size=config.DESKTOP_FONT_SIZE,
+  monospace=True)` and pass it as `base_font` in `backend_kwargs`. The macOS and Windows
+  backend constructors already accept `base_font`; **curses does not** (`__init__(self,
   pointer_shape=False)`), so keep this gui-gated exactly like `frame_autosave_name`.
-- Once wired, GUI switches from SF Mono 14 → Menlo 12; refresh any screenshots.
+- **UI (proportional) font as the default.** Define a TFM-level
+  `UI = Font(family=config.DESKTOP_UI_FONT_NAME, size=config.DESKTOP_FONT_SIZE)`
+  (`monospace=False` → flow path) and switch the general-text draws — today a bare
+  `Style()` that renders on the grid: file names/headers (`tfm_file_pane.py`) and the
+  dialog chrome (`tfm_input_dialog`, `tfm_isearch_bar`, `tfm_batch_rename_dialog`,
+  `tfm_progressive_search_dialog`, `tfm_filter_list_dialog`, `tfm_text_dialog`,
+  `tfm_task`, `tfm_file_operations`, `tfm_compare_dialog`) — to carry `font=UI`. Because
+  proportional text flows by measured width, those sites must measure with
+  `ctx.measure_text(s, Style(font=UI))` wherever they currently assume a column count
+  (the file pane already measures its name; the dialogs mostly left-align, so most need
+  only the font, not new measuring). This is the largest piece.
+- **Mono content follows `DESKTOP_MONO_FONT_NAME`.** The size/date/viewer/diff columns
+  render in the mono font — which *is* the base font — so draw them on the base grid
+  (`font=None`), not `MONO = Font(monospace=True)` (that hardcodes system SF Mono and
+  ignores the config; once the UI/mono split lands it would be a third face). `font=None`
+  and the base font are the same grid face kerned to `base_w`, so alignment / column-count
+  measuring are unchanged; the columns just follow the configured mono family. **Do not**
+  give a grid mono font a `family`: a `Font` with `family` set fails `_is_grid_font`,
+  drops onto the flow path, and de-aligns the columns (the `#62` case in
+  `macos_backend._is_grid_font`). Drop the now-redundant `MONO` constant.
+- Once wired, GUI default text becomes the proportional UI font and aligned content the
+  configured mono font, both at `DESKTOP_FONT_SIZE`; refresh screenshots.
 - Decide whether `DESKTOP_FONT_SIZE` stays startup-only or also drives the ttk-era
   Cmd-+/Cmd-- live font-size adjustment (`doc/FONT_SIZE_ADJUSTMENT_FEATURE.md`) —
   out of scope here, but the base-font seam is where it would hook in.
+- Update `src/_config.py`, `tfm_config.ConfigManager.validate_config`, and
+  `test/test_config_backend_settings.py` for the two new keys (`DESKTOP_UI_FONT_NAME`,
+  `DESKTOP_MONO_FONT_NAME`), replacing the interim single `DESKTOP_FONT_NAME`. Decide
+  the UI default: allow `None`/empty → the OS system UI font (`Font(family=None)`), or
+  ship a concrete proportional family. Mono defaults to `Menlo`.
 - Sweep the docs that still show the removed cascade-list form
   (`doc/CONFIGURATION_FEATURE.md`, `doc/TFM_USER_GUIDE.md`,
-  `doc/FONT_SIZE_ADJUSTMENT_FEATURE.md`, `doc/DESKTOP_MODE_GUIDE.md`) down to the
-  single-string form, and update the user's own `~/.tfm/config.py` if it still
-  carries the old list.
+  `doc/FONT_SIZE_ADJUSTMENT_FEATURE.md`, `doc/DESKTOP_MODE_GUIDE.md`) to the two-key
+  form, and update the user's own `~/.tfm/config.py`.
 
 ---
 

@@ -24,8 +24,12 @@ class Config:
     # - 'coregraphics': Desktop mode (macOS only, requires PyObjC)
     
     # Desktop mode settings (for CoreGraphics backend)
-    DESKTOP_FONT_NAME = ['Menlo', 'Monaco', 'Courier', 'Osaka-Mono', 'Hiragino Sans GB']  # Font names for desktop mode (first is primary, rest are cascade fallbacks)
-    DESKTOP_FONT_SIZE = 12  # Font size for desktop mode (8-72 points)
+    # GUI-mode fonts (ignored in TUI mode). Each names one family; missing glyphs
+    # fall back to the OS's native font substitution. `None` = the OS system default
+    # face for that role.
+    DESKTOP_UI_FONT_NAME = None       # Proportional UI font — the default text face; None = system UI font
+    DESKTOP_MONO_FONT_NAME = 'Menlo'  # Monospaced font — aligned content (columns, viewer, diffs); also the grid base font
+    DESKTOP_FONT_SIZE = 12  # Font size for both, in points (8-72)
     DESKTOP_WINDOW_WIDTH = 1200  # Initial window width in pixels
     DESKTOP_WINDOW_HEIGHT = 800  # Initial window height in pixels
     

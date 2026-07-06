@@ -55,7 +55,7 @@ class TestFileMonitoringConfig(unittest.TestCase):
             FILE_MONITORING_SUPPRESS_AFTER_ACTION_MS = 1000
             FILE_MONITORING_FALLBACK_POLL_INTERVAL_S = 5
             PREFERRED_BACKEND = 'curses'
-            DESKTOP_FONT_NAME = 'Menlo'
+            DESKTOP_MONO_FONT_NAME = 'Menlo'
             DESKTOP_FONT_SIZE = 12
             DESKTOP_WINDOW_WIDTH = 1200
             DESKTOP_WINDOW_HEIGHT = 800
@@ -79,7 +79,7 @@ class TestFileMonitoringConfig(unittest.TestCase):
             FILE_MONITORING_SUPPRESS_AFTER_ACTION_MS = 1000
             FILE_MONITORING_FALLBACK_POLL_INTERVAL_S = 5
             PREFERRED_BACKEND = 'curses'
-            DESKTOP_FONT_NAME = 'Menlo'
+            DESKTOP_MONO_FONT_NAME = 'Menlo'
             DESKTOP_FONT_SIZE = 12
             DESKTOP_WINDOW_WIDTH = 1200
             DESKTOP_WINDOW_HEIGHT = 800
@@ -103,7 +103,7 @@ class TestFileMonitoringConfig(unittest.TestCase):
             FILE_MONITORING_SUPPRESS_AFTER_ACTION_MS = 1000
             FILE_MONITORING_FALLBACK_POLL_INTERVAL_S = 5
             PREFERRED_BACKEND = 'curses'
-            DESKTOP_FONT_NAME = 'Menlo'
+            DESKTOP_MONO_FONT_NAME = 'Menlo'
             DESKTOP_FONT_SIZE = 12
             DESKTOP_WINDOW_WIDTH = 1200
             DESKTOP_WINDOW_HEIGHT = 800
@@ -127,7 +127,7 @@ class TestFileMonitoringConfig(unittest.TestCase):
             FILE_MONITORING_SUPPRESS_AFTER_ACTION_MS = -500  # Negative value
             FILE_MONITORING_FALLBACK_POLL_INTERVAL_S = 5
             PREFERRED_BACKEND = 'curses'
-            DESKTOP_FONT_NAME = 'Menlo'
+            DESKTOP_MONO_FONT_NAME = 'Menlo'
             DESKTOP_FONT_SIZE = 12
             DESKTOP_WINDOW_WIDTH = 1200
             DESKTOP_WINDOW_HEIGHT = 800
@@ -151,7 +151,7 @@ class TestFileMonitoringConfig(unittest.TestCase):
             FILE_MONITORING_SUPPRESS_AFTER_ACTION_MS = 1000
             FILE_MONITORING_FALLBACK_POLL_INTERVAL_S = 0  # Zero value
             PREFERRED_BACKEND = 'curses'
-            DESKTOP_FONT_NAME = 'Menlo'
+            DESKTOP_MONO_FONT_NAME = 'Menlo'
             DESKTOP_FONT_SIZE = 12
             DESKTOP_WINDOW_WIDTH = 1200
             DESKTOP_WINDOW_HEIGHT = 800
@@ -175,7 +175,7 @@ class TestFileMonitoringConfig(unittest.TestCase):
             FILE_MONITORING_SUPPRESS_AFTER_ACTION_MS = 1000
             FILE_MONITORING_FALLBACK_POLL_INTERVAL_S = 2.5  # Float value
             PREFERRED_BACKEND = 'curses'
-            DESKTOP_FONT_NAME = 'Menlo'
+            DESKTOP_MONO_FONT_NAME = 'Menlo'
             DESKTOP_FONT_SIZE = 12
             DESKTOP_WINDOW_WIDTH = 1200
             DESKTOP_WINDOW_HEIGHT = 800

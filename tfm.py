@@ -33,7 +33,6 @@ from pathlib import Path as _StdPath
 
 sys.path.insert(0, str(_StdPath(__file__).parent / "src"))
 
-import _config  # noqa: E402  (the canonical default Config template)
 from puikit import EventType, Item, Panel, Style, TextAttribute, Theme, VSplit, derive_theme  # noqa: E402
 from puikit.backends import create_backend  # noqa: E402
 from puikit.menu import Menu, MenuItem, SEPARATOR  # noqa: E402
@@ -49,7 +48,7 @@ PANES_FRACTION = 0.74
 _FILTER_HISTORY_KEY = "filter.history"
 _FILTER_HISTORY_MAX = 100
 
-from tfm_config import KeyBindings, get_favorite_directories  # noqa: E402
+from tfm_config import KeyBindings, get_config, get_favorite_directories  # noqa: E402
 from tfm_file_list_manager import FileListManager  # noqa: E402
 from tfm_file_monitor_manager import FileMonitorManager  # noqa: E402
 from tfm_file_pane import FilePane  # noqa: E402
@@ -256,7 +255,12 @@ class TfmApp:
         # macOS GUI, Ctrl-C on the curses TUI and other GUI platforms (curses
         # never sees Cmd; Windows/Linux copy with Ctrl). See _copy_log_selection.
         self._log_copy_mod = "cmd" if type(backend).__name__ == "MacOSBackend" else "ctrl"
-        self.config = _config.Config()
+        # Load via ConfigManager (the shared singleton): this creates
+        # ~/.tfm/config.py from the template on first run and reads the user's
+        # config, filling any missing fields from the template. Instantiating
+        # _config.Config() directly (as the port did) skipped both — the file was
+        # never created and the user's settings were ignored.
+        self.config = get_config()
         self.keys = KeyBindings(self.config.KEY_BINDINGS)
         # Central registry of running background tasks (file ops today; the seam
         # for future queued / non-modal tasks + a task-management UI).

@@ -550,18 +550,17 @@ class ConfigManager:
         if config.PREFERRED_BACKEND not in ['curses', 'coregraphics']:
             errors.append("PREFERRED_BACKEND must be 'curses' or 'coregraphics'")
         
-        # Validate desktop mode settings
-        # Accept both string (single font) and list (with fallbacks)
-        if isinstance(config.DESKTOP_FONT_NAME, str):
-            if not config.DESKTOP_FONT_NAME.strip():
-                errors.append("DESKTOP_FONT_NAME must be a non-empty string")
-        elif isinstance(config.DESKTOP_FONT_NAME, list):
-            if not config.DESKTOP_FONT_NAME:
-                errors.append("DESKTOP_FONT_NAME list must not be empty")
-            elif not all(isinstance(name, str) and name.strip() for name in config.DESKTOP_FONT_NAME):
-                errors.append("DESKTOP_FONT_NAME list must contain only non-empty strings")
-        else:
-            errors.append("DESKTOP_FONT_NAME must be a string or list of strings")
+        # Validate desktop mode fonts (GUI only; TUI has no font feature). Each
+        # names one family; missing glyphs fall back to the OS's native
+        # substitution. `None` = the OS system default face for that role.
+        if config.DESKTOP_UI_FONT_NAME is not None and (
+            not isinstance(config.DESKTOP_UI_FONT_NAME, str) or not config.DESKTOP_UI_FONT_NAME.strip()
+        ):
+            errors.append("DESKTOP_UI_FONT_NAME must be a non-empty string or None")
+        if config.DESKTOP_MONO_FONT_NAME is not None and (
+            not isinstance(config.DESKTOP_MONO_FONT_NAME, str) or not config.DESKTOP_MONO_FONT_NAME.strip()
+        ):
+            errors.append("DESKTOP_MONO_FONT_NAME must be a non-empty string or None")
         
         if not isinstance(config.DESKTOP_FONT_SIZE, int) or config.DESKTOP_FONT_SIZE < 8 or config.DESKTOP_FONT_SIZE > 72:
             errors.append("DESKTOP_FONT_SIZE must be an integer between 8 and 72")
