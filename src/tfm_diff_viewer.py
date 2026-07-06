@@ -25,18 +25,40 @@ from puikit.widgets import Splitter
 from puikit.widgets.base import Widget
 
 from tfm_text_dialog import keys_markdown, show_markdown
-from tfm_text_viewer import (MONO, _ScrollBody, _content_bg, _highlight, _read_lines,
-                             draw_hscrollbar)
+from tfm_text_viewer import (MONO, _ScrollBody, _content_bg, _highlight, _is_light,
+                             _read_lines, draw_hscrollbar)
 
-#: Whole-row tints by diff tag.
-_DEL_BG = (60, 30, 30)
-_INS_BG = (28, 50, 30)
-_REPLACE_BG = (50, 46, 28)
-#: Stronger tints for the changed character spans inside a replaced line.
-_CHAR_DEL_BG = (104, 42, 42)
-_CHAR_INS_BG = (40, 82, 44)
-#: Faint fill for the empty side of an insert/delete row.
-_EMPTY_BG = (32, 32, 34)
+#: Semantic diff hues. The whole-row tints and the stronger changed-character
+#: tints are the theme's *content background* blended toward these, so a diff
+#: band tracks the theme — a dark band on a dark theme, a pastel one on a light
+#: theme — instead of a fixed dark color that reads wrong on the light themes.
+_HUE_DEL = (180, 40, 40)       # red   (deleted / left-side change)
+_HUE_INS = (40, 150, 50)       # green (inserted / right-side change)
+_HUE_REPLACE = (150, 130, 40)  # amber (replaced line, both sides)
+_EMPTY_HUE = (128, 128, 128)   # neutral fill for the empty side of an ins/del row
+_ROW_TINT = 0.20               # whole-row band strength
+_CHAR_TINT = 0.50              # changed-character span (stronger than the row)
+_EMPTY_TINT = 0.08             # faint neutral, just off the content background
+
+
+def _mix(a, b, t):
+    """Linear RGB blend a→b by ``t`` (0..1)."""
+    return tuple(round(a[i] + (b[i] - a[i]) * t) for i in range(3))
+
+
+def _diff_bgs(content):
+    """Diff band backgrounds derived from the theme content background, so every
+    band adapts to the active theme's polarity. ``content`` falls back to a dark
+    surface when the theme reports none."""
+    c = content or (30, 30, 38)
+    return {
+        "delete": _mix(c, _HUE_DEL, _ROW_TINT),
+        "insert": _mix(c, _HUE_INS, _ROW_TINT),
+        "replace": _mix(c, _HUE_REPLACE, _ROW_TINT),
+        "char_del": _mix(c, _HUE_DEL, _CHAR_TINT),
+        "char_ins": _mix(c, _HUE_INS, _CHAR_TINT),
+        "empty": _mix(c, _EMPTY_HUE, _EMPTY_TINT),
+    }
 
 
 def _char_ranges(a: str, b: str) -> tuple[list[tuple[int, int]], list[tuple[int, int]]]:
@@ -91,16 +113,17 @@ def compute_diff(lines1: list[str], lines2: list[str]) -> tuple[list[dict], list
     return rows, blocks
 
 
-def _side_bg(row: dict, side: str) -> tuple[int, int, int] | None:
-    """Whole-row tint for one side of a diff row (None for an unchanged line)."""
+def _side_bg(row: dict, side: str, pal: dict) -> tuple[int, int, int] | None:
+    """Whole-row tint for one side of a diff row (None for an unchanged line),
+    picked from the theme-derived palette ``pal`` (see :func:`_diff_bgs`)."""
     tag = row["tag"]
     if tag == "equal":
         return None
     if tag == "replace":
-        return _REPLACE_BG
+        return pal["replace"]
     if tag == "delete":
-        return _DEL_BG if side == "l" else _EMPTY_BG
-    return _EMPTY_BG if side == "l" else _INS_BG  # insert
+        return pal["delete"] if side == "l" else pal["empty"]
+    return pal["empty"] if side == "l" else pal["insert"]  # insert
 
 
 class _DiffPane(Widget):
@@ -127,6 +150,9 @@ class _DiffPane(Widget):
         bg = _content_bg(theme)  # sit on TFM's own pane background, not popup_bg
         accent = theme.accent if theme is not None else (0, 122, 204)
         self._bg = bg
+        # Diff band tints derived from the current theme's content background, so
+        # the viewer isn't a fixed dark palette on the light themes.
+        self._diffpal = _diff_bgs(bg)
         self._text_fg = theme.text if theme is not None else (212, 212, 212)
         self._muted = theme.muted_text if theme is not None else (150, 150, 150)
         self._gutter = v._gutter_w()
@@ -147,9 +173,10 @@ class _DiffPane(Widget):
         v = self.v
         side = self.side
         bg, muted, text_fg = self._bg, self._muted, self._text_fg
+        pal = self._diffpal
         content_x, content_w = self._content_x, self._content_w
         highlighted = v.hl1 if side == "l" else v.hl2
-        char_bg = _CHAR_DEL_BG if side == "l" else _CHAR_INS_BG
+        char_bg = pal["char_del"] if side == "l" else pal["char_ins"]
         first = int(v.top)
         vfrac = v.top - first
         col0_int = int(v.left)
@@ -164,7 +191,7 @@ class _DiffPane(Widget):
             lineno = row["n1"] if side == "l" else row["n2"]
             plain = row["l1"] if side == "l" else row["l2"]
             cranges = row["cr1"] if side == "l" else row["cr2"]
-            side_bg = _side_bg(row, side)
+            side_bg = _side_bg(row, side, pal)
             row_bg = side_bg if side_bg is not None else bg
             if side_bg is not None:
                 ctx.fill_rect(0, y, self._w, 1.0, Style(bg=side_bg))
@@ -177,8 +204,12 @@ class _DiffPane(Widget):
                     vis_end = min(seg_end, window_end)
                     if vis_end > vis_start:
                         sub = text[vis_start - col: vis_end - col]
+                        # A syntax-colored span keeps its exact (dark-tuned) palette
+                        # on a dark theme; on a light theme auto-ink re-tones it to
+                        # the light surface. The uncolored fallback is always inked.
                         ctx.draw_text(content_x + (vis_start - col0_int) - xfrac, y, sub,
-                                      Style(fg=fg if fg is not None else text_fg, bg=row_bg, font=MONO))
+                                      Style(fg=fg if fg is not None else text_fg, bg=row_bg, font=MONO),
+                                      ink=fg is None or _is_light(bg))
                     col = seg_end
                     if col >= window_end:
                         break

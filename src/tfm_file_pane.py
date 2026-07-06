@@ -27,6 +27,7 @@ from __future__ import annotations
 from typing import Callable
 
 from puikit.backend import Style, TextAttribute, TRANSPARENT
+from puikit.color import LC_BODY, LC_LARGE, ensure_text_headroom
 from puikit.event import Event, EventType
 from puikit.font import Font
 from puikit.text import elide
@@ -50,10 +51,13 @@ MIN_NAME_W = 12
 #: names sit flush against the pane edge there.
 GUTTER_W = 1
 BRACKET_W = 1
-#: Incremental-search match highlight: a muted background behind every row that
-#: matches the live isearch pattern. Green, distinct from the selection fill and
-#: the blue directory color, and drawn *under* the selection fill / cursor cue.
-MATCH_BG = (58, 84, 58)
+#: Incremental-search match highlight: a muted green wash behind every row that
+#: matches the live isearch pattern — distinct from the selection fill and the
+#: blue directory color, drawn *under* the selection fill / cursor cue. Derived
+#: from the pane background (not a fixed dark constant) so it tracks the theme:
+#: a dark green on a dark theme, a pale green on a light one.
+MATCH_HUE = (80, 180, 100)
+MATCH_TINT = 0.28
 #: Cursor-position cue color — a distinct **red**, orthogonal to the selection
 #: fill so the two never read as the same channel: vivid on the active pane, a
 #: muted red on the inactive one (the louder cue marks the focused pane).
@@ -386,9 +390,13 @@ class FilePane(Widget):
         base = ctx.background or DEFAULT_BG
         if selected:
             ratio = SELECT_MIX_ACTIVE if self.active else SELECT_MIX_INACTIVE
-            row_bg = _mix(base, theme.accent, ratio)
+            # The accent tint reads as "selected"; on a light theme it lands
+            # mid-luminance and can't bear the row's body text, so nudge it back
+            # toward the pane background just enough to clear the body floor (a
+            # no-op on dark themes, where the dark tint already has headroom).
+            row_bg = ensure_text_headroom(_mix(base, theme.accent, ratio), base, LC_BODY)
         elif is_match:
-            row_bg = MATCH_BG
+            row_bg = _mix(base, MATCH_HUE, MATCH_TINT)
         else:
             row_bg = None
 
@@ -403,13 +411,17 @@ class FilePane(Widget):
         if gui_cursor:
             self._draw_cursor(ctx, y, band_left, band_right, grid)
 
-        # Foreground keeps the dir/file color language on every row — the subtle
-        # selection tint reads underneath it without needing a contrast override.
-        # The cursor row's glyphs draw over a *transparent* background so they land
-        # directly on the fill + outline below without a per-run fill repainting
-        # (and breaking) the stroke — the outline stays whole, the glyphs stay crisp.
-        name_fg = theme.accent if is_dir else theme.text
-        col_fg = theme.muted_text
+        # Foreground keeps the dir/file color language on every row, but is passed
+        # through ctx.ink against the *actual* background behind the glyphs — the
+        # pane base, or the selection/match tint where one is painted — so a
+        # directory's accent name stays legible even on a row tinted toward that
+        # same accent (floor-only: unchanged wherever it already reads). The cursor
+        # row's glyphs draw over a *transparent* background so they land directly on
+        # the fill + outline below without a per-run fill repainting (and breaking)
+        # the stroke — but they still contrast against that fill (eff_bg), not None.
+        eff_bg = row_bg if row_bg is not None else base
+        name_fg = ctx.ink(theme.accent if is_dir else theme.text, on=eff_bg, target=LC_BODY)
+        col_fg = ctx.ink(theme.muted_text, on=eff_bg, target=LC_LARGE)
         text_bg = TRANSPARENT if gui_cursor else row_bg
 
         ctx.draw_text(content_left, y, name_text, Style(fg=name_fg, bg=text_bg))

@@ -325,6 +325,12 @@ class TfmApp:
         self._isearch_bar: "ISearchBar | None" = None
 
         self.panel = Panel(backend)
+        # Guarantee text legibility across every theme: each run is lifted to a
+        # readability floor against its own background at draw time (floor-only,
+        # so designed colors that already read are untouched). This is what keeps
+        # directory names, the log, dialogs, and the diff views readable on the
+        # light themes and the low-contrast accents without per-widget tuning.
+        self.panel.auto_ink = True
         self.left_view = FilePane(
             self.pm.left_pane,
             config=self.config,

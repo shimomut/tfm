@@ -61,8 +61,32 @@ _SYNTAX = {
     "name": (156, 220, 254),
 }
 _ERROR_FG = (229, 110, 110)
-_MATCH_BG = (78, 78, 40)
-_CURRENT_MATCH_BG = (122, 102, 40)
+#: Search-match highlight = the content background blended toward amber; the
+#: current match is a firmer blend. Derived (not a fixed dark constant) so the
+#: highlight tracks the theme — a dark wash on a dark theme, a pale one on light.
+_MATCH_HUE = (200, 175, 55)
+_MATCH_TINT = 0.24
+_CURRENT_MATCH_TINT = 0.46
+
+
+def _mix(a, b, t):
+    """Linear RGB blend a→b by ``t`` (0..1)."""
+    return tuple(round(a[i] + (b[i] - a[i]) * t) for i in range(3))
+
+
+def _is_light(bg) -> bool:
+    """True when ``bg`` is a light surface (Rec.601 luma). Lets a caller flip a
+    polarity-dependent choice — e.g. keep the dark-tuned syntax palette exact on
+    a dark theme but let auto-ink re-tone it for a light one."""
+    if bg is None:
+        return False
+    return (0.299 * bg[0] + 0.587 * bg[1] + 0.114 * bg[2]) >= 140
+
+
+def _match_bg(content, current: bool):
+    """Search-highlight background for ``content``, firmer for the current match."""
+    return _mix(content or (30, 30, 38), _MATCH_HUE,
+                _CURRENT_MATCH_TINT if current else _MATCH_TINT)
 
 _EXT_LEXERS = {
     ".py": "python", ".js": "javascript", ".ts": "typescript", ".json": "json",
@@ -397,8 +421,15 @@ class TextViewer(Widget):
             if vis_end > vis_start:
                 sub = text[vis_start - col: vis_end - col]
                 style_fg = _ERROR_FG if self.is_error else (fg if fg is not None else text_fg)
+                # The syntax palette is tuned for a dark background, so on a dark
+                # theme a real syntax color is kept exact (ink=False) and reads as
+                # designed — recessive comments and all. On a light theme that same
+                # palette would be unreadable, so auto-ink re-tones each token
+                # (hue preserved, darkened to the light surface). The error color
+                # and the uncolored fallback are always auto-inked.
                 ctx.draw_text(content_x + (vis_start - col0_int) - xfrac, y, sub,
-                              Style(fg=style_fg, bg=bg, font=MONO))
+                              Style(fg=style_fg, bg=bg, font=MONO),
+                              ink=self.is_error or fg is None or _is_light(bg))
             col = seg_end
             if col >= window_end:
                 break
@@ -424,7 +455,7 @@ class TextViewer(Widget):
             if vis_end <= vis_start:
                 continue
             sub = self.lines[line_idx][vis_start:vis_end]
-            hl_bg = _CURRENT_MATCH_BG if is_current else _MATCH_BG
+            hl_bg = _match_bg(self._bg, is_current)
             ctx.draw_text(content_x + (vis_start - col0_int) - xfrac, y, sub,
                           Style(fg=text_fg, bg=hl_bg, font=MONO))
 
