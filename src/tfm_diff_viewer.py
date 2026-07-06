@@ -26,7 +26,7 @@ from puikit.widgets.base import Widget
 
 from tfm_text_dialog import keys_markdown, show_markdown
 from tfm_text_viewer import (MONO, _ScrollBody, _content_bg, _highlight, _is_light,
-                             _read_lines, draw_hscrollbar)
+                             _read_lines, draw_hscrollbar, draw_status_bar)
 
 #: Semantic diff hues. The whole-row tints and the stronger changed-character
 #: tints are the theme's *content background* blended toward these, so a diff
@@ -297,10 +297,8 @@ class DiffViewer(Widget):
     def draw(self, ctx) -> None:
         self._panel = ctx.panel
         theme = ctx.theme
-        w, h = ctx.width, ctx.height
         wu, hu = ctx.size_units  # exact (sub-cell) extent — anchor chrome to it
         bg = _content_bg(theme)  # sit on TFM's own pane background, not popup_bg
-        muted = theme.muted_text if theme is not None else (150, 150, 150)
         ctx.fill_rect(0, 0, wu, hu, Style(bg=bg))
 
         # Each pane gets its own horizontal scrollbar (the panes pan together by
@@ -340,9 +338,11 @@ class DiffViewer(Widget):
             if self._max_line > rcw:
                 draw_hscrollbar(ctx, rx, hbar_y, rcw, self.left, rcw, self._max_line)
 
+        # Bottom status bar — the themed 'status' surface, matching the main
+        # window (and the other two viewers), rather than a dim hint on content.
         hint = (f" {len(self.rows)} rows · {len(self.blocks)} changes · "
                 "n/N jump · ←→ pan · drag divider · q close ")
-        ctx.draw_text(0, foot_y, hint[:w], Style(fg=muted, bg=bg, attr=TextAttribute.DIM))
+        draw_status_bar(ctx, foot_y, hint)
 
     # --- events --------------------------------------------------------------
 

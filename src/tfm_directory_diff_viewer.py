@@ -46,7 +46,7 @@ from puikit.widgets.base import Widget
 
 from tfm_path import Path
 from tfm_str_format import format_size
-from tfm_text_viewer import MONO, _ScrollBody
+from tfm_text_viewer import MONO, _ScrollBody, draw_status_bar
 from tfm_diff_viewer import show_diff_viewer
 from tfm_text_dialog import keys_markdown, show_markdown
 from tfm_config import KeyBindings
@@ -1053,8 +1053,9 @@ class DirectoryDiffView(Widget):
         self._sel_inactive = getattr(theme, "selection_inactive_bg", muted) if theme else muted
         # Content fills the whole widget; the chrome bars are painted over it.
         ctx.fill_rect(0, 0, wu, hu, Style(bg=content_bg))
-        ctx.fill_rect(0, 0, wu, 1.0, Style(bg=chrome_bg))            # header bar
-        ctx.fill_rect(0, det_y, wu, hu - det_y, Style(bg=chrome_bg))  # footer bars
+        ctx.fill_rect(0, 0, wu, 1.0, Style(bg=chrome_bg))    # header bar
+        ctx.fill_rect(0, det_y, wu, 1.0, Style(bg=chrome_bg))  # details bar
+        # (the footer row below the details is painted as the themed status bar)
 
         # Column geometry: [left tree] [ gutter ] [right tree] [scrollbar]. The
         # split is user-movable and *pixel-smooth* — the split position is a
@@ -1116,8 +1117,9 @@ class DirectoryDiffView(Widget):
 
         ctx.draw_text(0, det_y, self._details_line()[:w],
                       Style(fg=self._text_fg, bg=chrome_bg))
-        ctx.draw_text(0, foot_y, self._footer()[:w],
-                      Style(fg=muted, bg=chrome_bg, attr=TextAttribute.DIM))
+        # Bottom status bar — the themed 'status' surface, matching the main
+        # window (and the text / diff viewers), so the three viewers read alike.
+        draw_status_bar(ctx, foot_y, self._footer())
         self._update_cursor(ctx, hu)
 
     def _update_cursor(self, ctx, h: int) -> None:

@@ -25,6 +25,7 @@ from puikit.backend import Style, TextAttribute
 from puikit.event import Event, EventType
 from puikit.font import Font
 from puikit.panel import Rect
+from puikit.text import elide
 from puikit.widgets.base import Widget
 
 from tfm_text_dialog import keys_markdown, show_markdown
@@ -48,6 +49,34 @@ def _content_bg(theme) -> tuple[int, int, int] | None:
     if theme is None:
         return None
     return theme.surface_bg("content") or getattr(theme, "popup_bg", None)
+
+
+def _status_bg(theme) -> tuple[int, int, int] | None:
+    """The themed status-bar surface — the same ``status`` role the main window's
+    bottom bar uses (its theme recipe / headroom pass already guarantees legible
+    chrome text) — so a full-window viewer ends in a bar consistent with TFM
+    proper instead of a dim hint on the content background. Falls back to the
+    content surface for a theme without the role."""
+    if theme is None:
+        return None
+    return theme.surface_bg("status") or _content_bg(theme)
+
+
+def draw_status_bar(ctx, y: float, text: str, *, font=None) -> None:
+    """Paint a viewer's bottom status bar: fill the row at ``y`` with the theme
+    ``status`` surface across the exact sub-cell width and draw ``text`` on it in
+    a legible ink (auto-inked against the bar, so it reads on every theme's status
+    recipe). The full-window counterpart to the main window's ``StatusBar``, so
+    the three modal viewers end in the same themed bar as TFM proper rather than a
+    plain dim hint. ``font`` pins a fixed advance where the caller needs columns
+    to line up (the text viewer's search field)."""
+    wu, _hu = ctx.size_units
+    theme = ctx.theme
+    bar_bg = _status_bg(theme)
+    fg = theme.muted_text if theme is not None else (150, 150, 150)
+    ctx.fill_rect(0, y, wu, 1.0, Style(bg=bar_bg))
+    label = elide(text, ctx.width, where="end", measure=ctx.measure_text)
+    ctx.draw_text(0, y, label, Style(fg=fg, bg=bar_bg, font=font))
 
 #: pygments token category → RGB (a VS Code-dark-ish palette). Categorised by
 #: substring of the token name, mirroring ttk TFM's ``get_syntax_color``.
@@ -373,17 +402,19 @@ class TextViewer(Widget):
             draw_hscrollbar(ctx, self._content_x, hbar_y, content_wf,
                             self.left, content_wf, self._max_line)
 
-        # Footer: search bar or hint.
+        # Footer status bar — the themed 'status' surface, matching the main
+        # window's bottom bar; shows the search field while searching, else the
+        # key hints.
         if self.searching or self.pattern:
             n = len(self.matches)
             here = (self.match_pos + 1) if n else 0
-            label = f"/{self.pattern}"
+            label = f" /{self.pattern}"
             if not self.searching:
                 label += f"   [{here}/{n}]" if n else "   (no matches)"
-            ctx.draw_text(0, fy, label[:w], Style(fg=text_fg, bg=bg, font=MONO))
+            draw_status_bar(ctx, fy, label, font=MONO)
         else:
             hint = " ↑↓ scroll · ←→ pan · w wrap · / search · n/N next · q close "
-            ctx.draw_text(0, fy, hint[:w], Style(fg=muted, bg=bg, attr=TextAttribute.DIM))
+            draw_status_bar(ctx, fy, hint)
 
     def _draw_rows(self, ctx) -> None:
         """Render the visible rows into the clipped body. ``self.top``'s fractional
