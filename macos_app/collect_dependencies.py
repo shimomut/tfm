@@ -391,7 +391,17 @@ def collect_dependencies(requirements_file, dest_dir):
         # Skip _distutils_hack (setuptools internal)
         if item.name == '_distutils_hack':
             continue
-        
+
+        # Skip editable-install shims. PuiKit is installed editable in dev, so
+        # site-packages holds a .pth plus a finder module that point at the
+        # developer's checkout - paths that won't exist on the target machine.
+        # The real PuiKit source is copied into the bundle separately by
+        # build.sh, so these shims are both broken and redundant here.
+        if item.name.startswith('__editable__') or item.suffix == '.pth':
+            log_info(f"Skipping editable-install shim: {item.name}")
+            skipped_count += 1
+            continue
+
         # Skip pip, setuptools, wheel (build tools not needed at runtime)
         if item.name in ['pip', 'setuptools', 'wheel', 'pkg_resources']:
             log_info(f"Skipping build tool: {item.name}")

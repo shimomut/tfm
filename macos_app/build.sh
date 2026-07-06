@@ -166,81 +166,54 @@ log_success "Executable copied and permissions set"
 
 log_info "Step 3: Copying resources..."
 
-# Copy TFM Python source
+# Copy TFM Python source.
+# The launcher imports the "tfm" module (Resources/tfm.py); tfm.py adds its
+# sibling src/ to sys.path to find the tfm_* business-logic modules, so the
+# bundle mirrors the repo layout with tfm.py and src/ side by side under
+# Resources/. Remove any stale package dir from older (TTK-era) builds so a
+# leftover Resources/tfm/ directory can't shadow Resources/tfm.py on import.
 log_info "Copying TFM Python source..."
-TFM_DEST="${RESOURCES_DIR_BUNDLE}/tfm"
-mkdir -p "${TFM_DEST}"
-cp -R "${PROJECT_ROOT}/src/"* "${TFM_DEST}/"
+rm -rf "${RESOURCES_DIR_BUNDLE}/tfm" "${RESOURCES_DIR_BUNDLE}/ttk"
+cp "${PROJECT_ROOT}/tfm.py" "${RESOURCES_DIR_BUNDLE}/tfm.py"
+TFM_SRC_DEST="${RESOURCES_DIR_BUNDLE}/src"
+rm -rf "${TFM_SRC_DEST}"
+mkdir -p "${TFM_SRC_DEST}"
+cp -R "${PROJECT_ROOT}/src/"* "${TFM_SRC_DEST}/"
 
 # Pre-compile TFM Python files
 log_info "Pre-compiling TFM Python files..."
-if "${VENV_PYTHON}" -m compileall -q "${TFM_DEST}"; then
+if "${VENV_PYTHON}" -m compileall -q "${RESOURCES_DIR_BUNDLE}/tfm.py" "${TFM_SRC_DEST}"; then
     log_info "  Compiled TFM Python files"
 else
     log_info "  Warning: Compilation failed"
 fi
 
-# Copy TTK library (runtime files only)
-log_info "Copying TTK library..."
-TTK_DEST="${RESOURCES_DIR_BUNDLE}/ttk"
-TTK_SRC="${PROJECT_ROOT}/ttk"
+# Copy PuiKit library.
+# PuiKit replaces the old TTK toolkit. It is a pure-Python package (its macOS
+# GUI backend renders through PyObjC/Quartz - there is no compiled extension to
+# bundle) installed editable into the venv from a sibling checkout. Resolve its
+# real source directory from the venv interpreter so this works regardless of
+# where the checkout lives (honours any PUIKIT_DIR override used at install).
+log_info "Copying PuiKit library..."
+PUIKIT_DEST="${RESOURCES_DIR_BUNDLE}/puikit"
+PUIKIT_SRC=$("${VENV_PYTHON}" -c "import puikit, os; print(os.path.dirname(os.path.abspath(puikit.__file__)))" 2>/dev/null)
 
-if [ ! -d "${TTK_SRC}" ]; then
-    log_error "TTK library not found at ${TTK_SRC}"
+if [ -z "${PUIKIT_SRC}" ] || [ ! -d "${PUIKIT_SRC}" ]; then
+    log_error "PuiKit not importable from the venv (resolved source: '${PUIKIT_SRC}')."
+    log_error "Install it first: make install-puikit"
     exit 1
 fi
 
-# Create TTK destination directory
-mkdir -p "${TTK_DEST}"
+# Copy the whole package, then drop caches (compiled fresh below).
+rm -rf "${PUIKIT_DEST}"
+cp -R "${PUIKIT_SRC}" "${PUIKIT_DEST}"
+find "${PUIKIT_DEST}" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+log_info "  Copied PuiKit from ${PUIKIT_SRC}"
 
-# Copy only runtime files (exclude docs, tests, demos, build artifacts)
-log_info "  Copying TTK runtime files..."
-
-# Copy essential Python files (exclude py.typed - only needed for type checkers)
-cp "${TTK_SRC}/__init__.py" "${TTK_DEST}/" 2>/dev/null || true
-
-# Copy top-level Python modules (exclude test/demo/setup files)
-for file in "${TTK_SRC}"/*.py; do
-    if [ -f "$file" ]; then
-        basename=$(basename "$file")
-        # Skip test, demo, and setup files
-        if [[ ! "$basename" =~ ^test_ ]] && [[ ! "$basename" =~ ^demo_ ]] && [[ "$basename" != "setup.py" ]]; then
-            cp "$file" "${TTK_DEST}/"
-        fi
-    fi
-done
-
-# Copy essential subdirectories (backends, serialization, utils)
-for dir in backends serialization utils; do
-    if [ -d "${TTK_SRC}/${dir}" ]; then
-        cp -R "${TTK_SRC}/${dir}" "${TTK_DEST}/"
-        log_info "    Copied ${dir}/"
-    fi
-done
-
-# Remove C++ source files from backends (only compiled .so is needed)
-if [ -d "${TTK_DEST}/backends" ]; then
-    find "${TTK_DEST}/backends" -name "*.cpp" -delete 2>/dev/null || true
-    log_info "    Removed C++ source files from backends/"
-fi
-
-log_info "  TTK runtime files copied (excluded: doc/, demo/, test/, build/, .coverage, etc.)"
-
-# Copy C++ renderer extension module to Resources root
-# This allows "import ttk_coregraphics_render" to work from anywhere
-log_info "Copying C++ renderer extension module..."
-if [ -f "${PROJECT_ROOT}/ttk_coregraphics_render.cpython-313-darwin.so" ]; then
-    cp "${PROJECT_ROOT}/ttk_coregraphics_render.cpython-313-darwin.so" "${RESOURCES_DIR_BUNDLE}/"
-    log_info "  Copied ttk_coregraphics_render.cpython-313-darwin.so to Resources/"
-else
-    log_warning "C++ renderer module not found at project root"
-    log_warning "Application will fall back to PyObjC rendering"
-fi
-
-# Pre-compile TTK Python files
-log_info "Pre-compiling TTK Python files..."
-if "${VENV_PYTHON}" -m compileall -q "${TTK_DEST}"; then
-    log_info "  Compiled TTK Python files"
+# Pre-compile PuiKit Python files
+log_info "Pre-compiling PuiKit Python files..."
+if "${VENV_PYTHON}" -m compileall -q "${PUIKIT_DEST}"; then
+    log_info "  Compiled PuiKit Python files"
 else
     log_info "  Warning: Compilation failed"
 fi
@@ -377,7 +350,7 @@ if [ "$USE_FRAMEWORK" = true ]; then
     fi
     
     # Remove development tools from bin/
-    for tool in idle3.13 pip3 pip3.13 pydoc3.13 python3.13-config; do
+    for tool in "idle${PYTHON_VERSION}" pip3 "pip${PYTHON_VERSION}" "pydoc${PYTHON_VERSION}" "python${PYTHON_VERSION}-config"; do
         if [ -f "${PYTHON_DEST}/bin/${tool}" ]; then
             rm -f "${PYTHON_DEST}/bin/${tool}"
             log_info "  Removed bin/${tool}"
@@ -506,7 +479,7 @@ else
     log_info "Removing unnecessary files from embedded Python..."
     
     # Remove development tools from bin/
-    for tool in idle3.13 pip3 pip3.13 pydoc3.13 python3.13-config; do
+    for tool in "idle${PYTHON_VERSION}" pip3 "pip${PYTHON_VERSION}" "pydoc${PYTHON_VERSION}" "python${PYTHON_VERSION}-config"; do
         if [ -f "${PYTHON_DEST}/bin/${tool}" ]; then
             rm -f "${PYTHON_DEST}/bin/${tool}"
             log_info "  Removed bin/${tool}"

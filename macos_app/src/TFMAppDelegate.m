@@ -111,27 +111,28 @@
     }
     
     // Configure sys.path to include bundled modules
-    // Add Resources directory to sys.path so Python can find tfm and ttk packages
-    NSString *packagesPath = [resourcesPath 
+    // Add Resources directory to sys.path so Python can find tfm and puikit
+    NSString *packagesPath = [resourcesPath
         stringByAppendingPathComponent:@"python_packages"];
-    
-    // Verify required directories exist
-    NSString *tfmPath = [resourcesPath stringByAppendingPathComponent:@"tfm"];
-    NSString *ttkPath = [resourcesPath stringByAppendingPathComponent:@"ttk"];
-    
+
+    // Verify required files exist: the tfm.py entry script and the PuiKit
+    // toolkit package (both live at the Resources root; see build.sh).
+    NSString *tfmPath = [resourcesPath stringByAppendingPathComponent:@"tfm.py"];
+    NSString *puikitPath = [resourcesPath stringByAppendingPathComponent:@"puikit"];
+
     if (![fileManager fileExistsAtPath:tfmPath]) {
-        NSLog(@"ERROR: TFM source directory not found at: %@", tfmPath);
+        NSLog(@"ERROR: TFM entry script not found at: %@", tfmPath);
         Py_Finalize();
         return NO;
     }
-    if (![fileManager fileExistsAtPath:ttkPath]) {
-        NSLog(@"ERROR: TTK library directory not found at: %@", ttkPath);
+    if (![fileManager fileExistsAtPath:puikitPath]) {
+        NSLog(@"ERROR: PuiKit library directory not found at: %@", puikitPath);
         Py_Finalize();
         return NO;
     }
-    
+
     // Add paths to sys.path
-    // Add Resources directory so Python can import tfm and ttk packages
+    // Add Resources directory so Python can import tfm and puikit
     PyRun_SimpleString("import sys");
     
     NSString *resourcesPathCmd = [NSString stringWithFormat:@"sys.path.insert(0, '%@')", resourcesPath];
@@ -181,45 +182,47 @@
     // This ensures SSH ProxyCommand can find tools like 'aws', 'gcloud', etc.
     [self setupEnvironmentPath];
     
-    // Import tfm_main module
-    PyObject *tfmModule = PyImport_ImportModule("tfm.tfm_main");
+    // Set up sys.argv to launch in the native macOS GUI backend, before the
+    // entry module runs. tfm.main() parses these via argparse.
+    PyRun_SimpleString("import sys");
+    PyRun_SimpleString("sys.argv = ['TFM', '--backend', 'gui']");
+
+    // Import the TFM entry module (Resources/tfm.py). tfm.py adds its sibling
+    // src/ directory to sys.path so its tfm_* modules resolve on import.
+    PyObject *tfmModule = PyImport_ImportModule("tfm");
     if (!tfmModule) {
-        NSLog(@"ERROR: Failed to import tfm.tfm_main module");
+        NSLog(@"ERROR: Failed to import tfm module");
         PyErr_Print();
         exit(1);
         return;
     }
-    
-    // Set up sys.argv to simulate --desktop mode
-    PyRun_SimpleString("import sys");
-    PyRun_SimpleString("sys.argv = ['TFM', '--desktop']");
-    
-    // Get cli_main function
-    PyObject *cliMainFunc = PyObject_GetAttrString(tfmModule, "cli_main");
-    if (!cliMainFunc || !PyCallable_Check(cliMainFunc)) {
-        NSLog(@"ERROR: cli_main function not found or not callable");
-        Py_XDECREF(cliMainFunc);
+
+    // Get main function
+    PyObject *mainFunc = PyObject_GetAttrString(tfmModule, "main");
+    if (!mainFunc || !PyCallable_Check(mainFunc)) {
+        NSLog(@"ERROR: main function not found or not callable");
+        Py_XDECREF(mainFunc);
         Py_DECREF(tfmModule);
         exit(1);
         return;
     }
-    
-    // Call cli_main() - this will block until the window is closed
-    NSLog(@"Calling cli_main()");
-    PyObject *result = PyObject_CallObject(cliMainFunc, NULL);
-    
+
+    // Call main() - this will block until the window is closed
+    NSLog(@"Calling main()");
+    PyObject *result = PyObject_CallObject(mainFunc, NULL);
+
     if (!result) {
-        NSLog(@"ERROR: cli_main() failed");
+        NSLog(@"ERROR: main() failed");
         PyErr_Print();
     }
-    
+
     // Clean up
     Py_XDECREF(result);
-    Py_DECREF(cliMainFunc);
+    Py_DECREF(mainFunc);
     Py_DECREF(tfmModule);
-    
-    // When cli_main() returns, the window was closed
-    NSLog(@"cli_main() returned, terminating application");
+
+    // When main() returns, the window was closed
+    NSLog(@"main() returned, terminating application");
     
     // Use exit() instead of [NSApp terminate:self] to avoid issues
     // when running directly from command line
