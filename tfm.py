@@ -33,7 +33,7 @@ from pathlib import Path as _StdPath
 
 sys.path.insert(0, str(_StdPath(__file__).parent / "src"))
 
-from puikit import EventType, Font, Item, Panel, Style, TextAttribute, Theme, VSplit, derive_theme  # noqa: E402
+from puikit import EventType, Font, Item, Panel, Style, TextAttribute, Theme, VSplit, derive_theme, mix  # noqa: E402
 from puikit.backends import create_backend  # noqa: E402
 from puikit.menu import Menu, MenuItem, SEPARATOR  # noqa: E402
 from puikit.text import elide  # noqa: E402
@@ -83,36 +83,60 @@ from tfm_text_viewer import show_text_viewer  # noqa: E402
 # alike — with one assignment and no per-widget repaint logic; the surface
 # backgrounds re-resolve from the new theme on the next render.
 #
-# Each theme is the six base colors ``derive_theme`` needs; it computes the rest
+# Each theme is the base colors ``derive_theme`` needs; it computes the rest
 # (hovers, borders, inactive selections, dividers) by lighten/darken/blend rules.
 #   background — content surface (its luminance also picks the lift direction)
 #   foreground — primary text          muted     — secondary text / dividers
-#   accent     — focus / status bar    surface   — raised panels (header/popup)
-#   selection  — active selection fill
+#   accent     — focus / default bars  surface   — raised panels (header/popup)
+#   selection  — active selection fill accent2   — secondary hue for chrome recipes
+#
+# The two chrome bars — the global ``status`` bar and each pane's ``footer`` — are
+# separate surface roles, and both default to the accent. A theme overrides either
+# with its own *recipe*: ``status``/``footer`` may be a Color or a callable taking
+# the palette namespace ``p`` (``p["bg"]``, ``p["accent2"]``, …), so a bar can be a
+# neutral gray, an accent2 blend, or anything expressible over the palette. Recipes
+# blend with ``mix`` / ``lift`` (from puikit); the theme's headroom pass then keeps
+# whatever a recipe produces legible. See puikit ``docs/color_system.md`` §7.
+
+
+def _theme(bg, fg, muted, accent, surface, selection, *, accent2=None,
+           status=None, footer=None) -> Theme:
+    ac2 = accent if accent2 is None else accent2
+    p = {"bg": bg, "fg": fg, "muted": muted, "accent": accent, "accent2": ac2,
+         "surface": surface}
+    surfaces = {}
+    for role, spec in (("status", status), ("footer", footer)):
+        if spec is not None:
+            surfaces[role] = spec(p) if callable(spec) else spec
+    extra = {"surfaces": surfaces} if surfaces else {}
+    return derive_theme(background=bg, foreground=fg, muted=muted, accent=accent,
+                        surface=surface, selection=selection, accent2=ac2, **extra)
+
+
 THEMES: list[tuple[str, Theme]] = [
-    ("Dark+", derive_theme(
-        background=(30, 30, 30), foreground=(212, 212, 212), muted=(157, 157, 157),
-        accent=(0, 122, 204), surface=(48, 48, 52), selection=(10, 105, 178))),
-    ("Monokai", derive_theme(
-        background=(39, 40, 34), foreground=(248, 248, 242), muted=(140, 140, 130),
-        accent=(166, 226, 46), surface=(56, 57, 48), selection=(86, 122, 38))),
-    ("Dracula", derive_theme(
-        background=(40, 42, 54), foreground=(248, 248, 242), muted=(98, 114, 164),
-        accent=(189, 147, 249), surface=(56, 59, 76), selection=(120, 86, 175))),
-    ("Nord", derive_theme(
-        background=(46, 52, 64), foreground=(216, 222, 233), muted=(76, 86, 106),
-        accent=(136, 192, 208), surface=(62, 70, 88), selection=(76, 128, 158))),
-    ("Solarized", derive_theme(
-        background=(0, 43, 54), foreground=(147, 161, 161), muted=(88, 110, 117),
-        accent=(38, 139, 210), surface=(10, 62, 78), selection=(26, 102, 150))),
-    # --- light variants: same six bases, opposite polarity (panels sink, text
+    ("Dark+", _theme((30, 30, 30), (212, 212, 212), (157, 157, 157),
+                     (0, 122, 204), (48, 48, 52), (10, 105, 178), accent2=(78, 201, 176))),
+    ("Monokai", _theme((39, 40, 34), (248, 248, 242), (140, 140, 130),
+                       (166, 226, 46), (56, 57, 48), (86, 122, 38), accent2=(249, 38, 114))),
+    ("Dracula", _theme((40, 42, 54), (248, 248, 242), (98, 114, 164),
+                       (189, 147, 249), (56, 59, 76), (120, 86, 175), accent2=(255, 121, 198))),
+    # Nord: status stays the frost accent, footer is a neutral gray (a blend of
+    # the background toward the text) — the "accent bar + gray footer" recipe.
+    ("Nord", _theme((46, 52, 64), (216, 222, 233), (76, 86, 106),
+                    (136, 192, 208), (62, 70, 88), (76, 128, 158), accent2=(180, 142, 173),
+                    footer=lambda p: mix(p["bg"], p["fg"], 0.16))),
+    # Solarized: both bars are an 80/20 blend of the background and the secondary
+    # accent (cyan) rather than the primary accent — the "accent2 blend" recipe.
+    ("Solarized", _theme((0, 43, 54), (147, 161, 161), (88, 110, 117),
+                         (38, 139, 210), (10, 62, 78), (26, 102, 150), accent2=(42, 161, 152),
+                         status=lambda p: mix(p["bg"], p["accent2"], 0.20),
+                         footer=lambda p: mix(p["bg"], p["accent2"], 0.20))),
+    # --- light variants: same bases, opposite polarity (panels sink, text
     # defaults dark), so a light background reads correctly on every backend.
-    ("Light+", derive_theme(
-        background=(255, 255, 255), foreground=(30, 30, 30), muted=(110, 110, 110),
-        accent=(0, 122, 204), surface=(235, 235, 238), selection=(120, 180, 240))),
-    ("Solarized Light", derive_theme(
-        background=(253, 246, 227), foreground=(88, 110, 117), muted=(147, 161, 161),
-        accent=(38, 139, 210), surface=(234, 228, 206), selection=(150, 195, 230))),
+    ("Light+", _theme((255, 255, 255), (30, 30, 30), (110, 110, 110),
+                      (0, 122, 204), (235, 235, 238), (120, 180, 240), accent2=(0, 128, 128))),
+    ("Solarized Light", _theme((253, 246, 227), (88, 110, 117), (147, 161, 161),
+                               (38, 139, 210), (234, 228, 206), (150, 195, 230), accent2=(211, 54, 130))),
 ]
 
 #: Which theme each ``Config.COLOR_SCHEME`` value starts on (ttk TFM's two
@@ -456,7 +480,7 @@ class TfmApp:
         return LayoutView(VSplit(
             Item(PaneHeader(self, name), size=1, hints={"surface": "header"}),
             Item(view, weight=1, hints={"surface": "content"}),
-            Item(footer, size=1, hints={"surface": "status"}),
+            Item(footer, size=1, hints={"surface": "footer"}),
             divider="subtle",
         ))
 
