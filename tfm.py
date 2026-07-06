@@ -121,6 +121,19 @@ THEMES: list[tuple[str, Theme]] = [
 _INITIAL_THEME = {"dark": "Dark+", "light": "Light+"}
 
 
+def _archive_header_label(path_str: str) -> str:
+    """Render an ``archive://…#internal`` URI for the pane header as
+    ``[archive.zip]/internal/path`` (or ``[archive.zip]`` at the archive root),
+    so a browsed archive reads as a location rather than a raw URI. Assumes
+    ``path_str`` starts with ``archive://`` (the caller checks)."""
+    path_part = path_str[len("archive://"):]
+    archive_path, sep, internal = path_part.partition("#")
+    archive_name = _StdPath(archive_path).name
+    if not sep:  # malformed (no '#'); fall back to the raw string
+        return path_str
+    return f"[{archive_name}]/{internal}" if internal else f"[{archive_name}]"
+
+
 class PaneHeader(Widget):
     """The location bar above a pane: its current path, brighter when active."""
 
@@ -139,6 +152,10 @@ class PaneHeader(Widget):
             n = len(pane["files"])
             label = f' ⌕ "{virtual["query"]}" — {n} result{"" if n == 1 else "s"} ({mode})'
             text = elide(label, ctx.width, where="end", measure=ctx.measure_text)
+        elif self.app._is_archive(pane["path"]):
+            # A browsed archive: show [archive.zip]/sub rather than the raw URI.
+            label = " " + _archive_header_label(str(pane["path"]))
+            text = elide(label, ctx.width, where="middle", measure=ctx.measure_text)
         else:
             text = elide(" " + str(pane["path"]), ctx.width, where="middle", measure=ctx.measure_text)
         fg = ctx.theme.accent if active else ctx.theme.text
@@ -1146,6 +1163,19 @@ class TfmApp:
                 pane["path"] = entry
                 self._refresh(pane, on_ready=self._restore_remembered_cursor)
                 self.log_info(f"Entered {entry.name}/")
+            elif self._archive_format(entry.name) and not self._is_archive(entry):
+                # A recognised archive file: browse it as a virtual directory via
+                # its archive:// URI. The listing/navigation machinery then treats
+                # it like any other (remote) directory — ArchivePathImpl backs
+                # iterdir/is_dir/read_bytes and returns the real containing dir as
+                # its parent, so "up" exits the archive on its own. Nested archives
+                # (already inside one) are skipped: the backend can't open an
+                # archive from within an archive.
+                self._remember_cursor(pane)  # remember the archive file's cursor
+                self._exit_virtual(pane)
+                pane["path"] = Path(f"archive://{entry.absolute()}#")
+                self._refresh(pane, on_ready=self._restore_remembered_cursor)
+                self.log_info(f"Entered archive {entry.name}")
         except Exception as exc:
             self.log_info(f"Cannot open {entry.name}: {exc}")
 
@@ -1295,6 +1325,12 @@ class TfmApp:
         """Whether ``path`` is a plain local-filesystem path — the only kind a
         terminal editor or subshell can operate on directly."""
         return not str(path).startswith(cls._REMOTE_SCHEMES)
+
+    @staticmethod
+    def _is_archive(path) -> bool:
+        """Whether ``path`` is inside a browsed archive (an ``archive://`` URI).
+        Such paths are read-only, so write-side operations refuse them."""
+        return str(path).startswith("archive://")
 
     def _run_in_terminal(self, argv: list, cwd: str | None = None) -> None:
         """Run a full-screen child process (editor / shell) with the display
@@ -2033,6 +2069,9 @@ class TfmApp:
         """Prompt for a name and create a directory in the active pane — the
         canonical text-input dialog, mirroring ttk TFM's create-directory flow."""
         pane = self.active_pane()
+        if self._is_archive(pane["path"]):
+            self.log_info("Cannot create a directory inside a read-only archive")
+            return
 
         def validate(name: str) -> str | None:
             name = name.strip()
@@ -2061,6 +2100,9 @@ class TfmApp:
     def create_file(self) -> None:
         """Prompt for a name and create an empty file in the active pane."""
         pane = self.active_pane()
+        if self._is_archive(pane["path"]):
+            self.log_info("Cannot create a file inside a read-only archive")
+            return
 
         def validate(name: str) -> str | None:
             name = name.strip()
@@ -2093,6 +2135,9 @@ class TfmApp:
         files = pane["files"]
         if not files:
             self.log_info("No file to rename")
+            return
+        if self._is_archive(pane["path"]):
+            self.log_info("Cannot rename inside a read-only archive")
             return
         selected = [f for f in files if str(f) in pane["selected_files"]]
         if len(selected) > 1:
@@ -2265,6 +2310,14 @@ class TfmApp:
             # nowhere to write. Reveal a real destination first (O / Shift-O).
             self.log_info(f"Cannot {kind}: the other pane is a search-results view")
             return
+        if self._is_archive(dst_pane["path"]):
+            # Browsed archives are read-only — copy/move out, never in.
+            self.log_info(f"Cannot {kind}: the other pane is a read-only archive")
+            return
+        if kind == "move" and self._is_archive(src_pane["path"]):
+            # Move = copy + delete source; the archive source can't be deleted.
+            self.log_info("Cannot move out of an archive — use copy instead")
+            return
         dest_dir = dst_pane["path"]
         targets = self._selected_or_focused(src_pane)
         if not targets:
@@ -2297,6 +2350,9 @@ class TfmApp:
         targets = self._selected_or_focused(pane)
         if not targets:
             self.log_info("No file to delete")
+            return
+        if any(self._is_archive(t) for t in targets):
+            self.log_info("Cannot delete inside a read-only archive")
             return
 
         def on_complete(result: dict) -> None:
@@ -2393,7 +2449,13 @@ class TfmApp:
         if not sources:
             self.log_info("No files to archive")
             return
+        if any(self._is_archive(s) for s in sources):
+            self.log_info("Cannot archive files that live inside a read-only archive")
+            return
         dest_dir = self.pm.get_inactive_pane()["path"]
+        if self._is_archive(dest_dir):
+            self.log_info("Cannot create an archive inside a read-only archive")
+            return
         # Prefill a single item's name plus a dot, ready for the extension.
         initial = ""
         if len(sources) == 1:
@@ -2457,7 +2519,13 @@ class TfmApp:
         if fmt is None:
             self.log_info(f"'{entry.name}' is not a supported archive")
             return
+        if self._is_archive(entry):
+            self.log_info("Cannot extract an archive nested inside another archive")
+            return
         dest_dir = self.pm.get_inactive_pane()["path"]
+        if self._is_archive(dest_dir):
+            self.log_info("Cannot extract into a read-only archive")
+            return
         target = dest_dir / self._archive_basename(entry.name)
 
         def go() -> None:

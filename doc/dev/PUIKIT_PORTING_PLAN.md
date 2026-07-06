@@ -147,38 +147,22 @@ Caveat: names can contain Markdown-special characters (`_ * [ ]` and backticks).
 Code spans neutralise most, but a name containing a backtick needs escaping —
 add a small helper (or reuse one) to wrap a filename safely as inline code.
 
-### 2.7 Archive virtual-directory browsing
-Let the user **enter an archive** (Enter on a `.zip` / `.tar.*`) and browse its
-contents in the pane as if it were a directory — navigate in/out, view files,
-extract out — rather than only create/extract as a whole (`create_archive`
-/ `extract_archive`). The port currently has **no archive browsing** wired
-(`tfm.py` only creates/extracts).
+### 2.7 Archive virtual-directory browsing — DONE
+Enter on a `.zip` / `.tar.*` browses it in the pane as a directory (navigate
+in/out, view files, copy files/dirs out); the header shows `[archive.zip]/sub`;
+writes into/within an archive are refused (read-only).
 
-The backend already exists (ported from ttk, unhooked in the UI):
-- `tfm_archive.py` — `ArchiveHandler` / `ZipHandler` (+ tar) with
-  `list_entries(internal_path)`, `get_entry_info`, `extract_to_bytes` /
-  `extract_to_file`, and the `ArchiveEntry` dataclass (`to_stat_result`).
-- `tfm_path.py` — recognises the archive-entry URI
-  `archive:///path/to/file.zip#internal/path.txt` (`get_scheme`, needs-extraction
-  / caching / entry-type branches), and `archive://` is already in `tfm.py`'s
-  `_REMOTE_SCHEMES`.
-
-Wire it on top of the existing **virtual-pane** mechanism (the same
-`pane["virtual"]` feed the search results use — see the header-label branch at
-`tfm.py:130`+ and `_exit_virtual` / `_refresh_virtual`):
-- Entering an archive sets the pane into an "archive" virtual mode carrying the
-  archive path + current `internal_path`; the row list comes from
-  `ArchiveHandler.list_entries(internal_path)` (async via the existing `_list_pane`
-  worker, like other listings).
-- Navigation updates `internal_path`; **up** from the archive root `_exit_virtual`s
-  back to the real containing directory (mirrors leaving a search feed).
-- Header label like the search feed's (a distinct icon + `archive.zip › sub/dir`)
-  so it's clearly not a real directory.
-- Opening a file extracts it (`extract_to_bytes` / a temp file) and hands it to
-  the text / diff viewer; **read-only** first (no writing back into the archive);
-  copy-out = extract. Reuse the entry cache in `ArchiveHandler`.
-- Guard the write-side ops the way virtual panes already do (a virtual pane isn't
-  a writable destination — see the `_transfer` virtual guard).
+Implemented as **real `archive://…#` paths**, not the `pane["virtual"]` feed the
+note originally suggested: `ArchivePathImpl` (`tfm_archive.py`) already implements
+the full `Path` interface (`iterdir` / `is_dir` / `read_bytes` / `.parent`), so
+`compute_listing` lists it, `_open`/`_go_parent` navigate it, and the text viewer
++ cross-storage copy read it — all unchanged. The only new code (all in `tfm.py`):
+an `_open` branch that wraps a recognised archive file as `archive://{abs}#`
+(skipping nested archives), the `_archive_header_label` formatter in
+`PaneHeader.draw`, an `_is_archive` predicate, and read-only guards on
+`_transfer` / create / rename / delete / archive / extract. Covered by
+`test/test_tfm_app_archive_browse.py`. Not done (intentional): writing back into
+archives, nested-archive entry, archive create/extract from *within* an archive.
 
 ### 2.8 Color theme brush-up (file types, cursor, syntax)
 The port's palette is thin in three places; brush them up into one coherent,
