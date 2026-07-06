@@ -383,6 +383,37 @@ Then run the existing `macos_app/README.md` / `doc/dev/MACOS_APP_TESTING.md`
 smoke tests against the rebuilt bundle, and update both docs + `build.sh`'s inline
 comments (they still describe copying ttk).
 
+### 2.14 Wire the GUI base font from config
+`DESKTOP_FONT_NAME` / `DESKTOP_FONT_SIZE` (`src/_config.py`) are **dormant**: they
+are declared and validated (`tfm_config.ConfigManager.validate_config`, itself only
+ever called from tests), but nothing feeds them to the backend. `main` (`tfm.py`)
+builds the GUI backend with only `frame_autosave_name`, so the macOS backend falls
+back to its default base font — `Font(size=14.0, monospace=True)`, i.e. the system
+mono face (SF Mono) at 14pt — and the config values never take effect. Today's GUI
+is **not** running the configured Menlo 12.
+
+PuiKit takes a **single** base-font family (no cascade list; missing glyphs use the
+OS's native font substitution — see `puikit/docs/font_system.md` §2). `DESKTOP_FONT_NAME`
+was accordingly narrowed from a fallback list to one string, so it now maps 1:1 onto
+`puikit.Font.family`.
+
+To build:
+- Load the config in `main` (it does not read it at all today) via `ConfigManager`,
+  then for the `gui` backend build
+  `Font(family=config.DESKTOP_FONT_NAME, size=config.DESKTOP_FONT_SIZE, monospace=True)`
+  and pass it as `base_font` in `backend_kwargs`. The macOS and Windows backend
+  constructors already accept `base_font`; **curses does not** (`__init__(self,
+  pointer_shape=False)`), so keep this gui-gated exactly like `frame_autosave_name`.
+- Once wired, GUI switches from SF Mono 14 → Menlo 12; refresh any screenshots.
+- Decide whether `DESKTOP_FONT_SIZE` stays startup-only or also drives the ttk-era
+  Cmd-+/Cmd-- live font-size adjustment (`doc/FONT_SIZE_ADJUSTMENT_FEATURE.md`) —
+  out of scope here, but the base-font seam is where it would hook in.
+- Sweep the docs that still show the removed cascade-list form
+  (`doc/CONFIGURATION_FEATURE.md`, `doc/TFM_USER_GUIDE.md`,
+  `doc/FONT_SIZE_ADJUSTMENT_FEATURE.md`, `doc/DESKTOP_MODE_GUIDE.md`) down to the
+  single-string form, and update the user's own `~/.tfm/config.py` if it still
+  carries the old list.
+
 ---
 
 ## 3. Reference — PuiKit keyboard contract
