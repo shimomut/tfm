@@ -68,6 +68,15 @@ venv:
 		echo ".venv already exists. Run 'make venv-clean' first to recreate it."; \
 		exit 1; \
 	fi
+ifneq (,$(findstring MINGW,$(UNAME_S))$(findstring MSYS,$(UNAME_S))$(findstring CYGWIN,$(UNAME_S)))
+	@echo "Windows detected; using the 'py' launcher to create .venv..."
+	@if ! command -v py >/dev/null 2>&1; then \
+		echo "Error: 'py' launcher not found in PATH. Install Python from python.org first."; \
+		exit 1; \
+	fi
+	@echo "Using $$(py --version 2>&1) to create .venv..."
+	@py -m venv .venv
+else
 	@echo "Searching for the latest python3 in PATH..."
 	@best=""; best_key=0; \
 	for dir in $$(echo "$$PATH" | tr ':' '\n'); do \
@@ -90,6 +99,7 @@ venv:
 	fi; \
 	echo "Using $$best ($$($$best --version 2>&1)) to create .venv..."; \
 	"$$best" -m venv .venv
+endif
 	@echo "Upgrading pip..."
 	@.venv/$(VENV_BINDIR)/python -m pip install --upgrade pip
 	@echo "Installing dependencies from requirements.txt..."
