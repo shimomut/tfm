@@ -36,7 +36,7 @@ def test_default_backend_config():
 
     # Check default values
     assert config.DESKTOP_UI_FONT_NAME is None, "Default UI font should be None (system UI font)"
-    assert config.DESKTOP_MONO_FONT_NAME == 'Menlo', "Default mono font should be 'Menlo'"
+    assert config.DESKTOP_MONO_FONT_NAME is None, "Default mono font should be None (system mono font)"
     assert config.DESKTOP_FONT_SIZE == 12, "Default font size should be 12"
     assert config.DESKTOP_WINDOW_WIDTH == 1200, "Default window width should be 1200"
     assert config.DESKTOP_WINDOW_HEIGHT == 800, "Default window height should be 800"

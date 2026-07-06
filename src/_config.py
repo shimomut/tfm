@@ -23,13 +23,49 @@ class Config:
     # - 'curses': Terminal mode (default, works on all platforms)
     # - 'coregraphics': Desktop mode (macOS only, requires PyObjC)
     
-    # Desktop mode settings (for CoreGraphics backend)
-    # GUI-mode fonts (ignored in TUI mode). Each names one family; missing glyphs
-    # fall back to the OS's native font substitution. `None` = the OS system default
-    # face for that role.
-    DESKTOP_UI_FONT_NAME = None       # Proportional UI font — the default text face; None = system UI font
-    DESKTOP_MONO_FONT_NAME = 'Menlo'  # Monospaced font — aligned content (columns, viewer, diffs); also the grid base font
-    DESKTOP_FONT_SIZE = 12  # Font size for both, in points (8-72)
+    # --- Desktop (GUI) mode fonts (ignored in TUI mode) ----------------------
+    # DESKTOP_UI_FONT_NAME   : proportional default face (file names, labels,
+    #                          dialogs, markdown prose).
+    # DESKTOP_MONO_FONT_NAME : monospaced face for aligned content (size/date
+    #                          columns, viewer, diffs); also grounds the layout
+    #                          grid, so it must be monospaced.
+    # DESKTOP_FONT_SIZE      : point size applied to BOTH faces.
+    # Missing glyphs use the OS's native font substitution.
+    #
+    # None = the OS system default face -- already a matched pair per platform:
+    #   macOS   -> San Francisco + SF Mono
+    #   Windows -> Segoe UI + Consolas
+    #
+    # To use named fonts, uncomment ONE block below (it runs after the defaults
+    # and overrides them). `sys` is already imported at the top of this file.
+
+    # Default: the system pair on every platform (recommended).
+    DESKTOP_UI_FONT_NAME = None
+    DESKTOP_MONO_FONT_NAME = None
+
+    # Example -- a sans-serif pairing:
+    # if sys.platform == 'darwin':        # macOS
+    #     DESKTOP_UI_FONT_NAME = 'Helvetica Neue'
+    #     DESKTOP_MONO_FONT_NAME = 'Menlo'
+    # elif sys.platform == 'win32':       # Windows
+    #     DESKTOP_UI_FONT_NAME = 'Segoe UI'
+    #     DESKTOP_MONO_FONT_NAME = 'Consolas'
+    # else:                               # Linux / other
+    #     DESKTOP_UI_FONT_NAME = 'DejaVu Sans'
+    #     DESKTOP_MONO_FONT_NAME = 'DejaVu Sans Mono'
+
+    # Example -- a serif pairing (serif UI + serif/slab monospace):
+    # if sys.platform == 'darwin':        # macOS
+    #     DESKTOP_UI_FONT_NAME = 'Georgia'
+    #     DESKTOP_MONO_FONT_NAME = 'PT Mono'
+    # elif sys.platform == 'win32':       # Windows
+    #     DESKTOP_UI_FONT_NAME = 'Georgia'
+    #     DESKTOP_MONO_FONT_NAME = 'Courier New'
+    # else:                               # Linux / other
+    #     DESKTOP_UI_FONT_NAME = 'Liberation Serif'
+    #     DESKTOP_MONO_FONT_NAME = 'Liberation Mono'
+
+    DESKTOP_FONT_SIZE = 12  # point size for both faces (8-72)
     DESKTOP_WINDOW_WIDTH = 1200  # Initial window width in pixels
     DESKTOP_WINDOW_HEIGHT = 800  # Initial window height in pixels
     
