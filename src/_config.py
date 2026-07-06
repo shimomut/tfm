@@ -17,12 +17,7 @@ from tfm_backend_detector import is_desktop_mode
 
 class Config:
     """User configuration for TFM"""
-    
-    # Backend settings
-    PREFERRED_BACKEND = 'curses'  # 'curses' or 'coregraphics'
-    # - 'curses': Terminal mode (default, works on all platforms)
-    # - 'coregraphics': Desktop mode (macOS only, requires PyObjC)
-    
+
     # --- Desktop (GUI) mode fonts (ignored in TUI mode) ----------------------
     # DESKTOP_UI_FONT_NAME   : proportional default face (file names, labels,
     #                          dialogs, markdown prose).
@@ -66,9 +61,7 @@ class Config:
     #     DESKTOP_MONO_FONT_NAME = 'Liberation Mono'
 
     DESKTOP_FONT_SIZE = 12  # point size for both faces (8-72)
-    DESKTOP_WINDOW_WIDTH = 1200  # Initial window width in pixels
-    DESKTOP_WINDOW_HEIGHT = 800  # Initial window height in pixels
-    
+
     # Display settings
     SHOW_HIDDEN_FILES = False
     DEFAULT_LEFT_PANE_RATIO = 0.5  # 0.1 to 0.9
@@ -80,7 +73,6 @@ class Config:
     DEFAULT_SORT_REVERSE = False
     
     # Color settings
-    USE_COLORS = True
     COLOR_SCHEME = 'dark'  # 'dark', 'light'
     
     # Behavior settings
@@ -228,9 +220,7 @@ class Config:
     
     # Performance settings
     MAX_LOG_MESSAGES = 1000
-    MAX_SEARCH_RESULTS = 10000  # Maximum number of search results to prevent memory issues
-    MAX_JUMP_DIRECTORIES = 5000  # Maximum directories to scan for jump dialog
-    
+
     # History settings
     MAX_HISTORY_ENTRIES = 100  # Maximum number of history entries to keep
     
@@ -276,18 +266,7 @@ class Config:
     FILE_MONITORING_ENABLED = True                      # Enable/disable automatic file list reloading
     FILE_MONITORING_COALESCE_DELAY_MS = 200            # Event coalescing window in milliseconds
     FILE_MONITORING_MAX_RELOADS_PER_SECOND = 5         # Maximum reloads per second (rate limiting)
-    FILE_MONITORING_SUPPRESS_AFTER_ACTION_MS = 1000    # Suppress automatic reloads after user actions (milliseconds)
     FILE_MONITORING_FALLBACK_POLL_INTERVAL_S = 5       # Polling interval for fallback mode (seconds)
-    
-    # Unicode and wide character settings
-    UNICODE_MODE = 'auto'  # 'auto', 'full', 'basic', 'ascii'
-    # - 'auto': Automatically detect terminal capabilities (recommended)
-    # - 'full': Full Unicode support with wide character handling
-    # - 'basic': Basic Unicode support, treat all characters as single-width
-    # - 'ascii': ASCII-only fallback mode for limited terminals
-    UNICODE_WARNINGS = True  # Show warnings for Unicode processing errors
-    UNICODE_FALLBACK_CHAR = '?'  # Character to use for unrepresentable characters in ASCII mode
-    UNICODE_TERMINAL_DETECTION = True  # Enable automatic terminal capability detection
     
     # File extension associations
     # Maps file patterns to programs for different actions (open, view, edit)

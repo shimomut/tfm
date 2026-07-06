@@ -73,8 +73,6 @@ def is_desktop_mode():
         return _cached_backend
     
     # Default to terminal mode (don't cache this default)
-    # Note: We don't check PREFERRED_BACKEND here to avoid circular imports
-    # when this is called from _config.py during config loading
     return False
 
 

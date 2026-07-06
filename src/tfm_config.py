@@ -546,10 +546,6 @@ class ConfigManager:
 
         errors = []
 
-        # Validate backend selection
-        if config.PREFERRED_BACKEND not in ['curses', 'coregraphics']:
-            errors.append("PREFERRED_BACKEND must be 'curses' or 'coregraphics'")
-        
         # Validate desktop mode fonts (GUI only; TUI has no font feature). Each
         # names one family; missing glyphs fall back to the OS's native
         # substitution. `None` = the OS system default face for that role.
@@ -564,13 +560,7 @@ class ConfigManager:
         
         if not isinstance(config.DESKTOP_FONT_SIZE, int) or config.DESKTOP_FONT_SIZE < 8 or config.DESKTOP_FONT_SIZE > 72:
             errors.append("DESKTOP_FONT_SIZE must be an integer between 8 and 72")
-        
-        if not isinstance(config.DESKTOP_WINDOW_WIDTH, int) or config.DESKTOP_WINDOW_WIDTH < 400:
-            errors.append("DESKTOP_WINDOW_WIDTH must be an integer >= 400")
-        
-        if not isinstance(config.DESKTOP_WINDOW_HEIGHT, int) or config.DESKTOP_WINDOW_HEIGHT < 300:
-            errors.append("DESKTOP_WINDOW_HEIGHT must be an integer >= 300")
-        
+
         # Validate ratios
         if not (0.1 <= config.DEFAULT_LEFT_PANE_RATIO <= 0.9):
             errors.append("DEFAULT_LEFT_PANE_RATIO must be between 0.1 and 0.9")
@@ -586,14 +576,6 @@ class ConfigManager:
         if config.COLOR_SCHEME not in ['dark', 'light']:
             errors.append("COLOR_SCHEME must be 'dark' or 'light'")
         
-        # Validate Unicode mode
-        if config.UNICODE_MODE not in ['auto', 'full', 'basic', 'ascii']:
-            errors.append("UNICODE_MODE must be 'auto', 'full', 'basic', or 'ascii'")
-        
-        # Validate Unicode fallback character
-        if not isinstance(config.UNICODE_FALLBACK_CHAR, str) or len(config.UNICODE_FALLBACK_CHAR) != 1:
-            errors.append("UNICODE_FALLBACK_CHAR must be a single character string")
-        
         # Validate file monitoring settings
         if not isinstance(config.FILE_MONITORING_ENABLED, bool):
             errors.append("FILE_MONITORING_ENABLED must be a boolean")
@@ -603,9 +585,6 @@ class ConfigManager:
         
         if not isinstance(config.FILE_MONITORING_MAX_RELOADS_PER_SECOND, int) or config.FILE_MONITORING_MAX_RELOADS_PER_SECOND < 1:
             errors.append("FILE_MONITORING_MAX_RELOADS_PER_SECOND must be a positive integer")
-        
-        if not isinstance(config.FILE_MONITORING_SUPPRESS_AFTER_ACTION_MS, int) or config.FILE_MONITORING_SUPPRESS_AFTER_ACTION_MS < 0:
-            errors.append("FILE_MONITORING_SUPPRESS_AFTER_ACTION_MS must be a non-negative integer")
         
         if not isinstance(config.FILE_MONITORING_FALLBACK_POLL_INTERVAL_S, (int, float)) or config.FILE_MONITORING_FALLBACK_POLL_INTERVAL_S <= 0:
             errors.append("FILE_MONITORING_FALLBACK_POLL_INTERVAL_S must be a positive number")

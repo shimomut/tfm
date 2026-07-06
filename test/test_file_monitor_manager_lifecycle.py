@@ -33,7 +33,6 @@ class TestFileMonitorManagerLifecycle(unittest.TestCase):
         self.config.FILE_MONITORING_ENABLED = True
         self.config.FILE_MONITORING_COALESCE_DELAY_MS = 200
         self.config.FILE_MONITORING_MAX_RELOADS_PER_SECOND = 5
-        self.config.FILE_MONITORING_SUPPRESS_AFTER_ACTION_MS = 1000
         self.config.FILE_MONITORING_FALLBACK_POLL_INTERVAL_S = 5
         
         # Create mock file_manager with reload_queue

@@ -23,8 +23,6 @@ class TestConfigCompleteness(unittest.TestCase):
         """Test that all performance settings are defined"""
         performance_settings = [
             'MAX_LOG_MESSAGES',
-            'MAX_SEARCH_RESULTS', 
-            'MAX_JUMP_DIRECTORIES',
             'MAX_HISTORY_ENTRIES'
         ]
         
@@ -121,8 +119,6 @@ class TestConfigCompleteness(unittest.TestCase):
         # These settings should have the same default values
         consistent_settings = [
             'MAX_LOG_MESSAGES',
-            'MAX_SEARCH_RESULTS',
-            'MAX_JUMP_DIRECTORIES',
             'MAX_HISTORY_ENTRIES',
         ]
         
