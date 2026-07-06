@@ -25,13 +25,14 @@ Done and wired (Phases 1–4, plus the GUI-polish pass):
   status bar. Virtualized draw, smooth/precise scroll, click/double-click, wheel,
   draggable splitters, scrollbars.
 - **Interaction** — navigation, selection + focus marker, sort (incl. quick-sort
-  keys), pane-local filter, incremental search, theme colors.
+  keys), pane-local filter, incremental search, compare-and-select, theme colors.
 - **Dialogs / menus** — `MenuBar` (native NSMenu on macOS, in-window strip on
   curses), message boxes, right-click context menus, the searchable
   filter-list picker (favorites / drives / programs / jump), and input dialogs
   (rename / mkdir / create), all as `push_layer` modals.
 - **File operations** — copy / move / delete / rename / batch-rename, threaded
-  with progress, wired through the context menu and keymap.
+  with progress, per-conflict resolution (overwrite / skip / keep-both) and
+  cooperative cancellation, wired through the context menu and keymap.
 - **Search** — recursive filename and content (grep) search, bounded, results in
   the filter-list dialog.
 - **Viewers** — text viewer (pygments, isearch), file diff viewer, directory-diff
@@ -74,48 +75,7 @@ already dispatch through `self._menu("<action>")` name their action directly;
 the ones wired to bespoke callbacks need an action id (or an explicit mapping) so
 the same lookup applies.
 
-### 2.4 File operations: threading, progress, cancellation, conflict resolution — DONE
-**Done.** Copy / move / delete now run through a small central task system built
-fresh for PuiKit (the ttk `BaseTask` / `FileOperationTask` / `Executor` / `UI`
-framework in `legacy/src/` was consulted for its *algorithms* but not imported —
-its `Executor` batch API can't express per-item renames, and its UI is ttk-bound):
-
-- **`tfm_task.py`** (new) — `Task` (`PENDING → RUNNING → DONE | CANCELLED |
-  FAILED`) + `TaskManager` (central registry; `has_active()` / `active_tasks()` for
-  future queued / non-modal tasks + a task UI) + a **blocking worker↔main UI
-  bridge** (`Task.ask`) so an operation reads as one linear function instead of a
-  state machine, + the generic `ProgressDialog` (drives off `Task` + the shared
-  `ProgressManager`, so any task type reuses it).
-- **`tfm_file_operations.py`** (rewritten) — `FileOperationService` submits a
-  linear worker: **threaded recursive count** (files + bytes; `BusyIndicator`
-  "Preparing…" phase) → **conflict resolution** → **per-file execute** with a
-  determinate item bar, a **secondary byte bar**, and the current file name.
-  `background=False` keeps the deterministic inline test path (conflicts resolve
-  headlessly = skip).
-
-The four rebuilt capabilities:
-- **Threading** — the whole operation (count, conflict detection, IO) runs off the
-  UI thread; the main thread only pumps the bridge + repaints on the tick.
-- **Progress UI** — `BusyIndicator` while preparing, then a primary item
-  `ProgressBar`, a **second per-file byte bar** (chunked local copies + cross-
-  storage `copy_to(progress_callback=…)`), and the current file name.
-- **Cancellation** — a cooperative `threading.Event` polled at per-file / per-chunk
-  `checkpoint()`s; `Esc` opens a confirm box → "Cancelling…" → clean partial
-  summary, dropping a partial file on mid-copy cancel.
-- **Conflict resolution** — restored TTK **file-by-file** flow: detect all
-  top-level conflicts up front, then a per-conflict `ConflictDialog`
-  (Overwrite / Skip / **Keep both** / Cancel) with an **"apply to all remaining"**
-  checkbox, resolved over the bridge before execution.
-
-Covered by `test/test_file_operations.py` (count, `_unique_dest`, resolution +
-apply-to-all, keep-both, cancel, the bridge, and background conflict/cancel with a
-real `MemoryBackend`).
-
-*Still open (separate items): archive create / extract are not yet routed through
-this task path (§2.10 area); the `TaskManager` runs one modal task at a time —
-background / queued execution + a task-management UI are future work.*
-
-### 2.5 Draw the tree disclosure indicator as a vector chevron in GUI
+### 2.4 Draw the tree disclosure indicator as a vector chevron in GUI
 The expand/collapse indicator on tree rows is a **glyph** today — `▸` (collapsed)
 / `▾` (expanded), drawn as text in both backends. In GUI it should instead be a
 **line-drawn chevron** (a `>` that rotates to `⌄` when open), rendered with vector
@@ -147,7 +107,7 @@ staircase if a 1–2px hairline `>` is enough. Decide with a small spike.
 Reserve the same marker-column width so the label origin (`label_x`) and the
 expander hit region are unchanged; only the mark's rendering swaps.
 
-### 2.6 Directory Diff Viewer — add content margins
+### 2.5 Directory Diff Viewer — add content margins
 Everything in the viewer is drawn **flush to the edges**, so text hugs the window
 border and the centre gutter with no breathing room. Add consistent insets. In
 `tfm_directory_diff_viewer.py` `draw` / the column geometry:
@@ -167,7 +127,7 @@ scrollbar x, the body child rect, and the pointer hit-tests / gutter-drag band
 must shift together, or the split drag and row clicks will land off by the margin.
 Keep it a single named constant (e.g. `_MARGIN`) so it's tunable in one place.
 
-### 2.7 Markdown for file-operation confirmation dialogs
+### 2.6 Markdown for file-operation confirmation dialogs
 The copy / move / delete confirm prompts in `tfm_file_operations.py` are built as
 **plain text** with filenames and paths inlined, so the names don't stand out
 from the surrounding prose:
@@ -187,10 +147,10 @@ Caveat: names can contain Markdown-special characters (`_ * [ ]` and backticks).
 Code spans neutralise most, but a name containing a backtick needs escaping —
 add a small helper (or reuse one) to wrap a filename safely as inline code.
 
-### 2.8 Archive virtual-directory browsing
+### 2.7 Archive virtual-directory browsing
 Let the user **enter an archive** (Enter on a `.zip` / `.tar.*`) and browse its
 contents in the pane as if it were a directory — navigate in/out, view files,
-extract out — rather than only create/extract as a whole (§2.4 / `create_archive`
+extract out — rather than only create/extract as a whole (`create_archive`
 / `extract_archive`). The port currently has **no archive browsing** wired
 (`tfm.py` only creates/extracts).
 
@@ -220,46 +180,7 @@ Wire it on top of the existing **virtual-pane** mechanism (the same
 - Guard the write-side ops the way virtual panes already do (a virtual pane isn't
   a writable destination — see the `_transfer` virtual guard).
 
-### 2.9 "Compare and select" (ttk `W` key) — DONE
-**Done**, and generalised past the ttk three-way menu. Instead of the legacy
-mutually-exclusive *filename / +size / +size+time* choices, each attribute is an
-independent **relation** the other pane's counterpart must satisfy, which subsumes
-the old menu and adds direction + content:
-
-- **`tfm_compare_selection.py`** (new) — the pure, headless engine.
-  `CompareCriteria` (`size` any/equal/differs · `mtime` any/same/newer/older ·
-  `content` any/equal/differs · `include_missing` · `mode` replace/add) and
-  `compute_compare_selection(current, other, criteria)` → `CompareResult`
-  (`paths` + file/dir counts). Entries are joined on **NFC name + type** (a file
-  never matches a same-named dir); an item is selected when every non-`any`
-  relation holds (AND), and orphans are selected only with `include_missing`.
-  `stat()` is called only on name-matches; content is a streaming byte compare
-  that **short-circuits on a size mismatch**. `mtime` uses the ttk 1s tolerance.
-- **`tfm_compare_dialog.py`** (new) — the `CompareSelectDialog` modal: a compact,
-  keyboard-first list (no Tab, no buttons). Each attribute is a single-line
-  `ConditionRow` — a real PuiKit `Checkbox` (enable) plus a segmented relation
-  picker whose current segment is drawn with a filled highlight (`round_rect`: a
-  rounded pill on vector / a block on a grid) in **color only**, never a
-  font-weight change (which would reflow proportional text). **Space** toggles the
-  checkbox (`any` = off), **←/→** choose the relation; **Up/Down** move focus over
-  the three rows + a "Preserve current selection" checkbox (off = replace, on =
-  add); **Enter** accepts, **Esc** cancels. The box height is measured from the
-  rows and trimmed to fit (`_fit_height`) so there's no bottom slack on either
-  backend. Orphan selection (`include_missing`) is intentionally not exposed — the
-  engine still supports it.
-- **`tfm.py`** — `compare_selection` handler (dispatched from the keymap `W` and a
-  new **Select ▸ Compare & Select…** menu item). Stat-only criteria run inline;
-  a **content** relation reads files, so it routes through the `tfm_task.py`
-  worker with a cancellable progress dialog. Both panes must be real directories
-  (virtual/search-results panes are blocked); the result folds into the active
-  pane's `selected_files` (replace or add) with a files/dirs summary log.
-
-Covered by `test/test_compare_selection.py` (engine relations, join, NFC,
-short-circuit) and `test/test_compare_dialog.py` (app-integration: the keyboard
-model — Up/Down focus, ←/→ options, Space toggle, Enter/Esc — plus
-replace/preserve, cancel, and the content task path).
-
-### 2.10 Color theme brush-up (file types, cursor, syntax)
+### 2.8 Color theme brush-up (file types, cursor, syntax)
 The port's palette is thin in three places; brush them up into one coherent,
 light/dark-aware scheme.
 
@@ -291,17 +212,7 @@ Cross-cutting:
   terminal specifically (suspected 256-color / palette quantization differs from
   Terminal.app); test there, not only in Terminal.app.
 
-### 2.11 Conflict resolution: "keep both" (auto-rename to a free name) — DONE
-**Done** (built with §2.4). `_unique_dest(dest_dir, name)`
-(`tfm_file_operations.py`) returns the first free name — ` (N)` **before the
-extension** for files (`foo (1).txt`), appended for directories / extension-less
-names (`foo (1)`) — and **"Keep both"** is a per-conflict button in the
-`ConflictDialog` (alongside Overwrite / Skip / Cancel), honoured by "apply to all
-remaining" like the others. On keep-both the target copies/moves to the unique
-dest (never `overwrite=True`). Covered by `test/test_file_operations.py`
-(`_unique_dest` naming + `test_resolve_keep_both`).
-
-### 2.12 Filepath TAB completion in input dialogs
+### 2.9 Filepath TAB completion in input dialogs
 Complete paths with TAB in the text-input prompts. `jump_to_path` in `tfm.py`
 even notes it: *"(TAB path completion is a later phase.)"* — the primary target,
 with the save-as / name prompts (`create_file`, `create_directory`,
@@ -336,7 +247,7 @@ To build:
   platform.
 - Remove the "later phase" note from `jump_to_path` once wired.
 
-### 2.13 macOS app bundle — port the build system from ttk to PuiKit
+### 2.10 macOS app bundle — port the build system from ttk to PuiKit
 The `macos_app/` build system (`build.sh` + `collect_dependencies.py` +
 `create_dmg.sh` + the Obj-C launcher in `macos_app/src/`) still packages the
 **old ttk toolkit** and has never been rebuilt against PuiKit. `make macos-app`
@@ -383,16 +294,13 @@ Then run the existing `macos_app/README.md` / `doc/dev/MACOS_APP_TESTING.md`
 smoke tests against the rebuilt bundle, and update both docs + `build.sh`'s inline
 comments (they still describe copying ttk).
 
-### 2.14 Wire GUI fonts from config — proportional UI default + mono
+### 2.11 Wire GUI fonts from config — docs + config-key sweep
 **Status: essentially DONE** — GUI renders a configurable proportional UI face by
-default and a configurable mono face for aligned content, both from `~/.tfm/config.py`.
-Only a docs sweep and optional cleanup remain.
-
-Key correction to an earlier version of this plan: **PuiKit's Panel substitutes the
-proportional `Font()` for any `font=None` Style on a GUI backend** (`puikit/panel.py`
-`_resolve`, gated on the `proportional_text` capability), so a bare `Style()` is
-*already* proportional on GUI (and mono only on TUI). TFM never had to "flip" its
-draws — there was no bulk conversion to do.
+default and a configurable mono face for aligned content, both from `~/.tfm/config.py`
+(`main` passes `base_font`/`ui_font` gui-gated in `backend_kwargs`; PuiKit's
+`resolve_font` routes an unnamed `Font()` to `ui_font` and an unnamed
+`Font(monospace=True)` to the mono `base_font`). Only the config-key/doc sweep and an
+optional decision remain.
 
 PuiKit grounds the layout grid in a **base font that must be monospaced**, and
 expresses per-widget faces through `Style.font` (a `puikit.Font`): `font=None` or an
@@ -421,19 +329,7 @@ the invisible grid grounding while ordinary text flows proportionally on its own
 **TUI has no font feature:** curses has one terminal font; family and size are ignored
 and everything folds to the grid. Gate all of this on the `gui` backend.
 
-To build:
-- **Base (mono) font. ✅ DONE.** `main` `get_config()`s and, for the `gui` backend,
-  passes `base_font=Font(family=config.DESKTOP_MONO_FONT_NAME,
-  size=float(config.DESKTOP_FONT_SIZE), monospace=True)` in `backend_kwargs`
-  (gui-gated, like `frame_autosave_name` — curses has no `base_font`). This is what
-  makes `DESKTOP_FONT_SIZE` / `DESKTOP_MONO_FONT_NAME` take effect.
-- **UI (proportional) font + PuiKit configurable defaults. ✅ DONE.** `main` also passes
-  `ui_font=Font(family=config.DESKTOP_UI_FONT_NAME)` to the `gui` backend. PuiKit's
-  `MacOSBackend`/`WindowsBackend` gained a `ui_font` param and `resolve_font` now routes
-  an unnamed `Font()` to `ui_font` and an unnamed `Font(monospace=True)` to `base_font`'s
-  family (OS system face when a default names no family) — so TFM's default text *and*
-  every PuiKit widget (markdown, message boxes, text fields) share the configured pair
-  (`puikit/docs/font_system.md` §4, `tests/test_macos_backend.py`).
+Remaining:
 - **`MONO` mismatch — auto-fixed.** Because an unnamed `Font(monospace=True)` now
   resolves to `base_font`'s family, the size/date/viewer/diff columns follow
   `DESKTOP_MONO_FONT_NAME` with no per-site edits. Dropping the redundant `MONO`
