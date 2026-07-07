@@ -127,6 +127,12 @@ class BatchRenameDialog(FocusContainer, Widget):
     def focus_children(self) -> list[Any]:
         return [self.active]
 
+    def get_focused(self) -> Any:
+        # The active field IS the focused leaf, so report it directly (Tab flips
+        # ``active``). This is what makes the Panel resolve focus to a TextEdit and
+        # engage the backend's text input / IME while the dialog is open.
+        return self.active
+
     # --- preview -------------------------------------------------------------
 
     def _refresh_preview(self) -> None:

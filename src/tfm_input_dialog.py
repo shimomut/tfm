@@ -74,6 +74,12 @@ class InputDialog(FocusContainer, Widget):
         # sits at the end, ready to append (jump-to-path's trailing separator).
         self.edit.cursor = len(text)
         self.edit._anchor = 0 if select_all else len(text)
+        # Focus the field so the Panel's focus leaf resolves to it: that is what
+        # engages the backend's text input (``begin_text_input`` → IME) while the
+        # dialog is open. Without it ``focused_leaf`` stops at the dialog (which is
+        # not a text widget), so IME never turns on — the field draws focused and
+        # keys are routed manually, but composition never starts.
+        self._focused: Any = self.edit
         self._field_rect = Rect(0.0, 0.0, 0.0, 0.0)
         self._size: tuple[float, float] = (0.0, 0.0)
 

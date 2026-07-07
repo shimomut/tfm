@@ -16,13 +16,21 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(_HERE, "..", "src"))
 sys.path.insert(0, os.path.join(_HERE, ".."))
 
+from puikit import Panel  # noqa: E402
+from puikit.backends import create_backend  # noqa: E402
 from puikit.event import Event, EventType  # noqa: E402
+from puikit.widgets.text_edit import TextEdit  # noqa: E402
 
-from tfm_input_dialog import InputDialog  # noqa: E402
-from tfm_filter_list_dialog import FilterListDialog  # noqa: E402
-from tfm_progressive_search_dialog import ProgressiveSearchDialog  # noqa: E402
-from tfm_batch_rename_dialog import BatchRenameDialog  # noqa: E402
+from tfm_input_dialog import InputDialog, show_input  # noqa: E402
+from tfm_filter_list_dialog import FilterListDialog, show_filter_list  # noqa: E402
+from tfm_progressive_search_dialog import ProgressiveSearchDialog, show_progressive_search  # noqa: E402
+from tfm_batch_rename_dialog import BatchRenameDialog, show_batch_rename  # noqa: E402
 from tfm_isearch_bar import ISearchBar  # noqa: E402
+
+
+class _Entry:  # the batch-rename dialog reads only .name off each file
+    def __init__(self, name):
+        self.name = name
 
 
 def _compose(text="にほん", caret=3):
@@ -56,10 +64,6 @@ class DialogImeForwarding(unittest.TestCase):
         self._assert_forwards(dlg, dlg.query_edit)
 
     def test_batch_rename_dialog(self):
-        class _Entry:  # the dialog reads only .name off each file
-            def __init__(self, name):
-                self.name = name
-
         dlg = BatchRenameDialog(files=[_Entry("a.txt"), _Entry("b.txt")])
         # Composition lands in whichever field is active (Tab switches).
         self._assert_forwards(dlg, dlg.active)
@@ -67,6 +71,48 @@ class DialogImeForwarding(unittest.TestCase):
     def test_isearch_bar(self):
         bar = ISearchBar()
         self._assert_forwards(bar, bar.edit)
+
+
+class DialogEngagesTextInput(unittest.TestCase):
+    """Pushing a text-input dialog must engage the backend's text input (IME): the
+    Panel's focus leaf has to resolve to the field, or ``begin_text_input`` never
+    fires and IME stays off — the Jump-to-Path regression (InputDialog never set
+    its focus to the edit)."""
+
+    def setUp(self):
+        self.b = create_backend("memory")
+        self.b.open()
+        self.panel = Panel(self.b)
+
+    def _assert_engaged(self):
+        self.panel.render()
+        self.assertIsInstance(self.panel.focused_leaf(), TextEdit)
+        self.assertTrue(self.b.text_input_active)
+
+    def test_input_dialog_engages(self):
+        show_input(self.panel, title="Jump to Path", prompt="Path:", text="/tmp/")
+        self._assert_engaged()
+
+    def test_filter_list_dialog_engages(self):
+        show_filter_list(self.panel, ["alpha", "beta"], title="Go to Favorite")
+        self._assert_engaged()
+
+    def test_progressive_search_dialog_engages(self):
+        show_progressive_search(
+            self.panel,
+            search_iter=lambda mode, q, cancel: iter(()),
+            to_label=lambda mode, v: str(v),
+        )
+        self._assert_engaged()
+
+    def test_batch_rename_dialog_engages(self):
+        show_batch_rename(self.panel, [_Entry("a.txt"), _Entry("b.txt")])
+        self._assert_engaged()
+
+    def test_isearch_bar_engages(self):
+        bar = ISearchBar()
+        self.panel.push_layer(bar, z=70, hints={"w": 40.0, "h": 1.0})
+        self._assert_engaged()
 
 
 if __name__ == "__main__":
