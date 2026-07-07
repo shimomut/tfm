@@ -247,6 +247,12 @@ class BatchRenameDialog(FocusContainer, Widget):
     # --- events --------------------------------------------------------------
 
     def handle_event(self, event: Event) -> bool:
+        if event.type is EventType.IME_COMPOSITION:
+            # Forward IME composition (preedit) to the active field (Tab switches
+            # which) so CJK input renders inline. The modal layer receives every
+            # event, so composition must be relayed to the field explicitly.
+            self.active.handle_event(event)
+            return True
         if event.type is EventType.KEY:
             key = event.key
             if key == "escape":

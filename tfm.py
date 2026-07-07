@@ -522,12 +522,16 @@ class TfmApp:
             config=self.config,
             on_click=lambda i: self._on_click("left", i),
             on_context=lambda i, x, y: self._show_context_menu("left", i, x, y),
+            on_drag=lambda i, ev: self._start_drag("left", i, ev),
+            on_drop=lambda i, paths: self._on_drop("left", i, paths),
         )
         self.right_view = FilePane(
             self.pm.right_pane,
             config=self.config,
             on_click=lambda i: self._on_click("right", i),
             on_context=lambda i, x, y: self._show_context_menu("right", i, x, y),
+            on_drag=lambda i, ev: self._start_drag("right", i, ev),
+            on_drop=lambda i, paths: self._on_drop("right", i, paths),
         )
         self.log = LogView(max_lines=2000, auto_scroll=True, wrap=True)
         self.status = StatusBar(self)
@@ -3212,13 +3216,97 @@ class TfmApp:
         self.panel.popup_menu(menu, x, y)
         self.panel.render()
 
+    def _start_drag(self, pane_name: str, index: int, event) -> None:
+        """A file row was dragged out: export it (or the whole selection, when the
+        dragged row is part of it) as a native OS file drag, so it can be dropped
+        onto Finder or another app. Local files only — a remote / archive entry
+        has no OS file URL to hand over. On a backend without a drag source (the
+        TUI), ``panel.begin_file_drag`` copies the paths to the clipboard instead;
+        the caller never branches."""
+        pane = self.pane(pane_name)
+        files = pane["files"]
+        if not (0 <= index < len(files)):
+            return
+        dragged = files[index]
+        selected = pane["selected_files"]
+        if selected and str(dragged) in selected:
+            # Dragging any selected row carries the whole selection, in list order.
+            entries = [f for f in files if str(f) in selected]
+        else:
+            entries = [dragged]
+        paths = [str(f) for f in entries if self._is_local(f)]
+        if not paths:
+            self.log_info("Only local files can be dragged out")
+            return
+        self.panel.begin_file_drag(
+            paths, event=event, operations=("copy",),
+            on_complete=lambda op: self._on_drag_complete(paths, op),
+        )
+
+    def _on_drag_complete(self, paths: list[str], operation: str) -> None:
+        """Log the outcome once a drag-out session ends. PuiKit never deletes the
+        originals (only ``copy`` is offered), so this is purely informational; a
+        cancelled drop reports ``"none"`` and is ignored."""
+        if operation and operation != "none":
+            n = len(paths)
+            self.log_info(f"Dragged {n} item{'' if n == 1 else 's'} out ({operation})")
+
+    def _on_drop(self, pane_name: str, index: int, paths: list) -> None:
+        """Files were dropped onto a pane from another app (Finder, an editor):
+        copy them into the drop target. The target is the directory *row* under
+        the drop when it is a folder (like Finder), otherwise the pane's own
+        directory. Refuses read-only destinations (a browsed archive) and a
+        search-results (virtual) pane, and skips any source already sitting in the
+        destination so a drop back onto its own folder is a no-op, not a conflict
+        prompt. Reuses the shared copy engine (confirm + conflict resolution +
+        threaded progress)."""
+        pane = self.pane(pane_name)
+        if pane.get("virtual"):
+            self.log_info("Cannot drop here: this pane is a search-results view")
+            return
+        if self._is_archive(pane["path"]):
+            self.log_info("Cannot drop here: this is a read-only archive")
+            return
+        dest_dir = pane["path"]
+        files = pane["files"]
+        if 0 <= index < len(files):
+            entry = files[index]
+            info = pane.get("file_info", {}).get(str(entry), {})
+            is_dir = info.get("is_dir")
+            if is_dir is None:
+                try:
+                    is_dir = entry.is_dir()
+                except Exception:
+                    is_dir = False
+            if is_dir:
+                dest_dir = entry  # drop onto a folder row targets that folder
+        targets = []
+        for p in paths:
+            src = Path(p)
+            if str(src.parent) != str(dest_dir):
+                targets.append(src)
+        if not targets:
+            self.log_info("Nothing to copy (already in this folder)")
+            return
+
+        def on_complete(result: dict) -> None:
+            self.flm.refresh_files(pane)
+            self.log_info(format_op_summary("Copy", result))
+            self._report_op_failures("Copy", result)
+            self.panel.render()
+
+        self._fileops.copy(self.panel, targets, dest_dir,
+                           on_complete=on_complete, log=self.log_info)
+        self.panel.render()
+
     # --- run -----------------------------------------------------------------
 
-    #: Mouse events routed to the widget under the pointer (the FilePanes own
-    #: click + wheel/trackpad scroll); keyboard uses TFM's global keymap.
+    #: Positioned events routed to the widget under the pointer (the FilePanes own
+    #: click + wheel/trackpad scroll and accept an OS FILE_DROP); keyboard uses
+    #: TFM's global keymap.
     _MOUSE = frozenset({
         EventType.MOUSE_DOWN, EventType.MOUSE_UP, EventType.MOUSE_CLICK,
-        EventType.MOUSE_DRAG, EventType.MOUSE_SCROLL,
+        EventType.MOUSE_DRAG, EventType.MOUSE_SCROLL, EventType.FILE_DROP,
     })
 
     def _copy_log_selection(self, event) -> bool:

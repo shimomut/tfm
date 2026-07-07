@@ -203,6 +203,12 @@ class FilterListDialog(FocusContainer, Widget):
     # --- events --------------------------------------------------------------
 
     def handle_event(self, event: Event) -> bool:
+        if event.type is EventType.IME_COMPOSITION:
+            # Forward IME composition (preedit) to the filter field so CJK input
+            # renders inline. The modal layer gets every event, so it must relay
+            # composition to the field itself (the list is not a text input).
+            self.filter_edit.handle_event(event)
+            return True
         if event.type is EventType.KEY:
             key = event.key
             if key == "escape":

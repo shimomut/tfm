@@ -104,6 +104,10 @@ CURSOR_PAD_CELLS = 0.25
 #: Device pixels the GUI cursor outline extends *beyond* the row band on each
 #: side, so the red frame sits a little wider than the selection fill.
 CURSOR_BLEED_PX = 1.0
+#: Manhattan distance (base units) a left-press must travel before it becomes a
+#: file *drag* rather than a click — enough that ordinary click jitter never
+#: starts a drag session, small enough that an intentional drag begins promptly.
+DRAG_THRESHOLD = 1.5
 
 
 def _mix(a, b, t):
@@ -118,6 +122,8 @@ class FilePane(Widget):
         config=None,
         on_click: Callable[[int], None] | None = None,
         on_context: Callable[[int, float, float], None] | None = None,
+        on_drag: Callable[[int, Event], None] | None = None,
+        on_drop: Callable[[int, list], None] | None = None,
     ):
         self.pane = pane_data
         #: TFM Config; read for SEPARATE_EXTENSIONS / MAX_EXTENSION_LENGTH so the
@@ -136,6 +142,22 @@ class FilePane(Widget):
         #: Called with (row index, screen_x, screen_y) on right-click, so the
         #: controller can pop a context menu anchored at the pointer.
         self.on_context = on_context
+        #: Called with (row index, drag Event) when a left-press over a row is
+        #: dragged past ``DRAG_THRESHOLD`` — the controller starts a native OS
+        #: file drag (``panel.begin_file_drag``) so the row (or the whole
+        #: selection) can be dropped onto another app / Finder.
+        self.on_drag = on_drag
+        #: Called with (row index under the drop, list of dropped paths) when files
+        #: are dropped onto the pane from another app (drop-IN, a FILE_DROP event).
+        #: ``index`` is ``-1`` when the drop lands below the last row (target the
+        #: pane's own directory); a directory row lets the controller target it.
+        self.on_drop = on_drop
+        #: Left-drag gesture state: the row a press landed on (``-1`` = none / not
+        #: a file row), the press position (base units), and whether a drag session
+        #: has already been kicked off, so the drag fires exactly once per gesture.
+        self._press_index = -1
+        self._press_xy: tuple[float, float] = (0.0, 0.0)
+        self._dragging = False
         #: This pane's absolute rect, captured each draw, to map a widget-local
         #: pointer back to screen coords for ``popup_menu``.
         self._abs: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)
@@ -525,6 +547,31 @@ class FilePane(Widget):
                 amount = float(event.scroll)
             self.scroll_by(-amount)
             return True
+        if event.type is EventType.MOUSE_DOWN and event.button == "left":
+            # Arm a possible drag: remember the row and press point. The click is
+            # still synthesized by the Panel on release (so plain clicks keep
+            # selecting); a drag only starts if the pointer travels far enough.
+            index = int(self.offset + max(0.0, (event.y or 0.0) - self._margin_y))
+            self._press_index = index if 0 <= index < len(self.pane["files"]) else -1
+            self._press_xy = (event.x or 0.0, event.y or 0.0)
+            self._dragging = False
+            return False  # don't consume: let the press→click gesture run
+        if event.type is EventType.MOUSE_DRAG and event.button == "left":
+            if (not self._dragging and self._press_index >= 0 and self.on_drag is not None):
+                dx = abs((event.x or 0.0) - self._press_xy[0])
+                dy = abs((event.y or 0.0) - self._press_xy[1])
+                if dx + dy >= DRAG_THRESHOLD:
+                    # Threshold crossed: hand off to a native OS file drag. Fire
+                    # once; the native session then captures the mouse, so no
+                    # further MOUSE_DRAGs arrive until the next press.
+                    self._dragging = True
+                    self.on_drag(self._press_index, event)
+                    return True
+            return False
+        if event.type is EventType.MOUSE_UP and event.button == "left":
+            self._press_index = -1
+            self._dragging = False
+            return False
         if event.type is EventType.MOUSE_CLICK and event.button == "left":
             index = int(self.offset + max(0.0, (event.y or 0.0) - self._margin_y))
             if 0 <= index < len(self.pane["files"]):
@@ -536,5 +583,16 @@ class FilePane(Widget):
             if 0 <= index < len(self.pane["files"]) and self.on_context is not None:
                 rx, ry, *_ = self._abs
                 self.on_context(index, rx + (event.x or 0.0), ry + (event.y or 0.0))
+                return True
+        if event.type is EventType.FILE_DROP and self.on_drop is not None:
+            # Files dropped onto the pane from another app. Map the drop point to a
+            # row so a drop *on a directory* can target it; a drop past the last
+            # row (or on empty space) reports -1 → the pane's own directory.
+            index = int(self.offset + max(0.0, (event.y or 0.0) - self._margin_y))
+            if not (0 <= index < len(self.pane["files"])):
+                index = -1
+            paths = event.hints.get("paths") or []
+            if paths:
+                self.on_drop(index, list(paths))
                 return True
         return False

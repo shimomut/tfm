@@ -150,6 +150,13 @@ class InputDialog(FocusContainer, Widget):
     # --- events --------------------------------------------------------------
 
     def handle_event(self, event: Event) -> bool:
+        if event.type is EventType.IME_COMPOSITION:
+            # In-progress IME composition (preedit): forward it to the field so it
+            # renders inline. The modal layer receives every event exclusively, so
+            # without this the composition never reaches the TextEdit and CJK input
+            # is invisible until it commits (which arrives as ordinary KEY events).
+            self.edit.handle_event(event)
+            return True
         if event.type is EventType.KEY:
             key = event.key
             if key == "escape":

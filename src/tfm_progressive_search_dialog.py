@@ -339,6 +339,12 @@ class ProgressiveSearchDialog(FocusContainer, Widget):
     # --- events --------------------------------------------------------------
 
     def handle_event(self, event: Event) -> bool:
+        if event.type is EventType.IME_COMPOSITION:
+            # Forward IME composition (preedit) to the query field so CJK input
+            # renders inline; the modal layer receives every event, so it must
+            # relay composition to the field (the results list is not a text input).
+            self.query_edit.handle_event(event)
+            return True
         if event.type is EventType.KEY:
             key = event.key
             if key == "escape":

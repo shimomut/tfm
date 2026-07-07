@@ -131,6 +131,12 @@ class ISearchBar(FocusContainer, Widget):
     # --- events --------------------------------------------------------------
 
     def handle_event(self, event: Event) -> bool:
+        if event.type is EventType.IME_COMPOSITION:
+            # Forward IME composition (preedit) to the field so CJK input renders
+            # inline; the bar is the top layer and receives every event, so it must
+            # relay composition to the field itself.
+            self.edit.handle_event(event)
+            return True
         if event.type is EventType.KEY:
             key = event.key
             if key == "escape":
