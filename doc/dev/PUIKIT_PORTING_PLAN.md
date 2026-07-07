@@ -59,10 +59,54 @@ it:
 - the two startup refreshes (panel/queue not up yet — needs a deferred kick).
 
 ### 2.2 Windows backend bring-up
-The PuiKit `WindowsBackend` exists and the keyboard contract is implemented for
-it, but TFM has **never been run/tested on Windows**. Stand it up: launch, smoke-
-test navigation/dialogs/viewers, fix backend-specific gaps. (New capability vs.
-`ttk`, which was curses + macOS only.)
+TFM now **runs on Windows** (verified in a VMware guest): the window, Direct2D/
+DirectWrite rendering, and basic navigation/features work. (New platform vs.
+`ttk`, which was curses + macOS only.) What remains is backend-specific gaps in
+PuiKit's `WindowsBackend` — all in the **PuiKit repo**
+(`puikit/backends/windows_backend.py` + `_win32_native.py`), not TFM.
+
+**A. IME / text input.** The widget layer is already IME-ready on every backend
+(`TextEdit` consumes `IME_COMPOSITION` preedit events and renders them inline),
+and `Panel` drives the seam (`begin_text_input`/`end_text_input` on focus). The
+gap is entirely the Windows backend's OS integration: it implements neither hook
+and makes no IMM32/`WM_IME_*` calls (`imm32` isn't even loaded). In priority
+order:
+- **A1 — Mode-gate the IME (the actual bug).** Implement `begin_text_input` /
+  `end_text_input`; disable the input context in command mode
+  (`ImmAssociateContext(hwnd, NULL)` or `ImmSetOpenStatus(FALSE)`) and re-enable
+  on text focus. Without this, with a CJK IME selected, command-mode
+  single-letter bindings (`j`/`f`/`v`) get swallowed into composition instead of
+  dispatching. Mirrors macOS's `_text_input_active` gating; satisfies the
+  backend contract ("while inactive, deliver plain command KEY events"). Needs
+  `imm32` loaded in `_win32_native.py`.
+- **A2 — Position the candidate window at the caret.** `request_text_input(x,y)`
+  currently only stores the caret; call `ImmSetCompositionWindow` (CFS_POINT /
+  CANDIDATEFORM) + `ImmSetCompositionFont` so the preedit/candidate popup appears
+  at the field instead of the window corner.
+- **A3 — Surrogate-pair committed input.** `_on_char` does `chr(wparam & 0xFFFF)`
+  and drops lone surrogates, so emoji / non-BMP CJK (delivered as two WM_CHARs)
+  can't be typed. Buffer a high surrogate and combine with the following low one.
+- **A4 — Inline preedit display.** Handle `WM_IME_STARTCOMPOSITION` (suppress the
+  default composition window), `WM_IME_COMPOSITION` (GCS_COMPSTR → `IME_COMPOSITION`
+  events; GCS_RESULTSTR → commit), `WM_IME_ENDCOMPOSITION`; flip PROFILE
+  `ime` → True. Biggest piece; matches macOS's inline underlined preedit. Widget
+  side already handles the events.
+
+A1 alone should restore usable IME (committed text already works via `WM_CHAR`);
+A2–A3 make it correct; A4 is the polish that matches macOS.
+
+**B. Other deferred capabilities** (PROFILE flags currently `False` in
+`windows_backend.py`), each its own COM/Win32 surface:
+- `os_drag_drop` — drag-*out* (IDropSource / DoDragDrop).
+- `drag_and_drop` — drop-*in* (IDropTarget).
+- `clipboard_rich`, `native_file_dialog` (IFileDialog), `system_tray`,
+  `media_keys`.
+
+(Images already work via WIC — not on this list.)
+
+**C. Bring-up testing.** Beyond "it launches": smoke-test navigation → dialogs →
+viewers → file operations, and validate the cross-backend keyboard contract (§3)
+live, fixing whatever backend-specific gaps surface.
 
 ### 2.3 MenuItem shortcuts from the configured keymap — DONE
 Menu shortcut hints and the bottom status-bar key hints are now derived from the
