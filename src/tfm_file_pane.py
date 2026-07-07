@@ -68,9 +68,13 @@ MATCH_TINT = 0.28
 #: still honored as a shorthand for ``file_types['directory']``.
 DIRECTORY_FG_DEFAULT = (204, 204, 120)
 LINK_FG_DEFAULT = (86, 194, 214)
-#: Cursor-position cue color — a distinct **red**, orthogonal to the selection
+#: Cursor-position cue color when a theme names no ``cursor`` palette (its
+#: ``extras['cursor']`` sub-dict of ``active`` / ``inactive``, the same shape as
+#: the ``file_types`` palette) — a distinct **red**, orthogonal to the selection
 #: fill so the two never read as the same channel: vivid on the active pane, a
-#: muted red on the inactive one (the louder cue marks the focused pane).
+#: muted red on the inactive one (the louder cue marks the focused pane). A theme
+#: (or a user's ``config.py`` ``THEMES``) overrides either per palette — e.g. a
+#: monochrome theme recolors the cue into its own hue instead of an off-palette red.
 CURSOR_ACTIVE = (231, 76, 76)
 CURSOR_INACTIVE = (140, 92, 94)
 #: Selection fill = the pane background blended toward the accent by this ratio
@@ -183,6 +187,14 @@ class FilePane(Widget):
                     or theme.extras.get("directory")  # legacy flat shorthand
                     or DIRECTORY_FG_DEFAULT)
         return ft.get("file") or theme.text
+
+    def _cursor_fg(self, theme):
+        """The cursor-cue color for this pane's focus state, from the theme's
+        ``cursor`` sub-palette (``extras['cursor']``: active / inactive), falling
+        back to the module reds. The active (focused-pane) cue is the louder cue."""
+        cur = theme.extras.get("cursor") or {}
+        key = "active" if self.active else "inactive"
+        return cur.get(key) or (CURSOR_ACTIVE if self.active else CURSOR_INACTIVE)
 
     def _date_width(self) -> int:
         """Character width of the date column, from the first dated entry.
@@ -476,15 +488,16 @@ class FilePane(Widget):
             self._draw_cursor(ctx, y, band_left, band_right, grid)
 
     def _draw_cursor(self, ctx, y, band_left, band_right, grid) -> None:
-        """Draw the cursor-position cue for the current row — a distinct **red**,
-        orthogonal to the selection fill. Vivid on the active pane, muted on the
-        inactive one so the focused pane's cursor reads louder. Framed within the
-        margin-inset content band ``[band_left, band_right)``.
+        """Draw the cursor-position cue for the current row — the theme's ``cursor``
+        color (default a distinct **red**), orthogonal to the selection fill. Vivid
+        on the active pane, muted on the inactive one so the focused pane's cursor
+        reads louder. Framed within the margin-inset content band
+        ``[band_left, band_right)``.
 
         - **GUI** (``vector_shapes``): an outline rectangle framing the row.
         - **TUI** (grid): a bold ``[`` … ``]`` bracket pair around the row.
         """
-        color = CURSOR_ACTIVE if self.active else CURSOR_INACTIVE
+        color = self._cursor_fg(ctx.theme)
         if not grid:
             # Span the full row height so the outline matches the selection fill
             # exactly (top and bottom flush). Horizontally, bleed CURSOR_BLEED_PX

@@ -101,7 +101,7 @@ from tfm_text_viewer import show_text_viewer  # noqa: E402
 
 def _theme(bg, fg, muted, accent, surface, selection, *, accent2=None,
            status=None, footer=None, directory=None, isearch_match=None,
-           syntax=None, file_types=None) -> Theme:
+           syntax=None, file_types=None, cursor=None) -> Theme:
     ac2 = accent if accent2 is None else accent2
     p = {"bg": bg, "fg": fg, "muted": muted, "accent": accent, "accent2": ac2,
          "surface": surface}
@@ -111,18 +111,21 @@ def _theme(bg, fg, muted, accent, surface, selection, *, accent2=None,
             surfaces[role] = spec(p) if callable(spec) else spec
     # App-specific themed colors carried in ``Theme.extras`` (read off ``ctx.theme``
     # by the widgets): the file-pane ``file_types`` name palette (directory / file /
-    # link, the same sub-dict shape as ``syntax``) and the i-search ``isearch_match``
-    # base hue — plus a partial ``syntax`` palette (token → Color) the text/diff
-    # viewers merge onto the VS Code default. ``isearch_match`` may be a Color or a
-    # callable over the palette namespace ``p`` (like the chrome recipes); ``directory``
-    # is a legacy shorthand for ``file_types['directory']`` and may likewise be a
-    # callable, with an explicit ``file_types`` entry winning.
+    # link) and ``cursor`` cue palette (active / inactive) — both the sub-dict shape
+    # of ``syntax`` — the i-search ``isearch_match`` base hue, and a partial
+    # ``syntax`` palette (token → Color) the text/diff viewers merge onto the VS Code
+    # default. ``isearch_match`` may be a Color or a callable over the palette
+    # namespace ``p`` (like the chrome recipes); ``directory`` is a legacy shorthand
+    # for ``file_types['directory']`` and may likewise be a callable, with an
+    # explicit ``file_types`` entry winning.
     extras: dict = {}
     ft = dict(file_types) if file_types else {}
     if directory is not None and "directory" not in ft:
         ft["directory"] = directory(p) if callable(directory) else directory
     if ft:
         extras["file_types"] = ft
+    if cursor is not None:
+        extras["cursor"] = dict(cursor)
     if isearch_match is not None:
         extras["isearch_match"] = isearch_match(p) if callable(isearch_match) else isearch_match
     if syntax is not None:
@@ -142,8 +145,9 @@ def _theme(bg, fg, muted, accent, surface, selection, *, accent2=None,
 # ``_merge_theme_override``). Beyond the six base colors a spec may name the two
 # chrome-bar recipes (``status`` / ``footer``) and the app-specific colors:
 # ``file_types`` (a file-pane name palette — directory / file / link, with a flat
-# ``directory`` accepted as shorthand), ``isearch_match`` (the i-search wash base —
-# defaults to ``accent2``), and ``syntax`` (a partial text-viewer palette).
+# ``directory`` accepted as shorthand), ``cursor`` (the file-pane cursor cue —
+# active / inactive), ``isearch_match`` (the i-search wash base — defaults to
+# ``accent2``), and ``syntax`` (a partial text-viewer palette).
 _THEME_SPECS: list[tuple[str, dict]] = [
     ("Dark+", dict(bg=(30, 30, 30), fg=(212, 212, 212), muted=(157, 157, 157),
                    accent=(0, 122, 204), surface=(48, 48, 52), selection=(10, 105, 178),
@@ -194,18 +198,19 @@ THEMES: list[tuple[str, Theme]] = [(name, _theme(**spec)) for name, spec in _THE
 
 #: Friendly ``config.py`` theme key → ``_theme`` keyword. Covers the base
 #: palette, the two chrome-bar recipes, and the app-specific colors (``file_types``
-#: sub-dict, ``directory`` shorthand, ``isearch_match``, ``syntax``); an unknown
-#: key is ignored (forward-compatible).
+#: sub-dict, ``directory`` shorthand, ``cursor`` sub-dict, ``isearch_match``,
+#: ``syntax``); an unknown key is ignored (forward-compatible).
 _THEME_OVERRIDE_MAP = {
     "background": "bg", "foreground": "fg", "muted": "muted", "accent": "accent",
     "accent2": "accent2", "surface": "surface", "selection": "selection",
     "status": "status", "footer": "footer", "directory": "directory",
     "isearch_match": "isearch_match", "syntax": "syntax", "file_types": "file_types",
+    "cursor": "cursor",
 }
 
 #: Sub-dict theme keys that deep-merge (the user recolors only the entries they
 #: name, keeping the base's other choices) rather than replacing wholesale.
-_THEME_SUBDICT_KEYS = frozenset({"syntax", "file_types"})
+_THEME_SUBDICT_KEYS = frozenset({"syntax", "file_types", "cursor"})
 
 
 def _merge_theme_override(spec: dict, override: dict) -> dict:
