@@ -124,7 +124,32 @@ class Config:
     #         'directory': (150, 110, 0),
     #     },
     # }
-    THEMES = {}
+    THEMES = {
+        # Phosphor: a monochrome phosphor-green CRT terminal — every color is a
+        # shade of green on a near-black screen. A ready-made example of a full
+        # custom theme; select it from View > Theme or with the T key.
+        'Phosphor': {
+            'background': (4, 15, 7),        # dark CRT green-black
+            'foreground': (51, 245, 121),    # phosphor green
+            'muted':      (33, 138, 74),     # dim green (secondary text / dividers)
+            'accent':     (60, 235, 122),    # focus ring / selection accent
+            'accent2':    (124, 255, 168),   # pale mint (i-search match base)
+            'surface':    (11, 38, 20),      # raised panels (header / popup)
+            'selection':  (24, 105, 54),     # active selection fill
+            'status':     (9, 30, 16),       # status bar (dark green panel)
+            'footer':     (9, 30, 16),       # per-pane info bar
+            'directory':  (150, 255, 150),   # directories (brightest green)
+            'syntax': {
+                'keyword':  (130, 255, 150),
+                'string':   (90, 220, 120),
+                'comment':  (36, 140, 78),
+                'number':   (150, 255, 130),
+                'operator': (70, 210, 110),
+                'builtin':  (150, 255, 170),
+                'name':     (60, 235, 120),
+            },
+        },
+    }
 
     # Behavior settings
     CONFIRM_DELETE = True   # Show confirmation dialog before deleting files/directories

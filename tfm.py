@@ -746,10 +746,13 @@ class TfmApp:
         captured = self._drain_captured_output()
         return reloaded or listed or loading or captured
 
-    #: Log-pane colors for captured streams: stderr reads as a warning, stdout as
-    #: ordinary output dimmer than TFM's own ``log_info`` lines.
+    #: Log-pane styles for captured streams. stdout leaves its color unset so it
+    #: resolves to ``theme.text`` at draw time (tracking the theme like
+    #: ``log_info``) but dimmed, so captured output reads as recessive under TFM's
+    #: own messages. stderr keeps a fixed warning red so an error stands out on
+    #: any theme.
     _STDERR_STYLE = Style(fg=(230, 130, 120))
-    _STDOUT_STYLE = Style(fg=(150, 160, 170))
+    _STDOUT_STYLE = Style(attr=TextAttribute.DIM)
 
     def _drain_captured_output(self) -> bool:
         """Append any stdout/stderr lines captured since the last pump to the log
@@ -1015,8 +1018,12 @@ class TfmApp:
         return dirs, len(pane["files"]) - dirs
 
     def log_info(self, message: str) -> None:
-        """Append a line to the log pane."""
-        self.log.append(message, Style(fg=(180, 200, 230)))
+        """Append a line to the log pane in the theme's primary text color. The
+        color is left unset so the LogView resolves it to ``theme.text`` at draw
+        time — the whole log then tracks the active theme (green on a monochrome
+        theme, dark on a light one) and recolors on a theme switch, instead of a
+        fixed near-white that clashes with monochrome themes like Phosphor."""
+        self.log.append(message)
 
     def _log_result(self, result) -> None:
         """Log the (success, message) a FileListManager action returns."""

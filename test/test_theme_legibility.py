@@ -179,9 +179,11 @@ def test_render_lifts_directory_and_keeps_legible_file():
 
 
 def test_log_message_lifted_on_light_theme():
-    """The log appends messages with fixed RGB styles and no theme in reach, so
-    they can only be made legible at draw time. Under auto_ink, TFM's stdout gray
-    — invisible on the light theme's white content — is lifted on render."""
+    """TFM's own log lines now resolve to ``theme.text`` at draw time (see
+    ``log_info``), but a widget can still hand the log a fixed RGB style with no
+    theme in reach — e.g. TFM's stderr warning red. Under auto_ink such a fixed,
+    theme-blind color, laid on the light theme's white content, is lifted to
+    legibility on render."""
     from puikit import Item, Panel, Style, VSplit
     from puikit.backends.memory_backend import MemoryBackend
     from puikit.widgets import LogView
@@ -190,10 +192,10 @@ def test_log_message_lifted_on_light_theme():
     theme = derive_theme(background=bg, foreground=fg, muted=muted,
                          accent=accent, surface=surface, selection=selection)
     content = theme.surfaces["content"]          # white
-    stdout_gray = (150, 160, 170)                # tfm.py's _StreamToLog STDOUT style
+    fixed_fg = (150, 160, 170)                   # a fixed low-contrast, theme-blind style
 
     log = LogView(max_lines=50, auto_scroll=True, wrap=True)
-    log.append("stdout line here", Style(fg=stdout_gray))
+    log.append("stderr line here", Style(fg=fixed_fg))
     backend = MemoryBackend(width=40, height=6)
     panel = Panel(backend, theme=theme)
     panel.auto_ink = True
@@ -201,10 +203,10 @@ def test_log_message_lifted_on_light_theme():
     panel.render()
 
     rows = backend.snapshot()
-    ry = next(i for i, r in enumerate(rows) if "stdout" in r)
+    ry = next(i for i, r in enumerate(rows) if "stderr" in r)
     drawn = backend.style_at(rows[ry].index("s"), ry).fg
-    assert drawn != stdout_gray
-    assert drawn == legible_ink(stdout_gray, content, LC_BODY)
+    assert drawn != fixed_fg
+    assert drawn == legible_ink(fixed_fg, content, LC_BODY)
     assert abs(apca_lc(drawn, content)) >= LC_BODY - 0.5
 
 
