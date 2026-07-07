@@ -64,16 +64,22 @@ it, but TFM has **never been run/tested on Windows**. Stand it up: launch, smoke
 test navigation/dialogs/viewers, fix backend-specific gaps. (New capability vs.
 `ttk`, which was curses + macOS only.)
 
-### 2.3 MenuItem shortcuts from the configured keymap
-`MenuItem(..., shortcut="…")` labels in `tfm.py` (Go/File/View/… menus around
-`tfm.py:971`+) are **hardcoded strings** (`"Enter"`, `"Shift-X"`, `"Cmd-Shift-C"`,
-…). They drift from `KEY_BINDINGS` and ignore user rebindings. Derive each label
-from the action instead: look up the bound key(s) via
-`KeyBindings.get_keys_for_action(action)` and render with
-`format_key_for_display()` (both already in `tfm_config.py`). Menu items that
-already dispatch through `self._menu("<action>")` name their action directly;
-the ones wired to bespoke callbacks need an action id (or an explicit mapping) so
-the same lookup applies.
+### 2.3 MenuItem shortcuts from the configured keymap — DONE
+Menu shortcut hints and the bottom status-bar key hints are now derived from the
+live keymap, so both track user rebindings instead of drifting from hardcoded
+strings. Each menu item passes its action id to `TfmApp._menu_shortcut(action)`
+(first bound key → `format_key_for_display`, or `None` when unbound);
+`StatusBar` builds its hint line the same way from an ordered `(action, label)`
+list. `KeyBindings.format_key_for_display` was upgraded to render named tokens as
+conventional labels (`ENTER`→`Enter`, `UP`→`↑`, `EQUAL`→`=`, `Command`→`Cmd`, …)
+rather than raw uppercase, which also improves the help dialog. Newly-bound items
+that previously showed no hint now do (Details `I`, Open-with `Cmd-Enter`, Reveal
+`Alt-Enter`, Drives `D`, Clear Selection `End`).
+
+Not converted (intentional): the Directory Diff Viewer's own `_keys_label`
+(`tfm_directory_diff_viewer.py`) still joins **raw** key tokens with hardcoded
+fallbacks — a separate, self-contained spot; fold it into the shared formatter if
+its footer keys ever grow beyond plain letters.
 
 ### 2.4 Draw the tree disclosure indicator as a vector chevron in GUI
 The expand/collapse indicator on tree rows is a **glyph** today — `▸` (collapsed)

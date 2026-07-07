@@ -305,41 +305,66 @@ class KeyBindings:
         
         return ([], 'any')
     
+    #: Display labels for named (non-literal) key tokens, so the keymap's
+    #: internal names render as conventional UI labels rather than raw
+    #: uppercase tokens (e.g. ``ENTER`` -> ``Enter``, ``UP`` -> ``↑``).
+    _KEY_DISPLAY = {
+        'ENTER': 'Enter', 'RETURN': 'Enter',
+        'BACKSPACE': 'Backspace',
+        'TAB': 'Tab',
+        'SPACE': 'Space',
+        'DELETE': 'Del',
+        'ESCAPE': 'Esc', 'ESC': 'Esc',
+        'INSERT': 'Ins',
+        'UP': '↑', 'DOWN': '↓', 'LEFT': '←', 'RIGHT': '→',
+        'PAGE_UP': 'PgUp', 'PAGE_DOWN': 'PgDn',
+        'HOME': 'Home', 'END': 'End',
+        'EQUAL': '=',
+    }
+
+    #: Modifier display names, abbreviated to conventional short forms and keyed
+    #: by upper-case form.
+    _MOD_DISPLAY = {
+        'COMMAND': 'Cmd', 'CMD': 'Cmd',
+        'CONTROL': 'Ctrl', 'CTRL': 'Ctrl',
+        'OPTION': 'Opt', 'ALT': 'Alt',
+        'SHIFT': 'Shift', 'META': 'Meta',
+    }
+
     def format_key_for_display(self, key_expr: str) -> str:
         """
         Format a key expression for display in UI.
-        
+
         Args:
             key_expr: Key expression string
-        
+
         Returns:
             Formatted string suitable for display
-        
+
         Examples:
             "q" -> "q"
-            "Shift-Down" -> "Shift-Down"
+            "ENTER" -> "Enter"
+            "Shift-EQUAL" -> "Shift-="
             "Command-Shift-X" -> "Cmd-Shift-X"
         """
-        # Single character - return as-is
+        # Single literal character (letter, digit, punctuation) - return as-is.
         if len(key_expr) == 1:
             return key_expr
-        
-        # Multi-character - format nicely
+
         parts = key_expr.split('-')
-        
-        # Format modifiers
-        formatted_parts = []
-        for part in parts[:-1]:
-            modifier = part.capitalize()
-            # Abbreviate Command to Cmd
-            if modifier == 'Command':
-                modifier = 'Cmd'
-            formatted_parts.append(modifier)
-        
-        # Add main key
-        formatted_parts.append(parts[-1].upper())
-        
-        return '-'.join(formatted_parts)
+        base = parts[-1]
+
+        # Base key: map a named token (ENTER, UP, EQUAL, …) to its UI label;
+        # keep a bare literal char as-is; title-case any other multi-char token.
+        base_disp = self._KEY_DISPLAY.get(base.upper())
+        if base_disp is None:
+            base_disp = base if len(base) == 1 else base.capitalize()
+
+        # Modifiers: abbreviate to conventional short forms (Command -> Cmd, …).
+        mods = [self._MOD_DISPLAY.get(part.upper(), part.capitalize())
+                for part in parts[:-1]]
+
+        return '-'.join(mods + [base_disp])
 
 
 def _load_template_config():

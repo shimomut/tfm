@@ -333,21 +333,50 @@ class PaneFooter(Widget):
 
 
 class StatusBar(Widget):
-    """The bottom bar: global key hints (TFM's dynamic status line, simplified)."""
+    """The bottom bar: global key hints (TFM's dynamic status line, simplified).
 
-    HINTS = ("q quit   tab switch   space select   a all-files   ↵ open   "
-             "⌫ parent   f find   ; filter   . hidden")
+    The key labels are derived from the live keymap (§2.3) so the bar tracks
+    user rebindings rather than repeating hardcoded strings."""
 
-    #: Shown in place of HINTS while the footer isearch is open, so the bottom bar
-    #: explains the isearch keys rather than the (now-inaccessible) global ones.
+    #: (action, label) pairs shown as ``<key> <label>``, in bar order. The key
+    #: for each is looked up from the keymap and formatted for display.
+    _HINTS = (
+        ("quit", "quit"),
+        ("switch_pane", "switch"),
+        ("select_file", "select"),
+        ("select_all_files", "all-files"),
+        ("open_item", "open"),
+        ("go_parent", "parent"),
+        ("search", "find"),
+        ("filter", "filter"),
+        ("toggle_hidden", "hidden"),
+    )
+
+    #: Shown in place of the hints while the footer isearch is open, so the bottom
+    #: bar explains the isearch keys rather than the (now-inaccessible) global
+    #: ones. These are isearch-mode internal keys, not configurable bindings.
     ISEARCH_HINTS = ("I-Search   ↑/↓ prev/next match   "
                      "↵ stop (save to filter history)   esc cancel")
 
     def __init__(self, app: "TfmApp"):
         self.app = app
+        self._hints_cache: str | None = None
+
+    def _hints(self) -> str:
+        """Build (and cache) the hint line from the keymap. The keymap is fixed
+        for the process lifetime, so this is computed once."""
+        if self._hints_cache is None:
+            parts = []
+            for action, label in self._HINTS:
+                keys, _ = self.app.keys.get_keys_for_action(action)
+                if keys:
+                    key = self.app.keys.format_key_for_display(keys[0])
+                    parts.append(f"{key} {label}")
+            self._hints_cache = "   ".join(parts)
+        return self._hints_cache
 
     def draw(self, ctx) -> None:
-        hints = self.ISEARCH_HINTS if self.app._isearch_active else self.HINTS
+        hints = self.ISEARCH_HINTS if self.app._isearch_active else self._hints()
         text = elide(" " + hints, ctx.width, where="end", measure=ctx.measure_text)
         ctx.draw_text(0, 0, text, Style(fg=ctx.theme.muted_text))
 
@@ -1379,86 +1408,94 @@ class TfmApp:
         def has_files() -> bool:
             return bool(self.active_pane()["files"])
 
+        # Shortcut hints are derived from the live keymap (§2.3) so menu labels
+        # track user rebindings instead of drifting from hardcoded strings.
+        sc = self._menu_shortcut
         sort_menu = self._sort_menu()
 
         file_menu = Menu(
             MenuItem("Open", on_select=lambda: self._menu("open_item"),
-                     enabled=has_files, shortcut="Enter"),
+                     enabled=has_files, shortcut=sc("open_item")),
             MenuItem("View File", on_select=self.view_file,
-                     enabled=has_files, shortcut="V"),
+                     enabled=has_files, shortcut=sc("view_file")),
             MenuItem("Edit File", on_select=self.edit_file,
-                     enabled=has_files, shortcut="E"),
-            MenuItem("Details…", on_select=self.file_details, enabled=has_files),
-            MenuItem("Open with Default App", on_select=self.open_with_os, enabled=has_files),
-            MenuItem("Reveal in File Manager", on_select=self.reveal_in_os, enabled=has_files),
-            MenuItem("External Programs…", on_select=self.show_programs, shortcut="X"),
-            MenuItem("Subshell Here", on_select=self.subshell, shortcut="Shift-X"),
+                     enabled=has_files, shortcut=sc("edit_file")),
+            MenuItem("Details…", on_select=self.file_details, enabled=has_files,
+                     shortcut=sc("file_details")),
+            MenuItem("Open with Default App", on_select=self.open_with_os,
+                     enabled=has_files, shortcut=sc("open_with_os")),
+            MenuItem("Reveal in File Manager", on_select=self.reveal_in_os,
+                     enabled=has_files, shortcut=sc("reveal_in_os")),
+            MenuItem("External Programs…", on_select=self.show_programs, shortcut=sc("programs")),
+            MenuItem("Subshell Here", on_select=self.subshell, shortcut=sc("subshell")),
             SEPARATOR,
             MenuItem("Parent Directory", on_select=lambda: self._menu("go_parent"),
-                     shortcut="Backspace"),
-            MenuItem("Go to Favorite…", on_select=self.show_favorites, shortcut="J"),
-            MenuItem("Jump to Path…", on_select=self.jump_to_path, shortcut="Shift-J"),
-            MenuItem("Drives…", on_select=self.show_drives),
-            MenuItem("History…", on_select=self.show_history, shortcut="H"),
+                     shortcut=sc("go_parent")),
+            MenuItem("Go to Favorite…", on_select=self.show_favorites, shortcut=sc("favorites")),
+            MenuItem("Jump to Path…", on_select=self.jump_to_path, shortcut=sc("jump_to_path")),
+            MenuItem("Drives…", on_select=self.show_drives, shortcut=sc("drives_dialog")),
+            MenuItem("History…", on_select=self.show_history, shortcut=sc("history")),
             SEPARATOR,
-            MenuItem("New Folder…", on_select=self.create_directory, shortcut="M"),
-            MenuItem("New File…", on_select=self.create_file, shortcut="Shift-E"),
-            MenuItem("Rename…", on_select=self.rename, enabled=has_files, shortcut="R"),
+            MenuItem("New Folder…", on_select=self.create_directory, shortcut=sc("create_directory")),
+            MenuItem("New File…", on_select=self.create_file, shortcut=sc("create_file")),
+            MenuItem("Rename…", on_select=self.rename, enabled=has_files, shortcut=sc("rename_file")),
             MenuItem("Copy to Other Pane", on_select=self.copy_files,
-                     enabled=has_files, shortcut="C"),
+                     enabled=has_files, shortcut=sc("copy_files")),
             MenuItem("Move to Other Pane", on_select=self.move_files,
-                     enabled=has_files, shortcut="M"),
+                     enabled=has_files, shortcut=sc("move_files")),
             MenuItem("Delete…", on_select=self.delete_files,
-                     enabled=has_files, shortcut="K"),
+                     enabled=has_files, shortcut=sc("delete_files")),
             SEPARATOR,
             MenuItem("Copy Name(s)", on_select=self.copy_names_to_clipboard,
-                     enabled=has_files, shortcut="Cmd-Shift-C"),
+                     enabled=has_files, shortcut=sc("copy_names")),
             MenuItem("Copy Full Path(s)", on_select=self.copy_paths_to_clipboard,
-                     enabled=has_files, shortcut="Cmd-Shift-P"),
+                     enabled=has_files, shortcut=sc("copy_paths")),
             SEPARATOR,
             MenuItem("Create Archive…", on_select=self.create_archive,
-                     enabled=has_files, shortcut="P"),
+                     enabled=has_files, shortcut=sc("create_archive")),
             MenuItem("Extract Archive…", on_select=self.extract_archive,
-                     enabled=has_files, shortcut="U"),
+                     enabled=has_files, shortcut=sc("extract_archive")),
             SEPARATOR,
-            MenuItem("Quit", on_select=self.confirm_quit, shortcut="q"),
+            MenuItem("Quit", on_select=self.confirm_quit, shortcut=sc("quit")),
             title="File",
         )
         select_menu = Menu(
             MenuItem("Toggle Selection", on_select=lambda: self._menu("select_file"),
-                     enabled=has_files, shortcut="Space"),
-            MenuItem("Select All Items", on_select=lambda: self._menu("select_all")),
+                     enabled=has_files, shortcut=sc("select_file")),
+            MenuItem("Select All Items", on_select=lambda: self._menu("select_all"),
+                     shortcut=sc("select_all")),
             MenuItem("Clear Selection", on_select=lambda: self._menu("unselect_all"),
-                     enabled=lambda: bool(self.active_pane()["selected_files"])),
+                     enabled=lambda: bool(self.active_pane()["selected_files"]),
+                     shortcut=sc("unselect_all")),
             MenuItem("Compare & Select…", on_select=self.compare_selection,
-                     enabled=has_files, shortcut="W"),
+                     enabled=has_files, shortcut=sc("compare_selection")),
             SEPARATOR,
-            MenuItem("Compare Selected Files…", on_select=self.diff_files, shortcut="="),
+            MenuItem("Compare Selected Files…", on_select=self.diff_files, shortcut=sc("diff_files")),
             MenuItem("Compare Directories…", on_select=self.diff_directories,
-                     shortcut="Shift-="),
+                     shortcut=sc("diff_directories")),
             title="Select",
         )
         view_menu = Menu(
-            MenuItem("Find…", on_select=self.enter_isearch, enabled=has_files, shortcut="F"),
-            MenuItem("Filter…", on_select=self.enter_filter, shortcut=";"),
-            MenuItem("Search Files…", on_select=self.show_search, shortcut="Shift-F"),
-            MenuItem("Search Content…", on_select=self.show_content_search, shortcut="Shift-G"),
+            MenuItem("Find…", on_select=self.enter_isearch, enabled=has_files, shortcut=sc("search")),
+            MenuItem("Filter…", on_select=self.enter_filter, shortcut=sc("filter")),
+            MenuItem("Search Files…", on_select=self.show_search, shortcut=sc("search_dialog")),
+            MenuItem("Search Content…", on_select=self.show_content_search, shortcut=sc("search_content")),
             SEPARATOR,
             MenuItem("Show Hidden Files", on_select=lambda: self._menu("toggle_hidden"),
-                     checked=lambda: self.flm.show_hidden, shortcut="."),
+                     checked=lambda: self.flm.show_hidden, shortcut=sc("toggle_hidden")),
             MenuItem("Reverse Sort", on_select=self._toggle_reverse,
                      checked=lambda: self.active_pane()["sort_reverse"]),
             MenuItem("Sort By", submenu=sort_menu),
             SEPARATOR,
             MenuItem("Theme", submenu=self._theme_menu()),
             MenuItem("Next Theme", on_select=lambda: self._menu("toggle_color_scheme"),
-                     shortcut="T"),
+                     shortcut=sc("toggle_color_scheme")),
             SEPARATOR,
-            MenuItem("Switch Pane", on_select=lambda: self._menu("switch_pane"), shortcut="Tab"),
+            MenuItem("Switch Pane", on_select=lambda: self._menu("switch_pane"), shortcut=sc("switch_pane")),
             title="View",
         )
         help_menu = Menu(
-            MenuItem("Keyboard Shortcuts…", on_select=self.show_help, shortcut="?"),
+            MenuItem("Keyboard Shortcuts…", on_select=self.show_help, shortcut=sc("help")),
             SEPARATOR,
             MenuItem("About TFM", on_select=self.show_about),
             title="Help",
@@ -1474,6 +1511,13 @@ class TfmApp:
         """Run a keymap action from a menu/context-menu selection and redraw."""
         if self.dispatch(action):
             self.panel.render()
+
+    def _menu_shortcut(self, action: str) -> str | None:
+        """The display-formatted first key bound to ``action`` for a MenuItem
+        shortcut hint, or ``None`` when unbound — so menu labels track the live
+        keymap (and user rebindings) instead of hardcoded strings."""
+        keys, _ = self.keys.get_keys_for_action(action)
+        return self.keys.format_key_for_display(keys[0]) if keys else None
 
     def _focused_entry(self):
         """The entry under the cursor in the active pane, or None if empty."""

@@ -30,8 +30,8 @@ class TestStatusBarDynamicKeys(unittest.TestCase):
         """Verify format_key_for_display works for common keys."""
         # Test basic keys
         self.assertEqual(format_key_for_display('?'), '?')
-        self.assertEqual(format_key_for_display('TAB'), 'TAB')
-        self.assertEqual(format_key_for_display('ENTER'), 'ENTER')
+        self.assertEqual(format_key_for_display('TAB'), 'Tab')
+        self.assertEqual(format_key_for_display('ENTER'), 'Enter')
         self.assertEqual(format_key_for_display('Q'), 'Q')
         
         # Test that function handles lowercase keys
