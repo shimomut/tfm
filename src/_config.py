@@ -19,12 +19,12 @@ class Config:
     """User configuration for TFM"""
 
     # --- Desktop (GUI) mode fonts (ignored in TUI mode) ----------------------
-    # DESKTOP_UI_FONT_NAME   : proportional default face (file names, labels,
-    #                          dialogs, markdown prose).
-    # DESKTOP_MONO_FONT_NAME : monospaced face for aligned content (size/date
-    #                          columns, viewer, diffs); also grounds the layout
-    #                          grid, so it must be monospaced.
-    # DESKTOP_FONT_SIZE      : point size applied to BOTH faces.
+    # UI_FONT_NAME   : proportional default face (file names, labels,
+    #                  dialogs, markdown prose).
+    # MONO_FONT_NAME : monospaced face for aligned content (size/date
+    #                  columns, viewer, diffs); also grounds the layout
+    #                  grid, so it must be monospaced.
+    # FONT_SIZE      : point size applied to BOTH faces.
     # Missing glyphs use the OS's native font substitution.
     #
     # None = the OS system default face -- already a matched pair per platform:
@@ -35,32 +35,32 @@ class Config:
     # and overrides them). `sys` is already imported at the top of this file.
 
     # Default: the system pair on every platform (recommended).
-    DESKTOP_UI_FONT_NAME = None
-    DESKTOP_MONO_FONT_NAME = None
+    UI_FONT_NAME = None
+    MONO_FONT_NAME = None
 
     # Example -- a sans-serif pairing:
     # if sys.platform == 'darwin':        # macOS
-    #     DESKTOP_UI_FONT_NAME = 'Helvetica Neue'
-    #     DESKTOP_MONO_FONT_NAME = 'Menlo'
+    #     UI_FONT_NAME = 'Helvetica Neue'
+    #     MONO_FONT_NAME = 'Menlo'
     # elif sys.platform == 'win32':       # Windows
-    #     DESKTOP_UI_FONT_NAME = 'Segoe UI'
-    #     DESKTOP_MONO_FONT_NAME = 'Consolas'
-    # else:                               # Linux / other
-    #     DESKTOP_UI_FONT_NAME = 'DejaVu Sans'
-    #     DESKTOP_MONO_FONT_NAME = 'DejaVu Sans Mono'
+    #     UI_FONT_NAME = 'Segoe UI'
+    #     MONO_FONT_NAME = 'Consolas'
+    # else:                               # other
+    #     UI_FONT_NAME = None
+    #     MONO_FONT_NAME = None
 
     # Example -- a serif pairing (serif UI + serif/slab monospace):
     # if sys.platform == 'darwin':        # macOS
-    #     DESKTOP_UI_FONT_NAME = 'Georgia'
-    #     DESKTOP_MONO_FONT_NAME = 'PT Mono'
+    #     UI_FONT_NAME = 'Georgia'
+    #     MONO_FONT_NAME = 'PT Mono'
     # elif sys.platform == 'win32':       # Windows
-    #     DESKTOP_UI_FONT_NAME = 'Georgia'
-    #     DESKTOP_MONO_FONT_NAME = 'Courier New'
-    # else:                               # Linux / other
-    #     DESKTOP_UI_FONT_NAME = 'Liberation Serif'
-    #     DESKTOP_MONO_FONT_NAME = 'Liberation Mono'
+    #     UI_FONT_NAME = 'Georgia'
+    #     MONO_FONT_NAME = 'Courier New'
+    # else:                               # other
+    #     UI_FONT_NAME = None
+    #     MONO_FONT_NAME = None
 
-    DESKTOP_FONT_SIZE = 12  # point size for both faces (8-72)
+    FONT_SIZE = 12  # point size for both faces (8-72)
 
     # Display settings
     SHOW_HIDDEN_FILES = False

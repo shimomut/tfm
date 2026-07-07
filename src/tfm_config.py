@@ -549,17 +549,17 @@ class ConfigManager:
         # Validate desktop mode fonts (GUI only; TUI has no font feature). Each
         # names one family; missing glyphs fall back to the OS's native
         # substitution. `None` = the OS system default face for that role.
-        if config.DESKTOP_UI_FONT_NAME is not None and (
-            not isinstance(config.DESKTOP_UI_FONT_NAME, str) or not config.DESKTOP_UI_FONT_NAME.strip()
+        if config.UI_FONT_NAME is not None and (
+            not isinstance(config.UI_FONT_NAME, str) or not config.UI_FONT_NAME.strip()
         ):
-            errors.append("DESKTOP_UI_FONT_NAME must be a non-empty string or None")
-        if config.DESKTOP_MONO_FONT_NAME is not None and (
-            not isinstance(config.DESKTOP_MONO_FONT_NAME, str) or not config.DESKTOP_MONO_FONT_NAME.strip()
+            errors.append("UI_FONT_NAME must be a non-empty string or None")
+        if config.MONO_FONT_NAME is not None and (
+            not isinstance(config.MONO_FONT_NAME, str) or not config.MONO_FONT_NAME.strip()
         ):
-            errors.append("DESKTOP_MONO_FONT_NAME must be a non-empty string or None")
+            errors.append("MONO_FONT_NAME must be a non-empty string or None")
         
-        if not isinstance(config.DESKTOP_FONT_SIZE, int) or config.DESKTOP_FONT_SIZE < 8 or config.DESKTOP_FONT_SIZE > 72:
-            errors.append("DESKTOP_FONT_SIZE must be an integer between 8 and 72")
+        if not isinstance(config.FONT_SIZE, int) or config.FONT_SIZE < 8 or config.FONT_SIZE > 72:
+            errors.append("FONT_SIZE must be an integer between 8 and 72")
 
         # Validate ratios
         if not (0.1 <= config.DEFAULT_LEFT_PANE_RATIO <= 0.9):

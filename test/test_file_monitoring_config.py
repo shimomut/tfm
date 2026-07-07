@@ -49,8 +49,8 @@ class TestFileMonitoringConfig(unittest.TestCase):
             FILE_MONITORING_COALESCE_DELAY_MS = 200
             FILE_MONITORING_MAX_RELOADS_PER_SECOND = 5
             FILE_MONITORING_FALLBACK_POLL_INTERVAL_S = 5
-            DESKTOP_MONO_FONT_NAME = 'Menlo'
-            DESKTOP_FONT_SIZE = 12
+            MONO_FONT_NAME = 'Menlo'
+            FONT_SIZE = 12
             DEFAULT_LEFT_PANE_RATIO = 0.5
             DEFAULT_LOG_HEIGHT_RATIO = 0.25
             DEFAULT_SORT_MODE = 'name'
@@ -66,8 +66,8 @@ class TestFileMonitoringConfig(unittest.TestCase):
             FILE_MONITORING_COALESCE_DELAY_MS = -100  # Negative value
             FILE_MONITORING_MAX_RELOADS_PER_SECOND = 5
             FILE_MONITORING_FALLBACK_POLL_INTERVAL_S = 5
-            DESKTOP_MONO_FONT_NAME = 'Menlo'
-            DESKTOP_FONT_SIZE = 12
+            MONO_FONT_NAME = 'Menlo'
+            FONT_SIZE = 12
             DEFAULT_LEFT_PANE_RATIO = 0.5
             DEFAULT_LOG_HEIGHT_RATIO = 0.25
             DEFAULT_SORT_MODE = 'name'
@@ -83,8 +83,8 @@ class TestFileMonitoringConfig(unittest.TestCase):
             FILE_MONITORING_COALESCE_DELAY_MS = 200
             FILE_MONITORING_MAX_RELOADS_PER_SECOND = 0  # Zero value
             FILE_MONITORING_FALLBACK_POLL_INTERVAL_S = 5
-            DESKTOP_MONO_FONT_NAME = 'Menlo'
-            DESKTOP_FONT_SIZE = 12
+            MONO_FONT_NAME = 'Menlo'
+            FONT_SIZE = 12
             DEFAULT_LEFT_PANE_RATIO = 0.5
             DEFAULT_LOG_HEIGHT_RATIO = 0.25
             DEFAULT_SORT_MODE = 'name'
@@ -100,8 +100,8 @@ class TestFileMonitoringConfig(unittest.TestCase):
             FILE_MONITORING_COALESCE_DELAY_MS = 200
             FILE_MONITORING_MAX_RELOADS_PER_SECOND = 5
             FILE_MONITORING_FALLBACK_POLL_INTERVAL_S = 0  # Zero value
-            DESKTOP_MONO_FONT_NAME = 'Menlo'
-            DESKTOP_FONT_SIZE = 12
+            MONO_FONT_NAME = 'Menlo'
+            FONT_SIZE = 12
             DEFAULT_LEFT_PANE_RATIO = 0.5
             DEFAULT_LOG_HEIGHT_RATIO = 0.25
             DEFAULT_SORT_MODE = 'name'
@@ -117,8 +117,8 @@ class TestFileMonitoringConfig(unittest.TestCase):
             FILE_MONITORING_COALESCE_DELAY_MS = 200
             FILE_MONITORING_MAX_RELOADS_PER_SECOND = 5
             FILE_MONITORING_FALLBACK_POLL_INTERVAL_S = 2.5  # Float value
-            DESKTOP_MONO_FONT_NAME = 'Menlo'
-            DESKTOP_FONT_SIZE = 12
+            MONO_FONT_NAME = 'Menlo'
+            FONT_SIZE = 12
             DEFAULT_LEFT_PANE_RATIO = 0.5
             DEFAULT_LOG_HEIGHT_RATIO = 0.25
             DEFAULT_SORT_MODE = 'name'

@@ -23,14 +23,14 @@ def test_default_desktop_config():
     config = Config()
 
     # Check desktop mode settings exist
-    assert hasattr(config, 'DESKTOP_UI_FONT_NAME'), "DefaultConfig should have DESKTOP_UI_FONT_NAME"
-    assert hasattr(config, 'DESKTOP_MONO_FONT_NAME'), "DefaultConfig should have DESKTOP_MONO_FONT_NAME"
-    assert hasattr(config, 'DESKTOP_FONT_SIZE'), "DefaultConfig should have DESKTOP_FONT_SIZE"
+    assert hasattr(config, 'UI_FONT_NAME'), "DefaultConfig should have UI_FONT_NAME"
+    assert hasattr(config, 'MONO_FONT_NAME'), "DefaultConfig should have MONO_FONT_NAME"
+    assert hasattr(config, 'FONT_SIZE'), "DefaultConfig should have FONT_SIZE"
 
     # Check default values
-    assert config.DESKTOP_UI_FONT_NAME is None, "Default UI font should be None (system UI font)"
-    assert config.DESKTOP_MONO_FONT_NAME is None, "Default mono font should be None (system mono font)"
-    assert config.DESKTOP_FONT_SIZE == 12, "Default font size should be 12"
+    assert config.UI_FONT_NAME is None, "Default UI font should be None (system UI font)"
+    assert config.MONO_FONT_NAME is None, "Default mono font should be None (system mono font)"
+    assert config.FONT_SIZE == 12, "Default font size should be 12"
 
     print("✓ Default desktop configuration test passed")
 
@@ -41,64 +41,64 @@ def test_desktop_settings_validation():
 
     # Test valid desktop settings: a mono family + UI font as None (system UI)
     class ValidDesktopConfig:
-        DESKTOP_UI_FONT_NAME = None
-        DESKTOP_MONO_FONT_NAME = 'Monaco'
-        DESKTOP_FONT_SIZE = 14
+        UI_FONT_NAME = None
+        MONO_FONT_NAME = 'Monaco'
+        FONT_SIZE = 14
 
     errors = manager.validate_config(ValidDesktopConfig())
     assert len(errors) == 0, f"Valid desktop settings should have no errors, got: {errors}"
 
     # Test valid: a named proportional UI font
     class ValidUiFontNamed:
-        DESKTOP_UI_FONT_NAME = 'Helvetica Neue'
-        DESKTOP_MONO_FONT_NAME = 'Menlo'
+        UI_FONT_NAME = 'Helvetica Neue'
+        MONO_FONT_NAME = 'Menlo'
 
     errors = manager.validate_config(ValidUiFontNamed())
     assert len(errors) == 0, f"A named UI font should be valid, got: {errors}"
 
     # Test invalid mono font name (empty string)
     class InvalidMonoFontEmpty:
-        DESKTOP_MONO_FONT_NAME = ''
+        MONO_FONT_NAME = ''
 
     errors = manager.validate_config(InvalidMonoFontEmpty())
     assert len(errors) > 0, "Empty mono font name should produce validation error"
-    assert any('DESKTOP_MONO_FONT_NAME' in err for err in errors), "Error should mention DESKTOP_MONO_FONT_NAME"
+    assert any('MONO_FONT_NAME' in err for err in errors), "Error should mention MONO_FONT_NAME"
 
     # Test invalid UI font name (empty string — use None for the system font)
     class InvalidUiFontEmpty:
-        DESKTOP_UI_FONT_NAME = ''
+        UI_FONT_NAME = ''
 
     errors = manager.validate_config(InvalidUiFontEmpty())
     assert len(errors) > 0, "Empty UI font name should produce validation error"
-    assert any('DESKTOP_UI_FONT_NAME' in err for err in errors), "Error should mention DESKTOP_UI_FONT_NAME"
+    assert any('UI_FONT_NAME' in err for err in errors), "Error should mention UI_FONT_NAME"
 
     # Test invalid font name (a list is not accepted — one family only)
     class InvalidFontNameList:
-        DESKTOP_MONO_FONT_NAME = ['Monaco', 'Menlo', 'Courier']
+        MONO_FONT_NAME = ['Monaco', 'Menlo', 'Courier']
 
     errors = manager.validate_config(InvalidFontNameList())
     assert len(errors) > 0, "A font list should produce a validation error"
-    assert any('DESKTOP_MONO_FONT_NAME' in err for err in errors), "Error should mention DESKTOP_MONO_FONT_NAME"
+    assert any('MONO_FONT_NAME' in err for err in errors), "Error should mention MONO_FONT_NAME"
 
     # Test invalid font name (wrong type)
     class InvalidFontNameType:
-        DESKTOP_MONO_FONT_NAME = 123
+        MONO_FONT_NAME = 123
 
     errors = manager.validate_config(InvalidFontNameType())
     assert len(errors) > 0, "Invalid font name type should produce validation error"
-    assert any('DESKTOP_MONO_FONT_NAME' in err for err in errors), "Error should mention DESKTOP_MONO_FONT_NAME"
+    assert any('MONO_FONT_NAME' in err for err in errors), "Error should mention MONO_FONT_NAME"
 
     # Test invalid font size (too small)
     class InvalidFontSizeSmall:
-        DESKTOP_FONT_SIZE = 5
+        FONT_SIZE = 5
 
     errors = manager.validate_config(InvalidFontSizeSmall())
     assert len(errors) > 0, "Font size < 8 should produce validation error"
-    assert any('DESKTOP_FONT_SIZE' in err for err in errors), "Error should mention DESKTOP_FONT_SIZE"
+    assert any('FONT_SIZE' in err for err in errors), "Error should mention FONT_SIZE"
 
     # Test invalid font size (too large)
     class InvalidFontSizeLarge:
-        DESKTOP_FONT_SIZE = 100
+        FONT_SIZE = 100
 
     errors = manager.validate_config(InvalidFontSizeLarge())
     assert len(errors) > 0, "Font size > 72 should produce validation error"
@@ -123,9 +123,9 @@ class Config:
     """Test configuration"""
 
     # Desktop settings
-    DESKTOP_UI_FONT_NAME = 'Helvetica Neue'
-    DESKTOP_MONO_FONT_NAME = 'Monaco'
-    DESKTOP_FONT_SIZE = 16
+    UI_FONT_NAME = 'Helvetica Neue'
+    MONO_FONT_NAME = 'Monaco'
+    FONT_SIZE = 16
 
     # Other settings
     SHOW_HIDDEN_FILES = True
@@ -148,14 +148,14 @@ class Config:
             config = manager.load_config()
 
             # Verify desktop settings were loaded
-            assert hasattr(config, 'DESKTOP_UI_FONT_NAME'), "Config should have DESKTOP_UI_FONT_NAME"
-            assert config.DESKTOP_UI_FONT_NAME == 'Helvetica Neue', "UI font should be 'Helvetica Neue'"
+            assert hasattr(config, 'UI_FONT_NAME'), "Config should have UI_FONT_NAME"
+            assert config.UI_FONT_NAME == 'Helvetica Neue', "UI font should be 'Helvetica Neue'"
 
-            assert hasattr(config, 'DESKTOP_MONO_FONT_NAME'), "Config should have DESKTOP_MONO_FONT_NAME"
-            assert config.DESKTOP_MONO_FONT_NAME == 'Monaco', "Mono font should be 'Monaco'"
+            assert hasattr(config, 'MONO_FONT_NAME'), "Config should have MONO_FONT_NAME"
+            assert config.MONO_FONT_NAME == 'Monaco', "Mono font should be 'Monaco'"
 
-            assert hasattr(config, 'DESKTOP_FONT_SIZE'), "Config should have DESKTOP_FONT_SIZE"
-            assert config.DESKTOP_FONT_SIZE == 16, "Font size should be 16"
+            assert hasattr(config, 'FONT_SIZE'), "Config should have FONT_SIZE"
+            assert config.FONT_SIZE == 16, "Font size should be 16"
 
             print("✓ Configuration loading with desktop settings test passed")
 
@@ -183,7 +183,7 @@ def test_config_reload_persistence():
         # Write initial config with font size 14
         config_content_initial = '''
 class Config:
-    DESKTOP_FONT_SIZE = 14
+    FONT_SIZE = 14
 '''
 
         with open(config_file, 'w') as f:
@@ -195,7 +195,7 @@ class Config:
         manager.config_file = config_file
 
         config = manager.load_config()
-        assert config.DESKTOP_FONT_SIZE == 14, "Initial font size should be 14"
+        assert config.FONT_SIZE == 14, "Initial font size should be 14"
 
         # Update config to font size 16. The trailing comment makes this file a
         # different byte length than the initial one: importlib keys its bytecode
@@ -203,7 +203,7 @@ class Config:
         # in the same second, so a same-size rewrite would be served stale.
         config_content_updated = '''
 class Config:
-    DESKTOP_FONT_SIZE = 16  # reloaded value
+    FONT_SIZE = 16  # reloaded value
 '''
 
         with open(config_file, 'w') as f:
@@ -211,7 +211,7 @@ class Config:
 
         # Reload and verify updated font size
         config = manager.reload_config()
-        assert config.DESKTOP_FONT_SIZE == 16, "Updated font size should be 16"
+        assert config.FONT_SIZE == 16, "Updated font size should be 16"
 
         print("✓ Configuration reload persistence test passed")
 
