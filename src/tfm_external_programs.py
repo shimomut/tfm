@@ -283,10 +283,9 @@ class ExternalProgramManager:
             # Resume the renderer
             self.renderer.resume()
             
-            # Reinitialize colors with configured scheme
+            # Reinitialize colors after the subprocess (legacy ttk renderer)
             from tfm_colors import init_colors
-            color_scheme = self.config.COLOR_SCHEME
-            init_colors(self.renderer, color_scheme)
+            init_colors(self.renderer)
             
             # Restore stdout/stderr capture (only needed in terminal mode)
             # In desktop mode, LogCapture was never disconnected
@@ -415,10 +414,9 @@ class ExternalProgramManager:
             # Resume the renderer
             self.renderer.resume()
             
-            # Reinitialize colors with configured scheme
+            # Reinitialize colors after the subprocess (legacy ttk renderer)
             from tfm_colors import init_colors
-            color_scheme = self.config.COLOR_SCHEME
-            init_colors(self.renderer, color_scheme)
+            init_colors(self.renderer)
             
             # Restore stdout/stderr capture  
             from tfm_log_manager import LogCapture

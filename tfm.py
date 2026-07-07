@@ -100,7 +100,8 @@ from tfm_text_viewer import show_text_viewer  # noqa: E402
 
 
 def _theme(bg, fg, muted, accent, surface, selection, *, accent2=None,
-           status=None, footer=None) -> Theme:
+           status=None, footer=None, directory=None, isearch_match=None,
+           syntax=None) -> Theme:
     ac2 = accent if accent2 is None else accent2
     p = {"bg": bg, "fg": fg, "muted": muted, "accent": accent, "accent2": ac2,
          "surface": surface}
@@ -108,41 +109,143 @@ def _theme(bg, fg, muted, accent, surface, selection, *, accent2=None,
     for role, spec in (("status", status), ("footer", footer)):
         if spec is not None:
             surfaces[role] = spec(p) if callable(spec) else spec
-    extra = {"surfaces": surfaces} if surfaces else {}
+    # App-specific themed colors carried in ``Theme.extras`` (read off ``ctx.theme``
+    # by the widgets): the file-pane ``directory`` foreground and the i-search
+    # ``isearch_match`` base hue — each a Color or, like the chrome recipes, a
+    # callable over the palette namespace ``p`` — plus a partial ``syntax`` palette
+    # (token → Color) the text/diff viewers merge onto the VS Code default.
+    extras: dict = {}
+    if directory is not None:
+        extras["directory"] = directory(p) if callable(directory) else directory
+    if isearch_match is not None:
+        extras["isearch_match"] = isearch_match(p) if callable(isearch_match) else isearch_match
+    if syntax is not None:
+        extras["syntax"] = dict(syntax)
+    kw: dict = {}
+    if surfaces:
+        kw["surfaces"] = surfaces
+    if extras:
+        kw["extras"] = extras
     return derive_theme(background=bg, foreground=fg, muted=muted, accent=accent,
-                        surface=surface, selection=selection, accent2=ac2, **extra)
+                        surface=surface, selection=selection, accent2=ac2, **kw)
 
 
-THEMES: list[tuple[str, Theme]] = [
-    ("Dark+", _theme((30, 30, 30), (212, 212, 212), (157, 157, 157),
-                     (0, 122, 204), (48, 48, 52), (10, 105, 178), accent2=(78, 201, 176))),
-    ("Monokai", _theme((39, 40, 34), (248, 248, 242), (140, 140, 130),
-                       (166, 226, 46), (56, 57, 48), (86, 122, 38), accent2=(249, 38, 114))),
-    ("Dracula", _theme((40, 42, 54), (248, 248, 242), (98, 114, 164),
-                       (189, 147, 249), (56, 59, 76), (120, 86, 175), accent2=(255, 121, 198))),
+# Theme palettes as data: each spec is the keyword set ``_theme`` needs, kept
+# separate from the built ``THEMES`` so the active theme can be rebuilt with a
+# user's ``config.py`` ``THEME`` overrides merged in (see ``TfmApp.__init__`` /
+# ``_merge_theme_override``). Beyond the six base colors a spec may name the two
+# chrome-bar recipes (``status`` / ``footer``) and the three app-specific colors:
+# ``directory`` (file-pane directory names), ``isearch_match`` (the i-search wash
+# base — defaults to ``accent2``), and ``syntax`` (a partial text-viewer palette).
+_THEME_SPECS: list[tuple[str, dict]] = [
+    ("Dark+", dict(bg=(30, 30, 30), fg=(212, 212, 212), muted=(157, 157, 157),
+                   accent=(0, 122, 204), surface=(48, 48, 52), selection=(10, 105, 178),
+                   accent2=(78, 201, 176))),
+    ("Monokai", dict(bg=(39, 40, 34), fg=(248, 248, 242), muted=(140, 140, 130),
+                     accent=(166, 226, 46), surface=(56, 57, 48), selection=(86, 122, 38),
+                     accent2=(249, 38, 114))),
+    ("Dracula", dict(bg=(40, 42, 54), fg=(248, 248, 242), muted=(98, 114, 164),
+                     accent=(189, 147, 249), surface=(56, 59, 76), selection=(120, 86, 175),
+                     accent2=(255, 121, 198))),
     # Nord: status stays the frost accent, footer is a neutral gray (a blend of
     # the background toward the text) — the "accent bar + gray footer" recipe.
-    ("Nord", _theme((46, 52, 64), (216, 222, 233), (76, 86, 106),
-                    (136, 192, 208), (62, 70, 88), (76, 128, 158), accent2=(180, 142, 173),
-                    footer=lambda p: mix(p["bg"], p["fg"], 0.16))),
+    ("Nord", dict(bg=(46, 52, 64), fg=(216, 222, 233), muted=(76, 86, 106),
+                  accent=(136, 192, 208), surface=(62, 70, 88), selection=(76, 128, 158),
+                  accent2=(180, 142, 173),
+                  footer=lambda p: mix(p["bg"], p["fg"], 0.16))),
     # Solarized: both bars are an 80/20 blend of the background and the secondary
     # accent (cyan) rather than the primary accent — the "accent2 blend" recipe.
-    ("Solarized", _theme((0, 43, 54), (147, 161, 161), (88, 110, 117),
-                         (38, 139, 210), (10, 62, 78), (26, 102, 150), accent2=(42, 161, 152),
-                         status=lambda p: mix(p["bg"], p["accent2"], 0.20),
-                         footer=lambda p: mix(p["bg"], p["accent2"], 0.20))),
+    ("Solarized", dict(bg=(0, 43, 54), fg=(147, 161, 161), muted=(88, 110, 117),
+                       accent=(38, 139, 210), surface=(10, 62, 78), selection=(26, 102, 150),
+                       accent2=(42, 161, 152),
+                       status=lambda p: mix(p["bg"], p["accent2"], 0.20),
+                       footer=lambda p: mix(p["bg"], p["accent2"], 0.20))),
+    # Sample theme — the *simple* per-theme color config: on top of the six base
+    # colors it names a directory hue, a secondary accent (the i-search match
+    # base), and a few syntax tokens; everything else falls back to the defaults.
+    # _config.py carries the fully spelled-out ``THEME`` configuration.
+    ("Gruvbox Dark", dict(bg=(40, 40, 40), fg=(235, 219, 178), muted=(146, 131, 116),
+                          accent=(131, 165, 152), surface=(60, 56, 54), selection=(80, 73, 69),
+                          accent2=(254, 128, 25),            # orange — i-search match base
+                          directory=(250, 189, 47),          # gruvbox yellow
+                          syntax={"keyword": (251, 73, 52),   # red
+                                  "string": (184, 187, 38),   # green
+                                  "comment": (146, 131, 116)})),  # gray
     # --- light variants: same bases, opposite polarity (panels sink, text
-    # defaults dark), so a light background reads correctly on every backend.
-    ("Light+", _theme((255, 255, 255), (30, 30, 30), (110, 110, 110),
-                      (0, 122, 204), (235, 235, 238), (120, 180, 240), accent2=(0, 128, 128))),
-    ("Solarized Light", _theme((253, 246, 227), (88, 110, 117), (147, 161, 161),
-                               (38, 139, 210), (234, 228, 206), (150, 195, 230), accent2=(211, 54, 130))),
+    # defaults dark). Each names a darker directory yellow that reads on a light
+    # surface (the default soft yellow is tuned for dark themes).
+    ("Light+", dict(bg=(255, 255, 255), fg=(30, 30, 30), muted=(110, 110, 110),
+                    accent=(0, 122, 204), surface=(235, 235, 238), selection=(120, 180, 240),
+                    accent2=(0, 128, 128), directory=(160, 120, 0))),
+    ("Solarized Light", dict(bg=(253, 246, 227), fg=(88, 110, 117), muted=(147, 161, 161),
+                             accent=(38, 139, 210), surface=(234, 228, 206), selection=(150, 195, 230),
+                             accent2=(211, 54, 130), directory=(181, 137, 0))),
 ]
 
-#: Which theme each ``Config.COLOR_SCHEME`` value starts on (ttk TFM's two
-#: schemes map onto the matching PuiKit palette; anything else falls back to the
-#: first, dark, theme).
-_INITIAL_THEME = {"dark": "Dark+", "light": "Light+"}
+THEMES: list[tuple[str, Theme]] = [(name, _theme(**spec)) for name, spec in _THEME_SPECS]
+
+#: Friendly ``config.py`` theme key → ``_theme`` keyword. Covers the base
+#: palette, the two chrome-bar recipes, and the three app-specific colors; an
+#: unknown key is ignored (forward-compatible).
+_THEME_OVERRIDE_MAP = {
+    "background": "bg", "foreground": "fg", "muted": "muted", "accent": "accent",
+    "accent2": "accent2", "surface": "surface", "selection": "selection",
+    "status": "status", "footer": "footer", "directory": "directory",
+    "isearch_match": "isearch_match", "syntax": "syntax",
+}
+
+
+def _merge_theme_override(spec: dict, override: dict) -> dict:
+    """Merge one user theme's overrides (config.py, friendly keys) onto a base
+    theme ``spec`` (``_theme`` keywords). Colors replace; the ``syntax`` palette
+    deep-merges so the user recolors only the tokens they name (keeping the base's
+    other syntax choices). ``base`` is consumed by the caller; unknown keys are
+    ignored."""
+    merged = dict(spec)
+    for key, kw in _THEME_OVERRIDE_MAP.items():
+        if key not in override:
+            continue
+        val = override[key]
+        if kw == "syntax" and isinstance(val, dict) and isinstance(merged.get("syntax"), dict):
+            merged["syntax"] = {**merged["syntax"], **val}
+        else:
+            merged[kw] = val
+    return merged
+
+
+def _build_theme_list(config) -> list[tuple[str, Theme]]:
+    """The runtime theme list: the built-ins plus every theme the user registered
+    in ``config.THEMES`` — all selectable at run time from the View ▸ Theme menu
+    and the ``T`` cycle.
+
+    ``config.THEMES`` is ``{name: overrides}``. Each theme inherits a base spec and
+    overrides it: ``overrides['base']`` names the base (any built-in or an
+    already-registered theme); with no ``base`` it builds on the theme of the same
+    name when one exists (so ``{'Dark+': {...}}`` tweaks the built-in) and on
+    ``Dark+`` otherwise. A registered name that matches an existing theme replaces
+    it in place (keeping its slot); a new name is appended. A theme that fails to
+    build (e.g. a from-scratch palette missing a base color) is skipped with a
+    logged warning rather than blocking startup."""
+    specs: list[list] = [[name, dict(spec)] for name, spec in _THEME_SPECS]
+    index = {name: i for i, (name, _s) in enumerate(specs)}
+    user = getattr(config, "THEMES", None) or {}
+    for name, override in user.items():
+        override = dict(override)
+        base_name = override.pop("base", None) or (name if name in index else "Dark+")
+        base_spec = dict(specs[index.get(base_name, index["Dark+"])][1])
+        merged = _merge_theme_override(base_spec, override)
+        if name in index:
+            specs[index[name]][1] = merged
+        else:
+            index[name] = len(specs)
+            specs.append([name, merged])
+    themes: list[tuple[str, Theme]] = []
+    for name, spec in specs:
+        try:
+            themes.append((name, _theme(**spec)))
+        except Exception as exc:  # a bad user theme must not block startup
+            print(f"Skipping theme {name!r}: {exc}", file=sys.stderr)
+    return themes
 
 
 def _archive_header_label(path_str: str) -> str:
@@ -355,6 +458,18 @@ class TfmApp:
         # directory names, the log, dialogs, and the diff views readable on the
         # light themes and the low-contrast accents without per-widget tuning.
         self.panel.auto_ink = True
+        # The selectable theme list — built-ins plus any the user registered in
+        # config.THEMES — held on the instance so the picker (View ▸ Theme) and the
+        # T cycle switch among all of them at run time. Resolved before the menu
+        # (which lists them) and the widgets (which read the active theme) are
+        # built. Restore the theme the user last switched to (persisted by
+        # ``_apply_theme``); default to the first theme (Dark+) on a fresh profile
+        # or if that theme no longer exists.
+        self.themes = _build_theme_list(self.config)
+        start = self.state_manager.get_state("theme")
+        self._theme_index = next(
+            (i for i, (name, _t) in enumerate(self.themes) if name == start), 0)
+        self.panel.theme = self.themes[self._theme_index][1]
         self.left_view = FilePane(
             self.pm.left_pane,
             config=self.config,
@@ -416,12 +531,7 @@ class TfmApp:
             ),
             margin_px=4,
         )
-        # Seed the active theme from the config's color scheme, then let the
-        # ``toggle_color_scheme`` action (T) cycle through the palettes.
-        start = _INITIAL_THEME.get(getattr(self.config, "COLOR_SCHEME", "dark"), "Dark+")
-        self._theme_index = next(
-            (i for i, (name, _t) in enumerate(THEMES) if name == start), 0)
-        self.panel.theme = THEMES[self._theme_index][1]
+        # (the theme + picker list were resolved above, before the menu / widgets)
         self.log_info(f"TFM on PuiKit — {self.pm.left_pane['path']}")
         # Files are listed now, so the saved cursor filenames can be matched.
         self._restore_cursor_positions()
@@ -1557,21 +1667,24 @@ class TfmApp:
         splitter.fraction = max(0.1, min(0.9, splitter.fraction + delta))
 
     def _theme_menu(self) -> Menu:
-        """The theme picker, shared by the View menu's 'Theme' submenu. A live
-        ``checked`` predicate marks the active palette (mirrors ``_sort_menu``)."""
+        """The theme picker, shared by the View menu's 'Theme' submenu. Lists every
+        theme — built-in and user-registered (``config.THEMES``) — with a live
+        ``checked`` predicate marking the active one (mirrors ``_sort_menu``)."""
         return Menu(*[
             MenuItem(name, on_select=(lambda i=i: self._select_theme(i)),
                      checked=(lambda i=i: self._theme_index == i))
-            for i, (name, _theme) in enumerate(THEMES)
+            for i, (name, _theme) in enumerate(self.themes)
         ], title="Theme")
 
     def _apply_theme(self, index: int) -> None:
         """Switch the active palette. One assignment recolors every widget: the
         chrome and file lists read the theme at draw time, and the surface-role
-        backgrounds re-resolve on the next render."""
-        self._theme_index = index % len(THEMES)
-        name, theme = THEMES[self._theme_index]
+        backgrounds re-resolve on the next render. The choice is persisted so the
+        next launch reopens on it (see the theme restore in ``__init__``)."""
+        self._theme_index = index % len(self.themes)
+        name, theme = self.themes[self._theme_index]
         self.panel.theme = theme
+        self.state_manager.set_state("theme", name)  # remember across restarts
         self.log_info(f"Theme: {name}")
 
     def _cycle_theme(self) -> None:

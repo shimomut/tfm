@@ -54,7 +54,6 @@ class TestFileMonitoringConfig(unittest.TestCase):
             DEFAULT_LEFT_PANE_RATIO = 0.5
             DEFAULT_LOG_HEIGHT_RATIO = 0.25
             DEFAULT_SORT_MODE = 'name'
-            COLOR_SCHEME = 'dark'
 
         errors = self.config_manager.validate_config(MockConfig())
         self.assertIn("FILE_MONITORING_ENABLED must be a boolean", errors)
@@ -72,7 +71,6 @@ class TestFileMonitoringConfig(unittest.TestCase):
             DEFAULT_LEFT_PANE_RATIO = 0.5
             DEFAULT_LOG_HEIGHT_RATIO = 0.25
             DEFAULT_SORT_MODE = 'name'
-            COLOR_SCHEME = 'dark'
 
         errors = self.config_manager.validate_config(MockConfig())
         self.assertIn("FILE_MONITORING_COALESCE_DELAY_MS must be a non-negative integer", errors)
@@ -90,7 +88,6 @@ class TestFileMonitoringConfig(unittest.TestCase):
             DEFAULT_LEFT_PANE_RATIO = 0.5
             DEFAULT_LOG_HEIGHT_RATIO = 0.25
             DEFAULT_SORT_MODE = 'name'
-            COLOR_SCHEME = 'dark'
 
         errors = self.config_manager.validate_config(MockConfig())
         self.assertIn("FILE_MONITORING_MAX_RELOADS_PER_SECOND must be a positive integer", errors)
@@ -108,7 +105,6 @@ class TestFileMonitoringConfig(unittest.TestCase):
             DEFAULT_LEFT_PANE_RATIO = 0.5
             DEFAULT_LOG_HEIGHT_RATIO = 0.25
             DEFAULT_SORT_MODE = 'name'
-            COLOR_SCHEME = 'dark'
 
         errors = self.config_manager.validate_config(MockConfig())
         self.assertIn("FILE_MONITORING_FALLBACK_POLL_INTERVAL_S must be a positive number", errors)
@@ -126,7 +122,6 @@ class TestFileMonitoringConfig(unittest.TestCase):
             DEFAULT_LEFT_PANE_RATIO = 0.5
             DEFAULT_LOG_HEIGHT_RATIO = 0.25
             DEFAULT_SORT_MODE = 'name'
-            COLOR_SCHEME = 'dark'
 
         errors = self.config_manager.validate_config(MockConfig())
         # Should not have error for fallback poll interval

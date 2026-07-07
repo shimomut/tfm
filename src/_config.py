@@ -72,9 +72,60 @@ class Config:
     DEFAULT_SORT_MODE = 'name'  # 'name', 'size', 'date'
     DEFAULT_SORT_REVERSE = False
     
-    # Color settings
-    COLOR_SCHEME = 'dark'  # 'dark', 'light'
-    
+    # -----------------------------------------------------------------------
+    # Custom themes (optional)
+    # -----------------------------------------------------------------------
+    # Register your own named themes here. Each one is added to the theme picker
+    # (View > Theme) and the T-key cycle alongside the built-ins — Dark+, Monokai,
+    # Dracula, Nord, Solarized, Gruvbox Dark, Light+, Solarized Light — so you can
+    # switch between them at run time. TFM starts on Dark+ and remembers whichever
+    # theme you last switched to across restarts.
+    #
+    # THEMES maps a display name to a dict of color overrides. A theme inherits a
+    # base and overrides only what differs: set 'base' to any built-in (or another
+    # theme you defined above) to inherit it; with no 'base' it builds on the theme
+    # of the same name if one exists (so {'Dark+': {...}} tweaks the built-in), else
+    # on 'Dark+'. A name matching an existing theme replaces it in place.
+    #
+    # Every available key (all optional). Colors are (R, G, B) tuples, 0-255:
+    #
+    #   'base':          'Dark+'          # theme to inherit (see above for default)
+    #   # --- base palette ---
+    #   'background':    (30, 30, 30)     # content surface / editor background
+    #   'foreground':    (212, 212, 212)  # primary text
+    #   'muted':         (157, 157, 157)  # secondary text, dividers
+    #   'accent':        (0, 122, 204)    # focus ring, selection fill, default bars
+    #   'accent2':       (78, 201, 176)   # secondary accent (i-search base, recipes)
+    #   'surface':       (48, 48, 52)     # raised panels (pane header / popup)
+    #   'selection':     (10, 105, 178)   # active selection fill
+    #   # --- chrome bars (a solid color for the whole bar) ---
+    #   'status':        (0, 122, 204)    # bottom status bar (also the viewers')
+    #   'footer':        (0, 122, 204)    # per-pane info bar
+    #   # --- file panes ---
+    #   'directory':     (204, 204, 120)  # directory names (default: soft yellow)
+    #   # --- incremental search ---
+    #   'isearch_match': (78, 201, 176)   # match-highlight base (default: accent2)
+    #   # --- text / diff viewer syntax colors (override only the tokens you name) ---
+    #   'syntax': {'keyword': (86, 156, 214), 'string': (206, 145, 120),
+    #              'comment': (106, 153, 85), 'number': (181, 206, 168),
+    #              'operator': (212, 212, 212), 'builtin': (78, 201, 176),
+    #              'name': (156, 220, 254)}
+    #
+    # Example:
+    #
+    # THEMES = {
+    #     'Ocean': {                       # builds on Dark+
+    #         'accent': (38, 139, 210),
+    #         'directory': (120, 200, 220),
+    #         'syntax': {'keyword': (0, 175, 215)},
+    #     },
+    #     'Paper': {                       # a light theme, from a light base
+    #         'base': 'Light+',
+    #         'directory': (150, 110, 0),
+    #     },
+    # }
+    THEMES = {}
+
     # Behavior settings
     CONFIRM_DELETE = True   # Show confirmation dialog before deleting files/directories
     CONFIRM_QUIT = True     # Show confirmation dialog before quitting TFM

@@ -51,13 +51,18 @@ MIN_NAME_W = 12
 #: names sit flush against the pane edge there.
 GUTTER_W = 1
 BRACKET_W = 1
-#: Incremental-search match highlight: a muted green wash behind every row that
-#: matches the live isearch pattern — distinct from the selection fill and the
-#: blue directory color, drawn *under* the selection fill / cursor cue. Derived
-#: from the pane background (not a fixed dark constant) so it tracks the theme:
-#: a dark green on a dark theme, a pale green on a light one.
-MATCH_HUE = (80, 180, 100)
+#: Incremental-search match highlight: a wash behind every row matching the live
+#: isearch pattern. Its base hue is the theme's **secondary accent**
+#: (``theme.accent2``, or a theme's ``extras['isearch_match']`` override) blended
+#: into the pane background by ``MATCH_TINT`` — kept distinct from the selection
+#: fill (which is the *primary* accent) and drawn *under* it / the cursor cue.
+#: Derived from the pane background so it tracks the theme: a dark wash on a dark
+#: theme, a pale one on a light one.
 MATCH_TINT = 0.28
+#: Directory-name foreground when a theme names no ``extras['directory']`` — a
+#: soft yellow (the ttk build's directory hue). Regular files use ``theme.text``.
+#: A theme (or a user's ``config.py`` ``THEME``) overrides this per palette.
+DIRECTORY_FG_DEFAULT = (204, 204, 120)
 #: Cursor-position cue color — a distinct **red**, orthogonal to the selection
 #: fill so the two never read as the same channel: vivid on the active pane, a
 #: muted red on the inactive one (the louder cue marks the focused pane).
@@ -396,7 +401,11 @@ class FilePane(Widget):
             # no-op on dark themes, where the dark tint already has headroom).
             row_bg = ensure_text_headroom(_mix(base, theme.accent, ratio), base, LC_BODY)
         elif is_match:
-            row_bg = _mix(base, MATCH_HUE, MATCH_TINT)
+            # Base hue = the theme's secondary accent (or an isearch_match
+            # override), blended into the pane bg — distinct from the accent
+            # selection fill.
+            match_base = theme.extras.get("isearch_match") or theme.accent2
+            row_bg = _mix(base, match_base, MATCH_TINT)
         else:
             row_bg = None
 
@@ -411,16 +420,18 @@ class FilePane(Widget):
         if gui_cursor:
             self._draw_cursor(ctx, y, band_left, band_right, grid)
 
-        # Foreground keeps the dir/file color language on every row, but is passed
-        # through ctx.ink against the *actual* background behind the glyphs — the
-        # pane base, or the selection/match tint where one is painted — so a
-        # directory's accent name stays legible even on a row tinted toward that
-        # same accent (floor-only: unchanged wherever it already reads). The cursor
-        # row's glyphs draw over a *transparent* background so they land directly on
-        # the fill + outline below without a per-run fill repainting (and breaking)
-        # the stroke — but they still contrast against that fill (eff_bg), not None.
+        # Foreground keeps the dir/file color language on every row (the themed
+        # directory color, else theme.text), but is passed through ctx.ink against
+        # the *actual* background behind the glyphs — the pane base, or the
+        # selection/match tint where one is painted — so the directory name stays
+        # legible even on a row tinted toward a nearby hue (floor-only: unchanged
+        # wherever it already reads). The cursor row's glyphs draw over a
+        # *transparent* background so they land directly on the fill + outline below
+        # without a per-run fill repainting (and breaking) the stroke — but they
+        # still contrast against that fill (eff_bg), not None.
         eff_bg = row_bg if row_bg is not None else base
-        name_fg = ctx.ink(theme.accent if is_dir else theme.text, on=eff_bg, target=LC_BODY)
+        dir_fg = theme.extras.get("directory", DIRECTORY_FG_DEFAULT)
+        name_fg = ctx.ink(dir_fg if is_dir else theme.text, on=eff_bg, target=LC_BODY)
         col_fg = ctx.ink(theme.muted_text, on=eff_bg, target=LC_LARGE)
         text_bg = TRANSPARENT if gui_cursor else row_bg
 

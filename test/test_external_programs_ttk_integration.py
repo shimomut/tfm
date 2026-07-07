@@ -18,7 +18,6 @@ class TestExternalProgramsTTKIntegration(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures"""
         self.mock_config = Mock()
-        self.mock_config.COLOR_SCHEME = 'dark'
         self.mock_log_manager = Mock()
         self.mock_log_manager.log_messages = []
         self.mock_log_manager.restore_stdio = Mock()
@@ -81,7 +80,7 @@ class TestExternalProgramsTTKIntegration(unittest.TestCase):
         self.mock_renderer.resume.assert_called_once()
         
         # Verify init_colors was called with renderer
-        mock_init_colors.assert_called_once_with(self.mock_renderer, 'dark')
+        mock_init_colors.assert_called_once_with(self.mock_renderer)
     
     @patch('builtins.input', return_value='')
     @patch('tfm_external_programs.subprocess.run')
@@ -120,7 +119,7 @@ class TestExternalProgramsTTKIntegration(unittest.TestCase):
         self.mock_renderer.resume.assert_called_once()
         
         # Verify init_colors was called with renderer
-        mock_init_colors.assert_called_once_with(self.mock_renderer, 'dark')
+        mock_init_colors.assert_called_once_with(self.mock_renderer)
     
     def test_no_curses_imports(self):
         """Test that the module doesn't import curses"""

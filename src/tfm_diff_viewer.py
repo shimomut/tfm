@@ -26,7 +26,8 @@ from puikit.widgets.base import Widget
 
 from tfm_text_dialog import keys_markdown, show_markdown
 from tfm_text_viewer import (MONO, _ScrollBody, _content_bg, _highlight, _is_light,
-                             _read_lines, draw_hscrollbar, draw_status_bar)
+                             _read_lines, _syntax_palette, draw_hscrollbar,
+                             draw_status_bar)
 
 #: Semantic diff hues. The whole-row tints and the stronger changed-character
 #: tints are the theme's *content background* blended toward these, so a diff
@@ -237,12 +238,12 @@ class DiffViewer(Widget):
         EventType.MOUSE_CLICK, EventType.MOUSE_DRAG,
     })
 
-    def __init__(self, path1, path2):
+    def __init__(self, path1, path2, *, syntax: dict | None = None):
         self.path1, self.path2 = path1, path2
         self.lines1, _ = _read_lines(path1)
         self.lines2, _ = _read_lines(path2)
-        self.hl1 = _highlight(self.lines1, path1)
-        self.hl2 = _highlight(self.lines2, path2)
+        self.hl1 = _highlight(self.lines1, path1, syntax)
+        self.hl2 = _highlight(self.lines2, path2, syntax)
         self.rows, self.blocks = compute_diff(self.lines1, self.lines2)
         self._panel: Any = None
         self._child_z = 90  # z for the help overlay; raised above this viewer in show_
@@ -414,7 +415,7 @@ class DiffViewer(Widget):
 
 def show_diff_viewer(panel: Any, path1, path2, z: int = 80) -> DiffViewer:
     """Push a full-window modal :class:`DiffViewer` comparing two files."""
-    viewer = DiffViewer(path1, path2)
+    viewer = DiffViewer(path1, path2, syntax=_syntax_palette(panel))
     sw, sh = panel.backend.size_units
     viewer._panel = panel
     viewer._child_z = z + 10  # help overlay stacks above the viewer's own layer

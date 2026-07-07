@@ -129,7 +129,6 @@ class Config:
 
     # Other settings
     SHOW_HIDDEN_FILES = True
-    COLOR_SCHEME = 'dark'
 '''
 
         with open(config_file, 'w') as f:

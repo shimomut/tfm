@@ -571,11 +571,7 @@ class ConfigManager:
         # Validate sort mode
         if config.DEFAULT_SORT_MODE not in ['name', 'ext', 'size', 'date']:
             errors.append("DEFAULT_SORT_MODE must be 'name', 'ext', 'size', or 'date'")
-        
-        # Validate color scheme
-        if config.COLOR_SCHEME not in ['dark', 'light']:
-            errors.append("COLOR_SCHEME must be 'dark' or 'light'")
-        
+
         # Validate file monitoring settings
         if not isinstance(config.FILE_MONITORING_ENABLED, bool):
             errors.append("FILE_MONITORING_ENABLED must be a boolean")

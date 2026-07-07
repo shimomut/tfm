@@ -78,9 +78,12 @@ def draw_status_bar(ctx, y: float, text: str, *, font=None) -> None:
     label = elide(text, ctx.width, where="end", measure=ctx.measure_text)
     ctx.draw_text(0, y, label, Style(fg=fg, bg=bar_bg, font=font))
 
-#: pygments token category → RGB (a VS Code-dark-ish palette). Categorised by
-#: substring of the token name, mirroring ttk TFM's ``get_syntax_color``.
-_SYNTAX = {
+#: pygments token category → RGB — the default syntax palette (VS Code Dark+),
+#: categorised by substring of the token name (mirroring ttk TFM's
+#: ``get_syntax_color``). A theme overrides any subset of these via its
+#: ``extras['syntax']`` (see :func:`_syntax_palette` and tfm.py's ``_theme``); the
+#: viewer bakes the resolved palette at show time.
+DEFAULT_SYNTAX = {
     "keyword": (86, 156, 214),
     "string": (206, 145, 120),
     "comment": (106, 153, 85),
@@ -117,6 +120,17 @@ def _match_bg(content, current: bool):
     return _mix(content or (30, 30, 38), _MATCH_HUE,
                 _CURRENT_MATCH_TINT if current else _MATCH_TINT)
 
+
+def _syntax_palette(panel) -> dict:
+    """The active theme's text-viewer syntax palette — its ``extras['syntax']``
+    merged onto :data:`DEFAULT_SYNTAX` — resolved from ``panel.theme`` at show
+    time. A theme names only the tokens it wants to recolor; the rest fall back to
+    the VS Code default. Resolved once when the viewer opens (the modal viewer
+    swallows the theme-toggle key, so the palette can't change while it is up)."""
+    theme = getattr(panel, "theme", None)
+    extra = theme.extras.get("syntax") if theme is not None else None
+    return {**DEFAULT_SYNTAX, **extra} if extra else DEFAULT_SYNTAX
+
 _EXT_LEXERS = {
     ".py": "python", ".js": "javascript", ".ts": "typescript", ".json": "json",
     ".md": "markdown", ".yml": "yaml", ".yaml": "yaml", ".xml": "xml",
@@ -144,22 +158,22 @@ def _expand_tabs(line: str) -> str:
     return "".join(out)
 
 
-def _syntax_fg(token_type) -> tuple[int, int, int] | None:
+def _syntax_fg(token_type, palette: dict) -> tuple[int, int, int] | None:
     name = str(token_type)
     if "Keyword" in name:
-        return _SYNTAX["keyword"]
+        return palette["keyword"]
     if "String" in name:
-        return _SYNTAX["string"]
+        return palette["string"]
     if "Comment" in name:
-        return _SYNTAX["comment"]
+        return palette["comment"]
     if "Number" in name:
-        return _SYNTAX["number"]
+        return palette["number"]
     if "Operator" in name or "Punctuation" in name:
-        return _SYNTAX["operator"]
+        return palette["operator"]
     if "Builtin" in name:
-        return _SYNTAX["builtin"]
+        return palette["builtin"]
     if "Name" in name:
-        return _SYNTAX["name"]
+        return palette["name"]
     return None  # default text color
 
 
@@ -186,9 +200,12 @@ def _read_lines(path) -> tuple[list[str], bool]:
     return [_expand_tabs(line) for line in content.splitlines()], False
 
 
-def _highlight(lines: list[str], path) -> list[list[tuple[str, Any]]]:
-    """Map each line to a list of ``(text, fg)`` segments. With pygments off (or
-    on failure) each line is a single default-colored segment."""
+def _highlight(lines: list[str], path, palette: dict | None = None) -> list[list[tuple[str, Any]]]:
+    """Map each line to a list of ``(text, fg)`` segments, colored per ``palette``
+    (a token-category → RGB map; the active theme's syntax palette, defaulting to
+    :data:`DEFAULT_SYNTAX`). With pygments off (or on failure) each line is a
+    single default-colored segment."""
+    palette = {**DEFAULT_SYNTAX, **(palette or {})}
     plain = [[(line, None)] for line in lines]
     if not _PYGMENTS or not lines:
         return plain
@@ -202,7 +219,7 @@ def _highlight(lines: list[str], path) -> list[list[tuple[str, Any]]]:
         result: list[list[tuple[str, Any]]] = []
         current: list[tuple[str, Any]] = []
         for token_type, value in lexer.get_tokens(text):
-            fg = _syntax_fg(token_type)
+            fg = _syntax_fg(token_type, palette)
             if "\n" in value:
                 parts = value.split("\n")
                 if parts[0]:
@@ -263,10 +280,10 @@ class TextViewer(Widget):
 
     focusable = True
 
-    def __init__(self, path):
+    def __init__(self, path, *, syntax: dict | None = None):
         self.path = path
         self.lines, self.is_error = _read_lines(path)
-        self.highlighted = _highlight(self.lines, path)
+        self.highlighted = _highlight(self.lines, path, syntax)
         self._panel: Any = None
         self._child_z = 90  # z for the help overlay; raised above this viewer in show_
         self.top = 0.0       # first visible display row (vertical scroll)
@@ -593,7 +610,7 @@ def show_text_viewer(panel: Any, path, z: int = 80) -> TextViewer:
     """Push a full-window modal :class:`TextViewer` over ``panel``. The ``reflow``
     callback re-derives the layer rect from the live window size each render, so
     the viewer follows terminal / window resizes."""
-    viewer = TextViewer(path)
+    viewer = TextViewer(path, syntax=_syntax_palette(panel))
     sw, sh = panel.backend.size_units
     viewer._panel = panel
     viewer._child_z = z + 10  # help overlay stacks above the viewer's own layer

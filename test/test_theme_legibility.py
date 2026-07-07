@@ -126,15 +126,20 @@ def test_recipe_only_deepens_low_headroom_surfaces():
 # --- end-to-end: the wiring reaches the screen --------------------------------
 def test_render_lifts_directory_and_keeps_legible_file():
     """Render a real FilePane through a Panel and read back the fg that reached
-    the cells: the directory's accent name is lifted off its dim raw value, while
-    an already-legible file name is left exactly as the theme declared it."""
+    the cells: the directory name (colored from the theme's ``extras['directory']``)
+    is lifted off its dim raw value, while an already-legible file name is left
+    exactly as the theme declared it."""
     from puikit import Item, Panel, VSplit
     from puikit.backends.memory_backend import MemoryBackend
     from tfm_file_pane import FilePane
 
     bg, fg, muted, accent, surface, selection = PALETTES["Dark+"]
+    # Give the theme a deliberately dim directory color (the accent, invisible at
+    # raw value on the content surface) so this exercises both the extras['directory']
+    # wiring and the readability lift.
     theme = derive_theme(background=bg, foreground=fg, muted=muted,
-                         accent=accent, surface=surface, selection=selection)
+                         accent=accent, surface=surface, selection=selection,
+                         extras={"directory": accent})
 
     class _Entry:
         def __init__(self, name, is_dir):
