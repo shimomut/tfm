@@ -59,10 +59,15 @@ BRACKET_W = 1
 #: Derived from the pane background so it tracks the theme: a dark wash on a dark
 #: theme, a pale one on a light one.
 MATCH_TINT = 0.28
-#: Directory-name foreground when a theme names no ``extras['directory']`` — a
-#: soft yellow (the ttk build's directory hue). Regular files use ``theme.text``.
-#: A theme (or a user's ``config.py`` ``THEME``) overrides this per palette.
+#: File-type name foregrounds when a theme names no ``file_types`` palette (its
+#: ``extras['file_types']`` sub-dict of ``directory`` / ``file`` / ``link``, the
+#: same shape as the ``syntax`` palette). ``directory`` defaults to a soft yellow
+#: (the ttk build's hue); ``link`` to a cyan (the ls convention); ``file`` to the
+#: theme's own ``theme.text``. A theme (or a user's ``config.py`` ``THEMES``)
+#: overrides any of them per palette; the legacy flat ``extras['directory']`` is
+#: still honored as a shorthand for ``file_types['directory']``.
 DIRECTORY_FG_DEFAULT = (204, 204, 120)
+LINK_FG_DEFAULT = (86, 194, 214)
 #: Cursor-position cue color — a distinct **red**, orthogonal to the selection
 #: fill so the two never read as the same channel: vivid on the active pane, a
 #: muted red on the inactive one (the louder cue marks the focused pane).
@@ -147,7 +152,8 @@ class FilePane(Widget):
     # --- helpers -------------------------------------------------------------
 
     def _info(self, entry) -> dict:
-        """Cached (size_str, date_str, is_dir) for an entry, or a stat fallback."""
+        """Cached (size_str, date_str, is_dir, is_link) for an entry, or a stat
+        fallback."""
         info = self.pane.get("file_info", {}).get(str(entry))
         if info is not None:
             return info
@@ -155,7 +161,28 @@ class FilePane(Widget):
             is_dir = entry.is_dir()
         except Exception:
             is_dir = False
-        return {"size_str": "<DIR>" if is_dir else "", "date_str": "", "is_dir": is_dir}
+        try:
+            is_link = entry.is_symlink()
+        except Exception:
+            is_link = False
+        return {"size_str": "<DIR>" if is_dir else "", "date_str": "",
+                "is_dir": is_dir, "is_link": is_link}
+
+    @staticmethod
+    def _type_fg(theme, is_dir: bool, is_link: bool):
+        """The raw name foreground for a file type, from the theme's ``file_types``
+        palette (``extras['file_types']``: directory / file / link). A symlink wins
+        over a directory so a link to a folder still reads as a link. Falls back to
+        the legacy flat ``extras['directory']`` and to the module defaults; the
+        returned color is passed through ``ctx.ink`` by the caller for legibility."""
+        ft = theme.extras.get("file_types") or {}
+        if is_link:
+            return ft.get("link") or LINK_FG_DEFAULT
+        if is_dir:
+            return (ft.get("directory")
+                    or theme.extras.get("directory")  # legacy flat shorthand
+                    or DIRECTORY_FG_DEFAULT)
+        return ft.get("file") or theme.text
 
     def _date_width(self) -> int:
         """Character width of the date column, from the first dated entry.
@@ -420,18 +447,18 @@ class FilePane(Widget):
         if gui_cursor:
             self._draw_cursor(ctx, y, band_left, band_right, grid)
 
-        # Foreground keeps the dir/file color language on every row (the themed
-        # directory color, else theme.text), but is passed through ctx.ink against
-        # the *actual* background behind the glyphs — the pane base, or the
-        # selection/match tint where one is painted — so the directory name stays
-        # legible even on a row tinted toward a nearby hue (floor-only: unchanged
-        # wherever it already reads). The cursor row's glyphs draw over a
-        # *transparent* background so they land directly on the fill + outline below
-        # without a per-run fill repainting (and breaking) the stroke — but they
-        # still contrast against that fill (eff_bg), not None.
+        # Foreground keeps the file-type color language on every row (link / dir /
+        # file from the theme's file_types palette, a symlink winning over a dir),
+        # but is passed through ctx.ink against the *actual* background behind the
+        # glyphs — the pane base, or the selection/match tint where one is painted —
+        # so the name stays legible even on a row tinted toward a nearby hue
+        # (floor-only: unchanged wherever it already reads). The cursor row's glyphs
+        # draw over a *transparent* background so they land directly on the fill +
+        # outline below without a per-run fill repainting (and breaking) the stroke —
+        # but they still contrast against that fill (eff_bg), not None.
         eff_bg = row_bg if row_bg is not None else base
-        dir_fg = theme.extras.get("directory", DIRECTORY_FG_DEFAULT)
-        name_fg = ctx.ink(dir_fg if is_dir else theme.text, on=eff_bg, target=LC_BODY)
+        is_link = info.get("is_link", False)
+        name_fg = ctx.ink(self._type_fg(theme, is_dir, is_link), on=eff_bg, target=LC_BODY)
         col_fg = ctx.ink(theme.muted_text, on=eff_bg, target=LC_LARGE)
         text_bg = TRANSPARENT if gui_cursor else row_bg
 

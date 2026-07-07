@@ -101,8 +101,14 @@ class Config:
     #   # --- chrome bars (a solid color for the whole bar) ---
     #   'status':        (0, 122, 204)    # bottom status bar (also the viewers')
     #   'footer':        (0, 122, 204)    # per-pane info bar
-    #   # --- file panes ---
-    #   'directory':     (204, 204, 120)  # directory names (default: soft yellow)
+    #   # --- file panes: per-type name colors (a sub-dict, like 'syntax';
+    #   #     override only the types you name) ---
+    #   'file_types': {'directory': (204, 204, 120),  # dirs  (default: soft yellow)
+    #                  'file':      (212, 212, 212),  # files (default: foreground)
+    #                  'link':      (86, 194, 214)}   # symlinks (default: cyan)
+    #   #   ('directory' may also be given as a flat top-level key — shorthand for
+    #   #    file_types['directory']. A symlink is colored as a link even when it
+    #   #    points at a directory.)
     #   # --- incremental search ---
     #   'isearch_match': (78, 201, 176)   # match-highlight base (default: accent2)
     #   # --- text / diff viewer syntax colors (override only the tokens you name) ---
@@ -116,12 +122,12 @@ class Config:
     # THEMES = {
     #     'Ocean': {                       # builds on Dark+
     #         'accent': (38, 139, 210),
-    #         'directory': (120, 200, 220),
+    #         'file_types': {'directory': (120, 200, 220), 'link': (90, 200, 180)},
     #         'syntax': {'keyword': (0, 175, 215)},
     #     },
     #     'Paper': {                       # a light theme, from a light base
     #         'base': 'Light+',
-    #         'directory': (150, 110, 0),
+    #         'file_types': {'directory': (150, 110, 0)},
     #     },
     # }
     THEMES = {
@@ -138,7 +144,10 @@ class Config:
             'selection':  (24, 105, 54),     # active selection fill
             'status':     (9, 30, 16),       # status bar (dark green panel)
             'footer':     (9, 30, 16),       # per-pane info bar
-            'directory':  (150, 255, 150),   # directories (brightest green)
+            'file_types': {
+                'directory': (150, 255, 150),  # directories (brightest green)
+                'link':      (124, 255, 168),  # symlinks (pale mint)
+            },
             'syntax': {
                 'keyword':  (130, 255, 150),
                 'string':   (90, 220, 120),

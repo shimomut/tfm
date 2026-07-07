@@ -193,6 +193,12 @@ class FileListManager:
         file_info = {}
         for file_path in files:
             file_key = str(file_path)
+            # is_symlink() does not follow the link, so it stays true even for a
+            # broken symlink whose stat() below fails; capture it up front.
+            try:
+                is_link = file_path.is_symlink()
+            except Exception:
+                is_link = False
             try:
                 stat_info = file_path.stat()
                 is_dir = file_path.is_dir()
@@ -210,14 +216,16 @@ class FileListManager:
                 file_info[file_key] = {
                     'size_str': size_str,
                     'date_str': date_str,
-                    'is_dir': is_dir
+                    'is_dir': is_dir,
+                    'is_link': is_link
                 }
             except Exception:
                 # Cache error result to avoid repeated stat() calls
                 file_info[file_key] = {
                     'size_str': '---',
                     'date_str': '---',
-                    'is_dir': False
+                    'is_dir': False,
+                    'is_link': is_link
                 }
         return file_info
 
