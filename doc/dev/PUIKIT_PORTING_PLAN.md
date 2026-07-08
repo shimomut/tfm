@@ -61,46 +61,50 @@ it:
 ### 2.2 Windows backend bring-up
 TFM now **runs on Windows** (verified in a VMware guest): the window, Direct2D/
 DirectWrite rendering, and basic navigation/features work. (New platform vs.
-`ttk`, which was curses + macOS only.) What remains is backend-specific gaps in
-PuiKit's `WindowsBackend` — all in the **PuiKit repo**
-(`puikit/backends/windows_backend.py` + `_win32_native.py`), not TFM.
+`ttk`, which was curses + macOS only.) The Windows-specific parity gap
+(IME + both drag-and-drop directions) is now closed — all in the **PuiKit repo**
+(`puikit/backends/windows_backend.py`, `_win32_ime.py`, `_win32_dragdrop.py`),
+not TFM. Only bring-up testing (§C) remains open.
 
-**A. IME / text input.** The widget layer is already IME-ready on every backend
-(`TextEdit` consumes `IME_COMPOSITION` preedit events and renders them inline),
-and `Panel` drives the seam (`begin_text_input`/`end_text_input` on focus). The
-gap is entirely the Windows backend's OS integration: it implements neither hook
-and makes no IMM32/`WM_IME_*` calls (`imm32` isn't even loaded). In priority
-order:
-- **A1 — Mode-gate the IME (the actual bug).** Implement `begin_text_input` /
-  `end_text_input`; disable the input context in command mode
-  (`ImmAssociateContext(hwnd, NULL)` or `ImmSetOpenStatus(FALSE)`) and re-enable
-  on text focus. Without this, with a CJK IME selected, command-mode
-  single-letter bindings (`j`/`f`/`v`) get swallowed into composition instead of
-  dispatching. Mirrors macOS's `_text_input_active` gating; satisfies the
-  backend contract ("while inactive, deliver plain command KEY events"). Needs
-  `imm32` loaded in `_win32_native.py`.
-- **A2 — Position the candidate window at the caret.** `request_text_input(x,y)`
-  currently only stores the caret; call `ImmSetCompositionWindow` (CFS_POINT /
-  CANDIDATEFORM) + `ImmSetCompositionFont` so the preedit/candidate popup appears
-  at the field instead of the window corner.
-- **A3 — Surrogate-pair committed input.** `_on_char` does `chr(wparam & 0xFFFF)`
-  and drops lone surrogates, so emoji / non-BMP CJK (delivered as two WM_CHARs)
-  can't be typed. Buffer a high surrogate and combine with the following low one.
-- **A4 — Inline preedit display.** Handle `WM_IME_STARTCOMPOSITION` (suppress the
-  default composition window), `WM_IME_COMPOSITION` (GCS_COMPSTR → `IME_COMPOSITION`
-  events; GCS_RESULTSTR → commit), `WM_IME_ENDCOMPOSITION`; flip PROFILE
-  `ime` → True. Biggest piece; matches macOS's inline underlined preedit. Widget
-  side already handles the events.
+**A. IME / text input — DONE.** Mode-gated (`ImmAssociateContext(hwnd, NULL)` in
+command mode, re-associated on text focus — `_win32_ime.disable_ime`/
+`enable_ime`), candidate window positioned at the live caret
+(`ImmSetCompositionWindow`/CFS_POINT), astral/emoji input fixed (`_on_char`
+buffers a WM_CHAR high surrogate and combines it with the following low one),
+and inline preedit wired (`WM_IME_SETCONTEXT` clears
+`ISC_SHOWUICOMPOSITIONWINDOW` so the OS doesn't draw its own composition box;
+`WM_IME_COMPOSITION`'s GCS_COMPSTR/GCS_CURSORPOS dispatch `IME_COMPOSITION` for
+the widget to render inline, matching macOS — a GCS_RESULTSTR commit only
+clears the preedit here since the committed characters still arrive via the
+existing WM_CHAR path, so nothing double-inserts). `PROFILE["ime"]` is `True`.
+Manually verified live in the real TFM app (rename dialog: type → Escape, no
+crash, IME state transitions cleanly); full CJK composition needs a live IME
+source to exercise end-to-end, not yet done.
 
-A1 alone should restore usable IME (committed text already works via `WM_CHAR`);
-A2–A3 make it correct; A4 is the polish that matches macOS.
-
-**B. Other deferred capabilities** (PROFILE flags currently `False` in
-`windows_backend.py`), each its own COM/Win32 surface:
-- `os_drag_drop` — drag-*out* (IDropSource / DoDragDrop).
-- `drag_and_drop` — drop-*in* (IDropTarget).
+**B. Both drag-and-drop directions — DONE**
+(`puikit/backends/_win32_dragdrop.py`). `PROFILE["drag_and_drop"]` and
+`PROFILE["os_drag_drop"]` are both `True`:
+- **Drop-in** — a hand-built `IDropTarget` (`RegisterDragDrop`), not
+  `DragAcceptFiles`/`WM_DROPFILES`: that legacy shortcut was tried first (no
+  custom COM object needed) but verified live *not* to fire for an arbitrary
+  OLE drag source, regardless of `OleInitialize` ordering — real `IDropTarget`
+  registration is what actually works.
+- **Drag-out** — a hand-built `IDropSource` (2 methods) *and* a hand-built
+  `IDataObject` (`FileDataObject`, exposing exactly CF_HDROP over a real
+  `DROPFILES` global-memory block). An earlier attempt built the data object
+  for free via the shell's `SHCreateDataObject` (given each path's PIDL) to
+  avoid hand-authoring `IDataObject` — verified live *not* to work (its
+  `QueryGetData`/`GetData` both rejected CF_HDROP with the NULL-`pidlFolder` +
+  absolute-PIDL calling form), so `FileDataObject` replaced it.
+- Verified live end-to-end with two real `WindowsBackend` windows: dragging a
+  file out of one (`begin_file_drag`, exactly TFM's `FilePane.on_drag` →
+  `panel.begin_file_drag` call shape) and dropping it on the other delivered a
+  `FILE_DROP` event with the right path/coordinates, and the source's
+  `on_complete` correctly reported the chosen operation (`"copy"`).
 - `clipboard_rich`, `native_file_dialog` (IFileDialog), `system_tray`,
-  `media_keys`.
+  `media_keys` remain `False` — confirmed unused by TFM (no native file
+  picker, tray, or media-key handling anywhere in the app) and also `False` on
+  `MacOSBackend`, so not a real parity gap; not on this backend's punch list.
 
 (Images already work via WIC — not on this list.)
 
