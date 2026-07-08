@@ -562,6 +562,65 @@ fi
 log_success "Install names updated"
 
 # ============================================================================
+# Step 4b: Make the bundle self-contained (vendor external dylibs)
+# ============================================================================
+#
+# Python's C-extension modules (_ssl, _hashlib, _sqlite3, _lzma, _zstd,
+# _decimal, ...) are dynamically linked against Homebrew libraries that live
+# OUTSIDE the bundle, e.g. /opt/homebrew/opt/openssl@3/lib/libssl.3.dylib.
+# On a Mac without those exact Homebrew formulae the app fails to launch with
+# "Library not loaded: /opt/homebrew/...". delocate copies each such library
+# into a .dylibs/ folder next to the extensions and rewrites their load
+# commands to @loader_path, so the bundle runs on any Mac.
+
+log_info "Step 4b: Vendoring external dynamic libraries (delocate)..."
+
+# The Homebrew framework copy can leave dangling / self-referential symlinks
+# (e.g. Versions/${PYTHON_VERSION}/${PYTHON_VERSION} -> ${PYTHON_VERSION}).
+# They are unused by TFM but trip up delocate's directory walk, so remove any
+# broken symlinks first.
+BROKEN_LINKS=$(find "${APP_BUNDLE}" -type l ! -exec test -e {} \; -print 2>/dev/null | wc -l | tr -d ' ')
+if [ "${BROKEN_LINKS}" != "0" ]; then
+    log_info "  Removing ${BROKEN_LINKS} broken symlink(s) from the bundle"
+    find "${APP_BUNDLE}" -type l ! -exec test -e {} \; -delete 2>/dev/null || true
+fi
+
+# Ensure delocate is available in the build venv.
+DELOCATE_PATH="${PROJECT_ROOT}/.venv/bin/delocate-path"
+if [ ! -x "${DELOCATE_PATH}" ]; then
+    log_info "  delocate not found in venv; installing..."
+    if ! "${VENV_PYTHON}" -m pip install --quiet delocate; then
+        log_error "Failed to install 'delocate'. Install it and re-run the build:"
+        log_error "  ${VENV_PYTHON} -m pip install delocate"
+        exit 1
+    fi
+fi
+
+# Delocate only the lib-dynload tree so the vendored .dylibs/ folder stays
+# inside Contents/ and the main executable and Python.framework (already wired
+# with @executable_path) are left untouched. This is the only part of the
+# bundle with external dependencies; the pip packages under Resources ship
+# self-contained wheels.
+LIB_DYNLOAD="${FRAMEWORKS_DIR}/Python.framework/Versions/${PYTHON_VERSION}/lib/python${PYTHON_VERSION}/lib-dynload"
+if [ -d "${LIB_DYNLOAD}" ]; then
+    "${DELOCATE_PATH}" "${LIB_DYNLOAD}"
+    log_info "  Vendored external libraries into ${LIB_DYNLOAD}/.dylibs"
+
+    # Verify no C-extension still depends on a library outside the bundle.
+    EXTERNAL_DEPS=$(find "${LIB_DYNLOAD}" -name "*.so" -exec otool -L {} \; 2>/dev/null \
+        | grep -E "^[[:space:]]+(/opt/homebrew|/usr/local|/opt/local|/Users/)" | sort -u || true)
+    if [ -n "${EXTERNAL_DEPS}" ]; then
+        log_warning "  Some extensions still reference external libraries:"
+        echo "${EXTERNAL_DEPS}"
+        log_warning "  The app may fail to launch on machines without these libraries."
+    else
+        log_success "  All C-extension modules are self-contained"
+    fi
+else
+    log_warning "  lib-dynload not found at ${LIB_DYNLOAD}; skipping delocate"
+fi
+
+# ============================================================================
 # Step 5: Generate Info.plist
 # ============================================================================
 
