@@ -1502,7 +1502,7 @@ class TfmApp:
             MenuItem("Clear Selection", on_select=lambda: self._menu("unselect_all"),
                      enabled=lambda: bool(self.active_pane()["selected_files"]),
                      shortcut=sc("unselect_all")),
-            MenuItem("Compare & Select…", on_select=self.compare_selection,
+            MenuItem("Compare and Select…", on_select=self.compare_selection,
                      enabled=has_files, shortcut=sc("compare_selection")),
             SEPARATOR,
             MenuItem("Compare Selected Files…", on_select=self.diff_files, shortcut=sc("diff_files")),

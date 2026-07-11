@@ -164,7 +164,7 @@ class CompareSelectDialog(FocusContainer, Widget):
     _HINT_OTHER = "Space toggle · Enter select · Esc cancel"
 
     def __init__(self, on_result: Callable[[Optional[CompareCriteria]], None]):
-        self.title = "Compare & Select"
+        self.title = "Compare and Select"
         self.on_result = on_result
         self._panel: Any = None
 
