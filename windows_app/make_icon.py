@@ -25,6 +25,35 @@ _ICO_SIZES = [16, 24, 32, 48, 64, 128, 256]
 _FILL = (38, 132, 128)
 _BORDER = (90, 200, 190)
 
+# Corner-rounding radius as a fraction of the icon size, applied when the source
+# has no transparency of its own (macOS .icns files are full-bleed squares that
+# the OS masks into a squircle). ~0.225 approximates the macOS Big Sur radius.
+_CORNER_RADIUS_FRAC = 0.225
+
+
+def _apply_rounded_mask(img, size):
+    """
+    Return a (size x size) RGBA image with rounded-corner transparency.
+
+    Rendered at 4x and downsampled so the rounded edge is smoothly antialiased,
+    and the existing alpha is multiplied by the mask (so a source that *does*
+    have transparency keeps it).
+    """
+    from PIL import Image, ImageChops, ImageDraw
+
+    ss = 4
+    big = size * ss
+    scaled = img.resize((big, big), Image.LANCZOS).convert("RGBA")
+    mask = Image.new("L", (big, big), 0)
+    ImageDraw.Draw(mask).rounded_rectangle(
+        [0, 0, big - 1, big - 1], radius=round(big * _CORNER_RADIUS_FRAC), fill=255
+    )
+    scaled = scaled.resize((size, size), Image.LANCZOS)
+    mask = mask.resize((size, size), Image.LANCZOS)
+    r, g, b, a = scaled.split()
+    scaled.putalpha(ImageChops.multiply(a, mask))
+    return scaled
+
 
 def _try_pillow(source: Path, out: Path) -> bool:
     try:
@@ -33,13 +62,15 @@ def _try_pillow(source: Path, out: Path) -> bool:
         return False
 
     try:
-        img = Image.open(source)
-        img = img.convert("RGBA")
-        sizes = [(s, s) for s in _ICO_SIZES if s <= max(img.size)]
-        if not sizes:
-            sizes = [(256, 256)]
-        img.save(out, format="ICO", sizes=sizes)
-        print(f"[INFO] Wrote {out} from {source} via Pillow ({len(sizes)} sizes)")
+        img = Image.open(source).convert("RGBA")
+        # Master at the largest ICO size, with rounded-corner transparency; the
+        # ICO encoder derives every smaller size by resizing this master, so the
+        # corners (and the alpha channel) stay proportional across sizes.
+        master = _apply_rounded_mask(img, 256)
+        sizes = [(s, s) for s in _ICO_SIZES]
+        master.save(out, format="ICO", sizes=sizes)
+        print(f"[INFO] Wrote {out} from {source} via Pillow "
+              f"({len(sizes)} sizes, rounded-corner alpha)")
         return True
     except Exception as exc:  # noqa: BLE001
         print(f"[WARNING] Pillow conversion of {source} failed: {exc}")
