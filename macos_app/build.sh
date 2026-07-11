@@ -656,6 +656,69 @@ else
 fi
 
 # ============================================================================
+# Step 4c: Generate third-party license notices
+# ============================================================================
+#
+# Build an aggregated THIRD_PARTY_NOTICES.txt from the license text shipped with
+# every bundled Python distribution (python_packages/*.dist-info), plus the
+# components that are not Python distributions: the embedded CPython interpreter,
+# the copied-in PuiKit source, and the bundled Noto fonts. The generator fails
+# the build if any bundled distribution has no discoverable license text, so an
+# incomplete notice can never ship. The script is stdlib-only and platform-
+# agnostic - the Windows bundle build reuses it the same way.
+
+log_info "Step 4c: Generating third-party license notices..."
+
+NOTICES_SCRIPT="${PROJECT_ROOT}/tools/generate_third_party_notices.py"
+NOTICES_OUT="${RESOURCES_DIR_BUNDLE}/THIRD_PARTY_NOTICES.txt"
+
+if [ ! -f "${NOTICES_SCRIPT}" ]; then
+    log_error "Notices generator not found at ${NOTICES_SCRIPT}"
+    exit 1
+fi
+
+NOTICES_EXTRAS=()
+
+# Embedded interpreter's PSF license (under lib/, survives the Resources/
+# cleanup performed while embedding Python above).
+PYTHON_LICENSE="${PYTHON_DEST}/lib/python${PYTHON_VERSION}/LICENSE.txt"
+if [ -f "${PYTHON_LICENSE}" ]; then
+    NOTICES_EXTRAS+=(--extra "Python ${PYTHON_VERSION} interpreter and standard library (Python Software Foundation License Agreement)=${PYTHON_LICENSE}")
+else
+    log_warning "Python LICENSE.txt not found at ${PYTHON_LICENSE}; the interpreter will not be listed in the generated notices"
+fi
+
+# PuiKit's LICENSE lives at the checkout root, one level above the package
+# directory resolved into PUIKIT_SRC; its source is copied in by Step 3.
+PUIKIT_LICENSE="$(dirname "${PUIKIT_SRC}")/LICENSE"
+if [ -f "${PUIKIT_LICENSE}" ]; then
+    NOTICES_EXTRAS+=(--extra "PuiKit (MIT License)=${PUIKIT_LICENSE}")
+else
+    log_error "PuiKit LICENSE not found at ${PUIKIT_LICENSE}"
+    exit 1
+fi
+
+# Bundled fonts (SIL OFL 1.1); OFL.txt was copied alongside the .ttf files.
+FONTS_OFL="${FONTS_DEST}/OFL.txt"
+if [ -f "${FONTS_OFL}" ]; then
+    NOTICES_EXTRAS+=(--extra "Noto Sans & Noto Sans Mono fonts (SIL Open Font License 1.1)=${FONTS_OFL}")
+else
+    log_error "Font license OFL.txt not found at ${FONTS_OFL}"
+    exit 1
+fi
+
+if "${VENV_PYTHON}" "${NOTICES_SCRIPT}" \
+        --title "TFM" \
+        --scan "${PACKAGES_DEST}" \
+        "${NOTICES_EXTRAS[@]}" \
+        --output "${NOTICES_OUT}"; then
+    log_success "Third-party notices written to ${NOTICES_OUT}"
+else
+    log_error "Failed to generate third-party license notices (see errors above)"
+    exit 1
+fi
+
+# ============================================================================
 # Step 5: Generate Info.plist
 # ============================================================================
 
