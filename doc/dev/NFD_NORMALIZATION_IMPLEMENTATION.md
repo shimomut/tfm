@@ -1,8 +1,15 @@
 # NFD Normalization Implementation
 
+> **⚠️ Partly historical (pre-PuiKit port).** The rendering-side normalization
+> described here lived in the old in-repo `ttk` backends (`ttk/backends/*`). That
+> layer is now the external **[PuiKit](https://github.com/crftwr/puikit)** framework
+> (`puikit/backends/`), which owns text-drawing normalization today. TFM's own
+> filesystem-side NFD handling (in `src/tfm_path.py`) still applies. See
+> [PUIKIT_PORTING_PLAN.md](PUIKIT_PORTING_PLAN.md).
+
 ## Overview
 
-This document describes the implementation of NFD (Normalization Form D) to NFC (Normalization Form C) conversion in TFM and TTK to handle macOS filesystem filename encoding correctly.
+This document describes the implementation of NFD (Normalization Form D) to NFC (Normalization Form C) conversion in TFM and the rendering backend to handle macOS filesystem filename encoding correctly.
 
 ## Problem Statement
 
@@ -126,7 +133,7 @@ Tests verify:
 
 Run tests:
 ```bash
-PYTHONPATH=.:src:ttk python3 test/test_nfd_normalization.py
+PYTHONPATH=.:src python3 test/test_nfd_normalization.py
 ```
 
 ## Technical Details

@@ -593,7 +593,7 @@ python3 tools/benchmark_coregraphics_performance.py \
 
 - [Desktop Mode Guide](DESKTOP_MODE_GUIDE.md) - High-performance desktop mode
 - Developer documentation: `doc/dev/PROFILING_SYSTEM_IMPLEMENTATION.md`
-- CoreGraphics performance: `doc/dev/COREGRAPHICS_PERFORMANCE_ANALYSIS.md`
+- CoreGraphics performance: `doc/dev/_archived/COREGRAPHICS_PERFORMANCE_ANALYSIS.md` (archived — pre-PuiKit)
 
 ---
 

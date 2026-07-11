@@ -6,18 +6,19 @@ inclusion: always
 
 ## Directory Structure
 
+- `tfm.py` - The application entry point (FileManager + top-level UI), at the repo root
+- `src/` - TFM modules imported by `tfm.py` (`tfm_*.py`)
 - `test/` - TFM test files (`test_*.py`)
-- `ttk/test/` - TTK library test files (`test_*.py`)
-- `ttk/demo/` - TTK library demo files (`demo_*.py`)
-- `ttk/doc/` - TTK end-user documentation
-- `ttk/doc/dev/` - TTK developer documentation
 - `doc/` - TFM end-user documentation (`FEATURE_NAME_FEATURE.md`)
 - `doc/dev/` - TFM developer documentation (`SYSTEM_NAME_SYSTEM.md`, `FEATURE_NAME_IMPLEMENTATION.md`)
-- `demo/` - TFM demo scripts (`demo_*.py`)
+- `doc/dev/_archived/` - Retired pre-PuiKit toolkit-internal docs (reference only)
 - `tools/` - Development tools and scripts for Kiro/developers (`*.sh`, `*.py`)
 - `src/tools/` - External programs for end users (`*.sh`, `*.py`)
-- `src/` - Core application code (`tfm_*.py`)
+- `legacy/` - Frozen pre-PuiKit code (old `ttk` toolkit + ttk-bound UI); not executed
 - `temp/` - Temporary files during development
+
+> **PuiKit** (the UI framework) is **not** in this repo — it lives in `../puikit`
+> and is installed editable. There is no longer a `ttk/` directory.
 
 ## Documentation Policy
 
@@ -33,13 +34,12 @@ inclusion: always
 
 | File Type | Location | Naming |
 |-----------|----------|--------|
+| App entry | repo root | `tfm.py` |
+| Source code | `src/` | `tfm_*.py` |
 | TFM tests | `test/` | `test_*.py` |
-| TTK tests | `ttk/test/` | `test_*.py` |
-| TFM demos | `demo/` | `demo_*.py` |
-| TTK demos | `ttk/demo/` | `demo_*.py` |
 | Development tools | `tools/` | `*.sh`, `*.py` |
 | End-user external programs | `src/tools/` | `*.sh`, `*.py` |
-| Source code | `src/` | `tfm_*.py` |
+| Retired pre-PuiKit code | `legacy/` | frozen, not executed |
 | Temporary files | `temp/` | `temp_*`, `TEMP_*` |
 
 ## Key Rules
@@ -47,5 +47,5 @@ inclusion: always
 - **Temporary files** → Always use `temp/` directory during development
 - **Development tools** → Use `tools/` for Kiro/developer utilities (not for end users)
 - **End-user external programs** → Use `src/tools/` for user-facing external integrations
-- **Separate TTK from TFM** → TTK library files go in `ttk/` subdirectories
+- **PuiKit is separate from TFM** → UI-framework/backend/renderer code belongs in the PuiKit repo (`../puikit`), not in this tree
 - **Documentation audience** → End-user docs must not include implementation details; developer docs must not include basic usage instructions

@@ -106,7 +106,7 @@ Comprehensive tests are in `test/test_natural_sorting.py`:
 
 Run tests:
 ```bash
-PYTHONPATH=.:src:ttk pytest test/test_natural_sorting.py -v
+PYTHONPATH=.:src pytest test/test_natural_sorting.py -v
 ```
 
 ### Performance Considerations

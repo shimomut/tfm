@@ -1,8 +1,16 @@
 # Drag-and-Drop Implementation Guide
 
+> **⚠️ Partly historical (pre-PuiKit port).** The backend-layer specifics below —
+> `ttk/...` paths, the `TtkBackend` base class, the C++ CoreGraphics renderer, and
+> the "add a new platform backend" walkthrough — describe the old in-repo `ttk`
+> toolkit. That layer is now the external **[PuiKit](https://github.com/crftwr/puikit)**
+> framework (`../puikit`; see its `docs/drag_drop.md` and `puikit/backends/`), where
+> the APIs differ. TFM's application-layer drag-initiation design still applies.
+> See [PUIKIT_PORTING_PLAN.md](PUIKIT_PORTING_PLAN.md).
+
 ## Overview
 
-This document provides comprehensive implementation details for TFM's drag-and-drop feature, which enables users to drag files from the file manager to external applications on desktop platforms. The implementation is designed with a platform-agnostic architecture at the TFM level, with platform-specific implementations in the TTK backend layer.
+This document provides comprehensive implementation details for TFM's drag-and-drop feature, which enables users to drag files from the file manager to external applications on desktop platforms. The implementation is designed with a platform-agnostic architecture at the TFM level, with platform-specific implementations in the PuiKit backend layer.
 
 **Target Audience**: Developers working on TFM, contributors adding platform support, maintainers debugging drag-and-drop issues.
 

@@ -45,7 +45,7 @@ class Config:
 ## Implementation Details
 
 ### Renderer Suspension
-The implementation properly handles renderer suspension and resumption using the TTK Renderer API:
+The implementation properly handles renderer suspension and resumption using the PuiKit backend API:
 
 ```python
 # Suspend renderer to allow external program to run
@@ -59,7 +59,7 @@ result = subprocess.run([editor, str(selected_file)],
 self.renderer.resume()
 ```
 
-The `suspend()` and `resume()` methods are part of the TTK Renderer interface and work across all backends (curses, CoreGraphics, etc.). For the curses backend, this internally calls `curses.endwin()` and `curses.reset_prog_mode()` respectively.
+The `suspend()` and `resume()` methods are part of the PuiKit backend interface and work across all backends (curses, macOS, etc.). For the curses backend, this internally calls `curses.endwin()` and `curses.reset_prog_mode()` respectively.
 
 ### Editor Execution
 The editor is launched as a subprocess with proper error handling:

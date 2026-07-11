@@ -170,7 +170,7 @@ Defined in `tfm_menu_manager.py`:
 ### Running Tests
 
 ```bash
-PYTHONPATH=.:src:ttk python -m pytest test/test_about_dialog.py -v
+PYTHONPATH=.:src python -m pytest test/test_about_dialog.py -v
 ```
 
 ## Demo Application
@@ -178,7 +178,7 @@ PYTHONPATH=.:src:ttk python -m pytest test/test_about_dialog.py -v
 The demo application (`demo/demo_about_menu.py`) provides a standalone way to test the About dialog:
 
 ```bash
-PYTHONPATH=.:src:ttk python demo/demo_about_menu.py
+PYTHONPATH=.:src python demo/demo_about_menu.py
 ```
 
 **Note**: This is a TUI application and will block execution. Do not run in automated scripts.
@@ -197,5 +197,5 @@ Potential improvements:
 
 - UILayer interface: `src/tfm_ui_layer.py`
 - Menu system: `src/tfm_menu_manager.py`
-- TTK rendering: `ttk/` directory
+- Rendering: [PuiKit](https://github.com/crftwr/puikit) framework (external — `../puikit`)
 - Constants: `src/tfm_const.py`

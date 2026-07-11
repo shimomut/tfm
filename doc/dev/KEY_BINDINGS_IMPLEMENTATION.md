@@ -32,7 +32,7 @@ This document describes the implementation of TFM's enhanced key bindings system
                          │ Uses
                          ↓
 ┌─────────────────────────────────────────────────────────────┐
-│                  TTK KeyCode & ModifierKey                   │
+│                PuiKit key events (Event/EventType)           │
 │  - KeyCode enum (StrEnum)                                   │
 │  - ModifierKey flags (IntFlag)                              │
 └─────────────────────────────────────────────────────────────┘
@@ -443,4 +443,4 @@ Possible future improvements:
 
 - [Key Bindings Feature](../KEY_BINDINGS_FEATURE.md) - User documentation
 - [Configuration System](CONFIGURATION_SYSTEM.md) - Configuration architecture
-- [TTK Event System](../../ttk/doc/dev/EVENT_SYSTEM.md) - KeyEvent details
+- [PuiKit event system](https://github.com/crftwr/puikit) - key/char event details (`puikit/event.py`)

@@ -199,6 +199,6 @@ Drag files to the Dock or application launchers:
 
 For developers interested in the implementation:
 - See `doc/dev/DRAG_AND_DROP_IMPLEMENTATION.md` for architecture details
-- Drag-and-drop uses the TTK backend abstraction layer
+- Drag-and-drop uses the PuiKit backend abstraction layer
 - Platform-specific implementations in backend modules
 - Gesture detection uses distance and time thresholds

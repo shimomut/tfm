@@ -1,10 +1,18 @@
 # Menu System Architecture
 
+> **⚠️ Partly historical (pre-PuiKit port).** This document predates the move from
+> the in-repo `ttk` toolkit to the external **[PuiKit](https://github.com/crftwr/puikit)**
+> framework. References below to `ttk`, `ttk/...` paths, the `MenuEvent`/renderer
+> classes, and the CoreGraphics backend describe the old rendering layer; the
+> equivalent code now lives in the PuiKit repo (`../puikit`, e.g. `puikit/menu.py`
+> and `puikit/backends/`), where the event/menu APIs differ. TFM's
+> application-layer menu design still applies. See [PUIKIT_PORTING_PLAN.md](PUIKIT_PORTING_PLAN.md).
+
 ## Overview
 
 This document provides comprehensive technical documentation for TFM's menu system architecture. It covers the design, implementation, and integration of the native menu bar feature in Desktop mode, including how to add new menu items, handle menu events, and extend the system.
 
-The menu system is designed with clear separation of concerns: TFM defines menu structure and behavior at the application layer, while TTK backends handle platform-specific rendering. This architecture ensures maintainability, testability, and cross-platform compatibility.
+The menu system is designed with clear separation of concerns: TFM defines menu structure and behavior at the application layer, while PuiKit backends handle platform-specific rendering. This architecture ensures maintainability, testability, and cross-platform compatibility.
 
 ## Target Audience
 
@@ -1505,7 +1513,7 @@ def show_context_menu(self, file_path: Path, position: Tuple[int, int]):
 
 - **End-User Documentation**: `doc/MENU_BAR_FEATURE.md` (includes keyboard shortcuts reference)
 - **Developer Documentation**: `doc/dev/MENU_SYSTEM.md` (this file)
-- **Keyboard Shortcuts Implementation**: `doc/dev/KEYBOARD_SHORTCUTS_IMPLEMENTATION.md`
+- **Keyboard Shortcuts Implementation**: `doc/dev/_archived/KEYBOARD_SHORTCUTS_IMPLEMENTATION.md` (archived — pre-PuiKit)
 
 ## References
 

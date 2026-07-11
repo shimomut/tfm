@@ -241,6 +241,35 @@ Systematic migration to the new architecture:
 
 ---
 
+## The PuiKit Port (2026)
+
+The TTK era established a backend abstraction, but the toolkit still lived **inside**
+the TFM repository. In 2026 TFM's rendering/UI foundation was ported off the in-repo
+`ttk` toolkit onto **[PuiKit](https://github.com/crftwr/puikit)** — an external,
+capability-based framework that runs the same widget code on curses, macOS, and
+Windows backends.
+
+- **`ttk` fully removed from `src/`.** The old toolkit and the UI modules bound to
+  it were frozen under `legacy/`; no `import ttk` remains in the live app.
+- **The app collapsed onto PuiKit widgets.** The shell became a top-level `tfm.py`
+  driving dual `FilePane` widgets in a `Splitter(Splitter(left, right), log)`
+  layout; dialogs, menus (native `NSMenu` on macOS, in-window strip on curses),
+  viewers, and threaded file operations were re-implemented as PuiKit `push_layer`
+  modals and widgets.
+- **Cross-backend parity.** A single keyboard contract implemented on curses /
+  macOS / Windows, always-async directory listing, and GUI-mode vector rendering.
+- **Native polish.** Theme-associated post-effects (CRT / Pip-Boy) via CoreImage
+  on macOS, DPI-aware rendering and packaging on Windows.
+
+PuiKit is now installed editable from a sibling `../puikit` checkout rather than
+vendored. The living record of the port and its remaining tasks is
+[PUIKIT_PORTING_PLAN.md](PUIKIT_PORTING_PLAN.md).
+
+**Key Achievement**: The UI framework became a reusable, independently-versioned
+project, and TFM became one of its applications rather than its host.
+
+---
+
 ## Key Milestones Summary
 
 | Milestone | Time | Achievement |
@@ -296,12 +325,14 @@ TFM's development followed a distinctive pattern:
 2. **Modular dialog system** (Day 2)
 3. **Backend abstraction** (Month 3)
 4. **TTK framework** (Month 3)
+5. **External PuiKit framework** (2026) — toolkit moved out of the repo
 
 ### Backend Support
 1. **Curses only** (Day 1 - Month 3)
 2. **TTK with Curses backend** (Dec 10)
 3. **CoreGraphics backend** (Dec 11)
 4. **Multi-backend architecture** (Dec 12+)
+5. **PuiKit curses / macOS / Windows backends** (2026)
 
 ---
 

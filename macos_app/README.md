@@ -169,7 +169,7 @@ The main build script that creates the complete app bundle.
 
 3. **Copies resources**
    - Copies TFM Python source from `src/` to `Resources/tfm/`
-   - Copies TTK library from `ttk/` to `Resources/ttk/`
+   - Copies the PuiKit framework (resolved via `import puikit`, typically from `../puikit`) to `Resources/puikit/`
    - Collects Python dependencies to `Resources/python_packages/`
    - Copies application icon (if present)
 
@@ -283,10 +283,10 @@ TFM.app/
     │   │   ├── tfm_*.py       # All TFM modules
     │   │   └── ...
     │   │
-    │   ├── ttk/               # TTK library
+    │   ├── puikit/            # PuiKit framework
     │   │   ├── __init__.py
     │   │   ├── backends/
-    │   │   │   ├── coregraphics_backend.py
+    │   │   │   ├── macos_backend.py
     │   │   │   └── ...
     │   │   └── ...
     │   │
@@ -325,7 +325,7 @@ TFM.app/
 
 **Resources/** - All Python code and dependencies:
 - TFM source code (from `src/`)
-- TTK library (from `ttk/`)
+- PuiKit framework (from the installed `puikit` package)
 - Python packages (from site-packages)
 - Application icon
 

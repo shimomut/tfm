@@ -22,9 +22,9 @@ Activate the virtual environment before running any Python scripts, tests, or de
 **When running Python scripts or tests**, always set PYTHONPATH to include the necessary directories:
 
 ```bash
-# ✅ CORRECT - Include current directory, src, and ttk
-PYTHONPATH=.:src:ttk python script.py
-PYTHONPATH=.:src:ttk pytest test/test_file.py -v
+# ✅ CORRECT - Include current directory and src (PuiKit comes from its editable install)
+PYTHONPATH=.:src python script.py
+PYTHONPATH=.:src pytest test/test_file.py -v
 
 # ❌ AVOID - Missing PYTHONPATH can cause import errors
 python script.py
@@ -32,10 +32,10 @@ pytest test/test_file.py -v
 ```
 
 **Why this is needed:**
-- TFM source code is in `src/` directory
-- TTK library is in `ttk/` directory
-- Tests and scripts need to import from both locations
-- Setting PYTHONPATH ensures imports work correctly
+- The TFM application is `tfm.py` at the repo root; its modules are in `src/`
+- The UI framework, **PuiKit**, is external (installed editable from `../puikit`), so it is already importable — no path entry needed
+- There is no longer a `ttk/` directory (removed in the PuiKit port; the old code is frozen under `legacy/`)
+- Setting PYTHONPATH ensures imports of `tfm` and `tfm_*` work correctly
 
 ## Git Command Standards
 
@@ -63,12 +63,12 @@ Commands that don't need it: `status`, `add`, `commit`, `push`, `pull`
 
 ### Demo and Test Script Guidelines
 
-**Demo scripts (`demo/*.py`):**
-- ❌ **DO NOT execute** - These launch interactive TUI applications that require user input
+**The application (`tfm.py`) and demos (`legacy/demo/*.py`, `../puikit/demo/*.py`):**
+- ❌ **DO NOT execute** - These launch interactive TUI/GUI applications that require user input
 - ✅ **Only inspect code** to verify implementation
-- If user explicitly requests running a demo, warn them it will block and suggest they run it manually
+- If user explicitly requests running the app or a demo, warn them it will block and suggest they run it manually
 
-**Test scripts (`test/test_*.py`, `ttk/test/test_*.py`):**
+**Test scripts (`test/test_*.py`):**
 - ✅ **Safe to run** - Use pytest which exits automatically
 - Always run with pytest: `pytest test/test_file.py -v`
 - Never run test files directly with `python test_file.py`
@@ -76,8 +76,8 @@ Commands that don't need it: `status`, `add`, `commit`, `push`, `pull`
 ### Identifying Blocking Programs
 
 Programs that will block execution:
-- Any file in `demo/` directory (TUI applications)
-- Scripts that import `curses`, `ttk.TtkApplication`, or `tfm_*` UI components
+- `tfm.py` (the file manager itself) and any file in `legacy/demo/` or `../puikit/demo/`
+- Scripts that import `curses`, PuiKit backends, or `tfm_*` UI components
 - Scripts with event loops or `while True` without timeout
 - Scripts that call `.run()`, `.mainloop()`, or similar blocking methods
 
@@ -93,16 +93,16 @@ Instead of running interactive programs:
 
 ```bash
 # ❌ WRONG - Will block indefinitely
-python demo/demo_file_manager.py
+python tfm.py
 
 # ✅ CORRECT - Inspect code instead
-cat demo/demo_file_manager.py
+cat tfm.py
 
 # ✅ CORRECT - Run tests
-pytest test/test_file_manager.py -v
+pytest test/test_file_pane.py -v
 
 # ⚠️ USE WITH CAUTION - Timeout as last resort (kills after 5 seconds)
-python3 tools/timeout.py 5 python demo/demo_file_manager.py
+python3 tools/timeout.py 5 python tfm.py
 ```
 
 ### Recovery from Stuck Processes

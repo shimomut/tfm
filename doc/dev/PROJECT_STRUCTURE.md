@@ -1,269 +1,156 @@
 # TFM Project Structure
 
 ## Overview
-The TFM (Terminal File Manager) project is organized into a clean directory structure that separates source code, tests, and documentation.
+
+TFM (Terminal File Manager) is organized so that the file-manager application,
+its tests, and its documentation stay cleanly separated. Since the **PuiKit
+port**, the rendering/UI toolkit is no longer vendored in this repo — TFM depends
+on the external [PuiKit](https://github.com/crftwr/puikit) framework, and the old
+in-repo `ttk` toolkit (plus the UI modules bound to it) is frozen under
+`legacy/`.
 
 ## Directory Structure
 
 ```
 tfm/
-├── src/                    # Source code
-│   ├── tfm_main.py        # Main application logic and FileManager class
-│   ├── tfm_config.py      # Configuration system and user settings
-│   ├── tfm_const.py       # Constants and key definitions
-│   ├── tfm_colors.py      # Color management and terminal colors
-│   ├── tfm_text_viewer.py # Text file viewer with syntax highlighting
-│   ├── tfm_path.py        # Extended Path implementation with S3 support
-│   ├── tfm_s3.py          # AWS S3 integration and operations
-│   ├── tfm_cache_manager.py # Caching system for S3 and remote operations
-│   ├── tfm_archive.py     # Archive creation and extraction
-│   ├── tfm_key_bindings.py # Key binding management system
-│   ├── tfm_single_line_text_edit.py # Single line text editor component
-│   ├── tfm_base_list_dialog.py      # Base class for searchable dialogs
-│   ├── tfm_batch_rename_dialog.py   # Batch rename dialog component
-│   ├── tfm_drives_dialog.py         # Drive selection dialog (Windows)
-│   ├── tfm_external_programs.py     # External programs and subshell functionality
-│   ├── tfm_file_operations.py       # File operations handler
-│   ├── tfm_general_purpose_dialog.py # General purpose dialog system
-│   ├── tfm_info_dialog.py           # Information dialog component
-│   ├── tfm_jump_dialog.py           # Jump to directory dialog
-│   ├── tfm_list_dialog.py           # Searchable list dialog component
-│   ├── tfm_log_manager.py           # Log management system with remote monitoring
-│   ├── tfm_pane_manager.py          # Pane management functionality
-│   ├── tfm_progress_animator.py     # Progress animation system
-│   ├── tfm_progress_manager.py      # Progress tracking system
-│   ├── tfm_quick_choice_bar.py      # Quick choice bar component
-│   ├── tfm_search_dialog.py         # Search dialog component
-│   ├── tfm_state_manager.py         # Application state persistence
-│   ├── tfm_color_tester.py          # Color testing and debugging
-│   └── _config.py         # Default configuration template
-├── test/                   # Test files and demos
-│   ├── test_*.py          # Unit and integration tests
-│   ├── demo_*.py          # Interactive demos
-│   └── verify_*.py        # Verification scripts
-├── doc/                    # Documentation
-│   ├── *_FEATURE.md       # Feature documentation
-│   ├── *_SYSTEM.md        # System component documentation
-│   ├── TFM_APPLICATION_OVERVIEW.md # Comprehensive application overview
-│   └── PROJECT_STRUCTURE.md # This file
-├── tools/                  # External integration tools
-│   ├── tfm_log_client.py  # Remote log monitoring client
-│   ├── vscode_wrapper.sh  # VSCode integration script
-│   ├── bcompare_*.sh      # Beyond Compare integration scripts
-│   └── preview_files.sh   # File preview script
-├── demo/                   # Interactive demonstrations
-│   └── demo_*.py          # Feature demonstration scripts
-├── temp/                   # Temporary files and work-in-progress
-│   └── .keepme            # Directory placeholder
-├── tfm.py                  # Main entry point with argument parsing
-├── setup.py               # Package setup for pip installation
-├── Makefile               # Build automation and common tasks
-├── requirements.txt       # Python dependencies (pygments, boto3)
-├── README.md              # Project overview and user guide
-└── .gitignore             # Git ignore rules
+├── tfm.py                  # The application: FileManager + top-level UI (runs on PuiKit)
+├── src/                    # TFM modules imported by tfm.py (tfm_*.py)
+├── test/                   # Unit / integration tests (test_*.py), run with pytest
+├── doc/                    # End-user docs (*_FEATURE.md, guides)
+│   └── dev/                # Developer docs (*_IMPLEMENTATION.md, *_SYSTEM.md, plans)
+│       └── _archived/      # Retired pre-PuiKit toolkit-internal docs (reference only)
+├── tools/                  # Internal dev/build utilities (*.py, *.sh)
+├── macos_app/              # macOS .app packaging (see MACOS_APP_BUILD_SYSTEM.md)
+├── windows_app/            # Windows packaging (see WINDOWS_APP_BUILD_SYSTEM.md)
+├── legacy/                 # Frozen pre-PuiKit code (old ttk toolkit + ttk-bound UI). Not executed.
+├── temp/                   # Throwaway work-in-progress files
+├── _archived/              # Retired Kiro specs
+├── .kiro/                  # Historical Kiro design specs (reference, not authoritative)
+├── setup.py                # Package setup for pip installation
+├── Makefile                # Build automation (run, test, venv, install-puikit, macos-app, ...)
+├── requirements.txt        # Python dependencies
+└── README.md               # Project overview and user guide
 ```
 
-## Source Code (`src/`)
+PuiKit itself lives in its **own repository** (`../puikit`) and is installed
+editable into `.venv/` via `make install-puikit` (`PUIKIT_DIR ?= ../puikit`). It
+is not part of this tree.
 
-### Core Files
-- **`tfm_main.py`**: Main application with FileManager class and UI logic
-- **`tfm_config.py`**: Configuration management and user settings
-- **`tfm_const.py`**: Application constants and key definitions
-- **`tfm_colors.py`**: Color scheme and terminal color management
-- **`tfm_text_viewer.py`**: Text file viewing functionality with syntax highlighting
-- **`_config.py`**: Template configuration file for users
+## Application (`tfm.py` + `src/`)
 
-### Path and Storage System
-- **`tfm_path.py`**: Extended Path implementation supporting local and S3 paths
-- **`tfm_s3.py`**: AWS S3 integration with full pathlib compatibility
-- **`tfm_cache_manager.py`**: Intelligent caching system for remote operations
-- **`tfm_archive.py`**: Archive creation and extraction (ZIP, TAR.GZ, TGZ)
+The application entry point and the top-level UI (the `FileManager` shell, the
+dual `FilePane` layout, menus, and the main loop) live in **`tfm.py`** at the
+repo root. It imports PuiKit (`from puikit import ...`) and the `tfm_*` modules
+in `src/`. The `src/` modules, grouped by concern:
 
-### Dialog Components
-- **`tfm_base_list_dialog.py`**: Base class for searchable list dialogs
-- **`tfm_single_line_text_edit.py`**: Reusable single-line text editor component
-- **`tfm_batch_rename_dialog.py`**: Batch file renaming dialog with regex support
-- **`tfm_drives_dialog.py`**: Drive selection dialog for Windows systems
-- **`tfm_general_purpose_dialog.py`**: Flexible dialog system for various inputs
-- **`tfm_info_dialog.py`**: Scrollable information display dialog
-- **`tfm_jump_dialog.py`**: Jump to directory dialog with intelligent scanning
-- **`tfm_list_dialog.py`**: Searchable list selection dialog
-- **`tfm_quick_choice_bar.py`**: Quick choice selection in status bar
-- **`tfm_search_dialog.py`**: File and content search functionality
+### Configuration & appearance
+- **`tfm_config.py`** — configuration system and user settings
+- **`tfm_const.py`** — application constants and key definitions
+- **`_config.py`** — default user-config template (copied to `~/.tfm/config.py`)
+- **`tfm_colors.py`** — color schemes and theme colors
 
-### Management Systems
-- **`tfm_external_programs.py`**: External program execution and subshell functionality
-- **`tfm_file_operations.py`**: File system operations and file management
-- **`tfm_key_bindings.py`**: Key binding management and configuration
-- **`tfm_log_manager.py`**: Logging system with remote monitoring support
-- **`tfm_pane_manager.py`**: Dual pane management and navigation
-- **`tfm_progress_animator.py`**: Configurable progress animation system
-- **`tfm_progress_manager.py`**: Progress tracking for long operations
-- **`tfm_state_manager.py`**: Application state persistence and restoration
+### Path & storage system
+- **`tfm_path.py`** — extended `Path` supporting local, S3, and SSH/SFTP paths
+- **`tfm_s3.py`** — AWS S3 integration with pathlib compatibility
+- **`tfm_ssh.py`**, **`tfm_ssh_connection.py`**, **`tfm_ssh_config.py`**, **`tfm_ssh_cache.py`** — SSH/SFTP backend and connection/config caching
+- **`tfm_archive.py`** — archive creation/extraction and archive virtual directories
 
-### Development and Testing
-- **`tfm_color_tester.py`**: Color testing and debugging utilities
+### Panes & file listing
+- **`tfm_file_pane.py`** — a single file pane widget (PuiKit `Widget`)
+- **`tfm_pane_manager.py`** — dual-pane management and navigation
+- **`tfm_file_list_manager.py`** — directory listing, sorting, filtering
 
-### Key Components
-- **FileManager Class**: Main application controller
-- **Configuration System**: User-customizable settings
-- **Color Management**: Terminal color support
-- **Text Viewer**: Built-in text file viewer
-- **Dialog System**: User interaction dialogs
+### File operations, tasks & progress
+- **`tfm_file_operations.py`** — copy / move / delete / rename operations
+- **`tfm_task.py`** — central `Task` / `TaskManager` and worker for threaded operations
+- **`tfm_progress_manager.py`** — progress tracking for long operations
+- **`tfm_progress_animator.py`** — configurable progress animation
+
+### File monitoring
+- **`tfm_file_monitor_manager.py`**, **`tfm_file_monitor_observer.py`** — watchdog-based auto-reload of directory listings
+
+### Dialogs & bars
+- **`tfm_input_dialog.py`** — single-line input (rename / mkdir / create)
+- **`tfm_text_dialog.py`** — scrollable text / message dialogs
+- **`tfm_filter_list_dialog.py`** — searchable list picker (favorites / drives / programs / jump)
+- **`tfm_batch_rename_dialog.py`** — batch rename with regex
+- **`tfm_progressive_search_dialog.py`** — filename / content search dialog
+- **`tfm_isearch_bar.py`** — incremental-search bar
+- **`tfm_compare_dialog.py`**, **`tfm_compare_selection.py`** — compare-and-select
+- **`tfm_dialog_geometry.py`** — shared dialog sizing/anchoring helpers
+
+### Viewers
+- **`tfm_text_viewer.py`** — text viewer with pygments highlighting and isearch
+- **`tfm_diff_viewer.py`** — file diff viewer
+- **`tfm_directory_diff_viewer.py`** — directory diff viewer
+- **`tfm_text_layout.py`** — text measurement / wrapping / layout helpers
+
+### Logging
+- **`tfm_log_manager.py`** — unified logger (`getLogger`) with remote monitoring
+- **`tfm_logging_handlers.py`** — logging handlers (in-app log pane, remote)
+
+### Backend, state & misc
+- **`tfm_backend_detector.py`** — selects the PuiKit backend (terminal vs. native)
+- **`tfm_state_manager.py`** — application state persistence and restoration
+- **`tfm_str_format.py`** — string / size / date formatting helpers
+- **`src/tools/`** — end-user-facing external programs (preview, diff wrappers, ...)
 
 ## Tests (`test/`)
 
-### Test Categories
-- **Unit Tests** (`test_*.py`): Individual component testing
-- **Integration Tests** (`test_*_integration.py`): Feature integration testing
-- **Demo Scripts** (`demo_*.py`): Interactive demonstrations
-- **Verification Scripts** (`verify_*.py`): Quick feature verification
+Unit and integration tests, discovered by pytest as `test_*.py`. Run them with
+`src` (and the repo root, for the few tests that `import tfm`) on the path;
+PuiKit is resolved through its editable install:
 
-### Test Files
-- `test_delete_integration.py`: Delete functionality tests
-- `test_copy_integration.py`: Copy functionality tests
-- `test_navigation_keys_removed.py`: Navigation key removal tests
-- `test_help_integration.py`: Help system tests
-- `demo_delete_feature.py`: Interactive delete demo
-- `verify_complete_implementation.py`: Overall verification
+```bash
+PYTHONPATH=.:src pytest test/                       # all
+PYTHONPATH=.:src pytest test/test_tfm_path.py -v    # one file
+```
+
+`make test` runs the suite; `make test-quick` runs a fast subset. Interactive
+demos are **not** here — the old TFM demos are retired under `legacy/demo/`, and
+PuiKit ships its own demos in `../puikit/demo/`. Neither should be launched
+non-interactively (they block).
 
 ## Documentation (`doc/`)
 
-### Documentation Types
-- **Feature Documentation**: Detailed feature descriptions
-- **Implementation Summaries**: Development progress tracking
-- **User Guides**: Usage instructions and examples
-- **Technical Specifications**: System design and architecture
-
-### Core Feature Documentation
-- `CONFIGURATION_SYSTEM.md`: Configuration management and key bindings
-- `EXTERNAL_PROGRAMS_FEATURE.md`: External programs execution
-- `SUBSHELL_FEATURE.md`: Interactive subshell mode
-- `BATCH_RENAME_FEATURE.md`: Batch file renaming with regex
-- `HELP_DIALOG_FEATURE.md`: Comprehensive help system
-- `STATUS_BAR_FEATURE.md`: Text viewer status bar
-
-### File Operations
-- `CREATE_DIRECTORY_FEATURE.md`: Directory creation
-- `CREATE_FILE_FEATURE.md`: File creation
-- `FILE_DETAILS_FEATURE.md`: File information display
-
-### Archive Operations
-- `ARCHIVE_CREATION_FEATURE.md`: Archive creation functionality
-- `ARCHIVE_EXTRACTION_FEATURE.md`: Archive extraction functionality
-
-### Component Documentation
-- `SINGLE_LINE_TEXT_EDIT_IMPLEMENTATION.md`: Reusable text editor component
-- `GENERAL_PURPOSE_DIALOG_SYSTEM.md`: Flexible dialog framework
-- `INFO_DIALOG_COMPONENT.md`: Scrollable information dialogs
-- `LIST_DIALOG_COMPONENT.md`: Searchable list selection dialogs
-- `LOG_MANAGER_SYSTEM.md`: Logging and output management
-- `PANE_MANAGER_COMPONENT.md`: Dual pane management
-- `PROGRESS_MANAGER_SYSTEM.md`: Progress tracking system
-- `QUICK_CHOICE_BAR_COMPONENT.md`: Quick choice dialogs
-- `SEARCH_DIALOG_COMPONENT.md`: File and content search
-- `FILE_OPERATIONS_SYSTEM.md`: File system operations
-
-### Additional Features
-- `TEXT_VIEWER_FEATURE.md`: Built-in text file viewer with search
-- `TEXT_EDITOR_FEATURE.md`: External text editor integration
-- `FAVORITE_DIRECTORIES_FEATURE.md`: Favorite directories management
-- `COLOR_SCHEMES_FEATURE.md`: Color scheme system
-- `NAVIGATION_KEYS_SIMPLIFICATION.md`: Navigation improvements
-
-### Integration Documentation
-- `BEYONDCOMPARE_INTEGRATION.md`: BeyondCompare integration setup
-- `VSCODE_INTEGRATION.md`: Visual Studio Code integration
+- **`doc/*_FEATURE.md`** — end-user feature docs (usage, behavior)
+- **`doc/dev/*_IMPLEMENTATION.md`, `*_SYSTEM.md`** — developer docs (design, internals)
+- **`doc/dev/PUIKIT_PORTING_PLAN.md`** — living record of the ttk→PuiKit port and remaining tasks
+- **`doc/dev/PROJECT_HISTORY.md`** — project timeline
+- **`doc/dev/_archived/`** — pre-PuiKit toolkit-internal docs (renderer / backend / event-system internals that now live in the PuiKit repo), kept for reference only
 
 ## Entry Points
 
-### Main Entry Point
-- **`tfm.py`**: Primary executable that sets up paths and launches TFM
+- **`python tfm.py`** / **`make run`** — launch the file manager
+- **`tfm`** console script — created on `pip install` (see `setup.py`)
 
-### Alternative Entry Points
-- **`python -m src.tfm_main`**: Direct module execution
-- **`make run`**: Makefile target
-- **`python setup.py install && tfm`**: Installed package
+## Build System (Makefile targets)
 
-## Build System
-
-### Makefile Targets
-- `make run`: Run TFM
-- `make test`: Run all tests
-- `make test-quick`: Quick verification
-- `make clean`: Clean temporary files
-- `make install`: Install package
-- `make dev-install`: Development installation
-
-### Setup Script
-- **`setup.py`**: Standard Python package setup
-- Supports pip installation
-- Defines console script entry point
-- Manages dependencies
-
-## Development Workflow
-
-### Adding New Features
-1. Implement in `src/` directory
-2. Add tests in `test/` directory
-3. Document in `doc/` directory
-4. Update README.md if needed
-
-### Testing
-1. Run individual tests: `python test/test_feature.py`
-2. Run all tests: `make test`
-3. Quick verification: `make test-quick`
-
-### Documentation
-1. Feature docs go in `doc/`
-2. Code comments in source files
-3. README.md for project overview
-4. Update PROJECT_STRUCTURE.md for structural changes
+- `make venv` / `make install-puikit` — create the venv and install PuiKit editable from `../puikit`
+- `make run` / `make run-gui` — run TFM (terminal / native)
+- `make test` / `make test-quick` — run tests
+- `make macos-app` / `make windows-app` — build platform packages
+- `make clean` — clean temporary artifacts
 
 ## Dependencies
 
-### Runtime Dependencies
+### Runtime
 - Python 3.9+ (3.13 supported)
-- Standard library modules (curses, pathlib, etc.)
+- **PuiKit** (external, editable from `../puikit`)
+- `pygments` (syntax highlighting), `boto3` (S3), `watchdog` (file monitoring)
+- Platform extras via environment markers: `pyobjc` (macOS native backend), `windows-curses` (Windows)
 
-### Development Dependencies
-- pytest (optional, for testing)
-- flake8 (optional, for linting)
-- black (optional, for formatting)
+### Development
+- `pytest` (tests), plus optional `flake8` / `black`
 
 ## Configuration
 
-### User Configuration
-- Located at `~/.tfm/config.py`
-- Created from `src/_config.py` template
-- Fully customizable key bindings and settings
+- User config at `~/.tfm/config.py`, created from `src/_config.py`
+- Defaults / constants / colors in `src/tfm_config.py`, `src/tfm_const.py`, `src/tfm_colors.py`
 
-### System Configuration
-- Default settings in `src/tfm_config.py`
-- Constants in `src/tfm_const.py`
-- Color schemes in `src/tfm_colors.py`
+## The `legacy/` boundary
 
-## Benefits of This Structure
-
-1. **Separation of Concerns**: Clear separation between source, tests, and docs
-2. **Easy Navigation**: Logical organization makes finding files simple
-3. **Clean Root**: Root directory contains only essential files
-4. **Scalability**: Structure supports project growth
-5. **Standard Layout**: Follows Python project conventions
-6. **Build Automation**: Makefile provides common tasks
-7. **Package Ready**: Setup.py enables pip installation
-
-## Migration Notes
-
-### From Flat Structure
-- All source files moved to `src/`
-- All test files moved to `test/`
-- All documentation moved to `doc/`
-- Import paths updated in test files
-- New entry point created (`tfm.py`)
-
-### Backward Compatibility
-- Old import paths still work within `src/`
-- Configuration system unchanged
-- User settings location unchanged
-- All functionality preserved
+A module moved to `legacy/` iff it transitively imported the old `ttk` toolkit;
+everything `ttk`-free stayed in `src/`. `legacy/` is frozen and **not executed**
+— its imports point at `src/` paths it no longer sits on. Consult it for old
+behavior, not to run it. See `legacy/README.md`.

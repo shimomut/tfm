@@ -383,7 +383,7 @@ class DirectoryDiffViewer(UILayer):
     A UILayer that displays recursive directory comparison results.
     
     Attributes:
-        renderer: TTK renderer instance
+        renderer: PuiKit rendering backend instance
         left_path: Path to left directory
         right_path: Path to right directory
         root_node: Root of the tree structure

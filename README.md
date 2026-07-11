@@ -40,30 +40,35 @@ This application was developed using [Kiro](https://kiro.dev/) heavily - an AI-p
 ## Quick Start
 
 ### Installation
-1. Ensure you have Python 3.9+ installed
-2. Clone or download TFM:
+
+TFM's UI runs on **[PuiKit](https://github.com/crftwr/puikit)**, a separate
+framework that is not yet published to PyPI. The simplest setup checks out PuiKit
+next to TFM and lets the Makefile wire everything into a virtualenv.
+
+1. Ensure you have Python 3.9+ installed.
+2. Clone TFM and PuiKit side by side:
    ```bash
+   git clone https://github.com/crftwr/puikit.git
    git clone https://github.com/shimomut/tfm.git
    cd tfm
    ```
-3. Install dependencies:
-   
-   **Terminal Mode** (all platforms):
+3. Create the environment and run (installs base deps **plus PuiKit editable**):
+   ```bash
+   make venv        # expects PuiKit at ../puikit; override with PUIKIT_DIR=/path/to/puikit
+   make run         # launch TFM
+   ```
+
+   Prefer to manage the environment yourself? Install the dependencies and PuiKit
+   manually instead:
    ```bash
    pip install -r requirements.txt
+   pip install -e ../puikit          # PuiKit (editable) — required
    python3 tfm.py
    ```
-   
-   **Desktop Mode** (macOS only):
+
+   **Desktop Mode** (macOS only) additionally needs PyObjC:
    ```bash
-   # Install base dependencies plus PyObjC
-   pip install -r requirements.txt
-   pip install pyobjc
-   
-   # Or install with the macos extra
-   pip install -e .[macos]
-   
-   # Run as native desktop application
+   pip install pyobjc                # or: pip install -e .[macos]
    python3 tfm.py --desktop
    ```
 
@@ -236,6 +241,9 @@ See the [User Guide](doc/TFM_USER_GUIDE.md#desktop-mode-macos) for detailed desk
 
 ### Requirements
 
+**All modes:**
+- [PuiKit](https://github.com/crftwr/puikit) — TFM's UI framework, installed editable from a sibling `../puikit` checkout (`make venv` / `make install-puikit`). Not on PyPI.
+
 **Terminal Mode** (all platforms):
 - Python 3.9+ with curses library (built-in on macOS/Linux, 3.13 supported)
 - Windows: `pip install windows-curses` (automatically installed via setup.py)
@@ -248,10 +256,16 @@ See the [User Guide](doc/TFM_USER_GUIDE.md#desktop-mode-macos) for detailed desk
 
 ### Dependencies
 
+**PuiKit** (required — TFM's UI framework, editable from a sibling checkout):
+```bash
+pip install -e ../puikit   # or: make install-puikit  (PUIKIT_DIR=../puikit by default)
+```
+
 **Base dependencies** (installed via `requirements.txt`):
 ```bash
 pip install pygments  # Enhanced syntax highlighting (20+ file formats)
 pip install boto3     # AWS S3 support (cloud storage operations)
+pip install watchdog  # Automatic directory-listing reload on file changes
 ```
 
 **macOS Desktop Mode** (optional):
@@ -270,8 +284,9 @@ pip install tfm[macos]
 
 #### Option 1: Run Directly (No Installation)
 ```bash
-# Install dependencies
+# Install dependencies + PuiKit (editable, from a sibling ../puikit checkout)
 pip install -r requirements.txt
+pip install -e ../puikit
 
 # Terminal mode (all platforms)
 python3 tfm.py
@@ -329,15 +344,18 @@ For detailed configuration options, see the **[Configuration Feature Guide](doc/
 
 ```
 tfm/
-├── src/           # Core application code
+├── tfm.py         # The application (FileManager + top-level UI); runs on PuiKit
+├── src/           # TFM modules imported by tfm.py (tfm_*.py)
 │   └── tools/     # External programs for end users
 ├── tools/         # Development tools and utilities
-├── test/          # Test files (720+ passing tests)
+├── test/          # Test files (1000+ passing tests)
 ├── doc/           # User documentation
-├── doc/dev/       # Developer documentation
-├── legacy/        # Pre-PuiKit-port code (retired: old ttk src/test/demo)
-└── tfm.py         # Main entry point
+│   └── dev/       # Developer documentation (+ dev/_archived/ for retired toolkit docs)
+└── legacy/        # Pre-PuiKit-port code (retired: old ttk src/test/demo)
 ```
+
+> TFM's UI framework, **PuiKit**, is **not** in this tree — it lives in its own
+> repository (`../puikit`) and is installed editable into the virtualenv.
 
 ## Remote Log Monitoring
 

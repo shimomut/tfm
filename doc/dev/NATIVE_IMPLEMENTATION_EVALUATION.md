@@ -28,7 +28,7 @@ The CoreGraphics backend has been optimized through Python-level improvements in
 
 The baseline measurement framework has been created but baseline measurements have not been run:
 - Framework: `tools/manual_baseline_benchmark.sh` ✅ Created
-- Documentation: `doc/dev/COREGRAPHICS_PERFORMANCE_ANALYSIS.md` ✅ Created
+- Documentation: `doc/dev/_archived/COREGRAPHICS_PERFORMANCE_ANALYSIS.md` ✅ Created
 - Actual measurements: ❌ Not executed
 
 ### Optimized Measurements
@@ -36,7 +36,7 @@ The baseline measurement framework has been created but baseline measurements ha
 
 The optimized measurement framework has been created but measurements have not been run:
 - Framework: `tools/measure_optimized_manual.sh` ✅ Created
-- Documentation: `doc/dev/COREGRAPHICS_PERFORMANCE_ANALYSIS.md` ✅ Created
+- Documentation: `doc/dev/_archived/COREGRAPHICS_PERFORMANCE_ANALYSIS.md` ✅ Created
 - Actual measurements: ❌ Not executed
 
 ### Required Actions
@@ -363,8 +363,8 @@ This evaluation cannot be completed until actual performance measurements are ex
 
 ### Related Documentation
 - **Optimization Design**: `.kiro/specs/coregraphics-performance-optimization/design.md`
-- **Performance Analysis**: `doc/dev/COREGRAPHICS_PERFORMANCE_ANALYSIS.md`
-- **Visual Correctness**: `doc/dev/VISUAL_CORRECTNESS_VERIFICATION.md`
+- **Performance Analysis**: `doc/dev/_archived/COREGRAPHICS_PERFORMANCE_ANALYSIS.md`
+- **Visual Correctness**: `doc/dev/_archived/VISUAL_CORRECTNESS_VERIFICATION.md`
 
 ### Related Scripts
 - **Baseline Benchmark**: `tools/manual_baseline_benchmark.sh`

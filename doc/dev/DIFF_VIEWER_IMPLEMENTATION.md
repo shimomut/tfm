@@ -321,13 +321,13 @@ The `'selection': 'required'` ensures the action only works when files are selec
 - `tfm_colors`: Color scheme integration
 - `tfm_wide_char_utils`: Wide character support
 - `tfm_scrollbar`: Scrollbar rendering
-- `ttk`: Terminal toolkit for rendering
+- `puikit`: UI framework used for rendering (external — the old in-repo `ttk` toolkit)
 
 ### File Manager Integration
 
 1. **Selection System**: Uses `pane_manager.left_pane['selected_files']` and `pane_manager.right_pane['selected_files']`
 2. **Text Detection**: Uses `is_text_file()` from `tfm_text_viewer`
-3. **Renderer**: Shares TTK renderer with main file manager
+3. **Renderer**: Shares the PuiKit rendering backend with the main file manager
 4. **Color Scheme**: Uses same color scheme as file manager
 
 ## Future Enhancements
@@ -420,5 +420,5 @@ Follows TFM exception handling policy:
 ### External Documentation
 
 - Python difflib: https://docs.python.org/3/library/difflib.html
-- TTK Renderer API: `ttk/renderer.py`
+- PuiKit backend API: `puikit/backend.py` (in the [PuiKit](https://github.com/crftwr/puikit) repo)
 - TFM Path Abstraction: `src/tfm_path.py`

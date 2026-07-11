@@ -859,22 +859,22 @@ def test_property_1_filesystem_event_detection(filenames):
 
 **All file monitoring tests**:
 ```bash
-PYTHONPATH=.:src:ttk pytest test/test_*file_monitor*.py -v
+PYTHONPATH=.:src pytest test/test_*file_monitor*.py -v
 ```
 
 **Property-based tests only**:
 ```bash
-PYTHONPATH=.:src:ttk pytest test/ -v -m property_test
+PYTHONPATH=.:src pytest test/ -v -m property_test
 ```
 
 **Specific test file**:
 ```bash
-PYTHONPATH=.:src:ttk pytest test/test_end_to_end_file_monitoring.py -v
+PYTHONPATH=.:src pytest test/test_end_to_end_file_monitoring.py -v
 ```
 
 **With coverage**:
 ```bash
-PYTHONPATH=.:src:ttk pytest test/test_*file_monitor*.py --cov=src --cov-report=html
+PYTHONPATH=.:src pytest test/test_*file_monitor*.py --cov=src --cov-report=html
 ```
 
 

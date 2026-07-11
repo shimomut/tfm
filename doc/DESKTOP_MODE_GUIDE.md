@@ -419,7 +419,7 @@ If you encounter issues not covered here:
 1. Check console output for error messages
 2. Try terminal mode to isolate desktop-specific issues
 3. Review the [User Guide](TFM_USER_GUIDE.md)
-4. Check [TTK Integration](dev/TTK_INTEGRATION_GUIDE.md) for technical details
+4. Check the [PuiKit Porting Plan](dev/PUIKIT_PORTING_PLAN.md) for technical details on the UI framework
 5. Report issues on GitHub with:
    - macOS version
    - Python version

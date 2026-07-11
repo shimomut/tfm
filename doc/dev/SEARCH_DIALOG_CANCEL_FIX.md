@@ -102,15 +102,15 @@ def _search_worker(self, search_root, pattern_text, search_type, search_thread):
 
 ```bash
 # Test per-thread cancel events
-PYTHONPATH=.:src:ttk python -m pytest test/test_search_per_thread_cancel.py -v
+PYTHONPATH=.:src python -m pytest test/test_search_per_thread_cancel.py -v
 # 2 tests pass
 
 # Test searching flag race condition
-PYTHONPATH=.:src:ttk python -m pytest test/test_search_searching_flag_race.py -v
+PYTHONPATH=.:src python -m pytest test/test_search_searching_flag_race.py -v
 # 3 tests pass
 
 # Run all search tests together
-PYTHONPATH=.:src:ttk python -m pytest test/test_search_per_thread_cancel.py test/test_search_searching_flag_race.py -v
+PYTHONPATH=.:src python -m pytest test/test_search_per_thread_cancel.py test/test_search_searching_flag_race.py -v
 # 5 tests pass
 ```
 
@@ -258,11 +258,11 @@ def _search_worker(self, search_root, pattern_text, search_type, cancel_event):
 
 ```bash
 # Test per-thread cancel events
-PYTHONPATH=.:src:ttk python -m pytest test/test_search_per_thread_cancel.py -v
+PYTHONPATH=.:src python -m pytest test/test_search_per_thread_cancel.py -v
 # 2 tests pass
 
 # Test searching flag race condition
-PYTHONPATH=.:src:ttk python -m pytest test/test_search_searching_flag_race.py -v
+PYTHONPATH=.:src python -m pytest test/test_search_searching_flag_race.py -v
 # 3 tests pass
 ```
 

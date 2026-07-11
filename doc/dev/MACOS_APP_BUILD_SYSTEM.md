@@ -85,9 +85,10 @@ All Python components are copied from the venv's base_prefix:
 - Source: `${PROJECT_ROOT}/src/`
 - Destination: `TFM.app/Contents/Resources/tfm/`
 
-**TTK Library:**
-- Source: `${PROJECT_ROOT}/ttk/` (runtime files only)
-- Destination: `TFM.app/Contents/Resources/ttk/`
+**PuiKit Framework:**
+- Source: the installed PuiKit package, located via `import puikit` in the venv (its checkout is typically `../puikit`; honours any `PUIKIT_DIR` override used at install)
+- Destination: `TFM.app/Contents/Resources/puikit/`
+- Bundled fonts (`puikit/fonts/`) are fetched into the source tree before copying so Core Text can register them at runtime
 
 ### 4. Framework Structure
 
@@ -121,12 +122,11 @@ The build script optimizes the bundle size by:
 - pkg-config files (~8KB)
 - Resources directory (~176KB)
 
-**Selective TTK copying (~12.4MB savings):**
-- Excludes doc/, demo/, test/, build/ directories
-- Excludes development files (setup.py, py.typed, *.cpp)
-- Includes only runtime files (Python modules, backends, serialization, utils)
+**Selective PuiKit copying:**
+- Copies the installed `puikit/` package (Python modules, backends, fonts)
+- Excludes docs/, examples/, tests/, and development files
 
-**Total bundle size savings: ~12.8MB**
+**Total bundle size savings: ~400KB+ from Python trimming above**
 
 ### 6. Python Pre-compilation
 
@@ -136,8 +136,8 @@ All Python source files are pre-compiled to bytecode for faster startup:
 # Pre-compile TFM source
 python3 -m compileall -q "${TFM_DEST}"
 
-# Pre-compile TTK library
-python3 -m compileall -q "${TTK_DEST}"
+# Pre-compile PuiKit framework
+python3 -m compileall -q "${PUIKIT_DEST}"
 
 # Pre-compile Python standard library
 python3 -m compileall -q -f "${STDLIB_PATH}"

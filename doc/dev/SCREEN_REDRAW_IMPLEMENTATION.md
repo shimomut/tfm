@@ -1,5 +1,12 @@
 # Screen Redraw (Ctrl-L) Implementation
 
+> **⚠️ Partly historical (pre-PuiKit port).** The `force_repaint()` / backend
+> plumbing referenced below (`ttk/backends/curses_backend.py`, `ttk/renderer.py`)
+> moved to the external **[PuiKit](https://github.com/crftwr/puikit)** framework
+> (`puikit/backends/curses_backend.py`, `puikit/backend.py`), where the API may
+> differ. TFM's redraw-trigger design still applies. See
+> [PUIKIT_PORTING_PLAN.md](PUIKIT_PORTING_PLAN.md).
+
 ## Problem
 
 When TFM runs inside a terminal multiplexer (tmux/screen), switching away from
