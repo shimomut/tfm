@@ -304,7 +304,17 @@ class Config:
         'programs': ['X'],                     # Show external programs menu
         'subshell': ['Shift-X'],               # Enter subshell (command line) mode
     }
-    
+
+    # Windows has no Command key, and Alt-Enter is the platform fullscreen-toggle
+    # convention — so the Mac-centric defaults above are unreachable there. Remap
+    # them to Ctrl equivalents on Windows.
+    if sys.platform == 'win32':
+        KEY_BINDINGS['open_with_os'] = ['Ctrl-ENTER']    # Open file(s) with OS default application
+        KEY_BINDINGS['reveal_in_os'] = ['Ctrl-Shift-E']  # Reveal focused file in Explorer
+        KEY_BINDINGS['copy_names'] = ['Ctrl-Shift-C']    # Copy selected/focused file name(s) to clipboard
+        KEY_BINDINGS['copy_paths'] = ['Ctrl-Shift-P']    # Copy selected/focused full path(s) to clipboard
+
+
     # Favorite directories - customize your frequently used directories
     # Each entry should have 'name' and 'path' keys
     FAVORITE_DIRECTORIES = [
