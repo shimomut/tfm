@@ -144,8 +144,8 @@ bundle root.
 The Windows build reuses the **shared, platform-agnostic** scripts rather than
 maintaining Windows-specific copies:
 
-- **`macos_app/collect_dependencies.py`** (despite the directory, it makes no OS
-  assumptions — its one PyObjC check self-skips off `darwin`). It resolves the
+- **`tools/collect_dependencies.py`** (platform-agnostic — its one PyObjC check
+  self-skips off `darwin`; shared with `macos_app/build.sh`). It resolves the
   *runtime dependency closure* of `requirements.txt` from installed package
   metadata (not a blanket `site-packages` copy), honouring environment markers
   so `windows-curses; sys_platform=="win32"` is collected and `pyobjc; darwin`
@@ -181,7 +181,7 @@ directly). Steps:
 4. **Assemble app code**: copy `tfm.py`, `src/`, the resolved `puikit/` package,
    and `LICENSE` into `app/`; `compileall` them.
 5. **Collect dependencies** into `Lib\site-packages` via the shared
-   `macos_app/collect_dependencies.py` (`--include-deps-of puikit`), then
+   `tools/collect_dependencies.py` (`--include-deps-of puikit`), then
    **generate `THIRD_PARTY_NOTICES.txt`** at the bundle root via
    `tools/generate_third_party_notices.py`. See the section above.
 6. **Generate resources**: `version_generated.h` (from `$VERSION` / tfm.py's

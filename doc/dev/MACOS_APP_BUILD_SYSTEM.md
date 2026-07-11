@@ -323,7 +323,7 @@ The `install_name_tool` command updates dynamic library references in the TFM ex
 ## Related Files
 
 - `macos_app/build.sh` - Main build script
-- `macos_app/collect_dependencies.py` - Dependency collection script
+- `tools/collect_dependencies.py` - Dependency collection script (shared with the Windows build)
 - `macos_app/src/main.m` - Objective-C entry point
 - `macos_app/src/TFMAppDelegate.m` - Application delegate
 - `macos_app/resources/Info.plist.template` - Bundle metadata template

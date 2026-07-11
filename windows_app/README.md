@@ -63,7 +63,7 @@ windows_app/
 ```
 
 Dependency collection and license notices are **not** duplicated here — `build.ps1`
-reuses the shared, platform-agnostic `macos_app/collect_dependencies.py`
+reuses the shared, platform-agnostic `tools/collect_dependencies.py`
 (`--include-deps-of puikit`, which pulls in `numpy`) and
 `tools/generate_third_party_notices.py`, which writes `THIRD_PARTY_NOTICES.txt`
 into the bundle root and fails the build if any bundled component lacks a license.

@@ -225,8 +225,8 @@ if (Test-Path (Join-Path $ProjectRoot 'LICENSE')) {
 # ---------------------------------------------------------------------------
 # Step 5: Collect third-party dependencies into Lib\site-packages
 # ---------------------------------------------------------------------------
-# Uses the shared, platform-agnostic collector that lives under macos_app/ (it
-# makes no OS assumptions; its PyObjC check self-skips off darwin). It resolves
+# Uses the shared, platform-agnostic collector in tools/ (it makes no OS
+# assumptions; its PyObjC check self-skips off darwin). It resolves
 # the runtime closure of requirements.txt via installed metadata - honouring
 # environment markers, so windows-curses is picked up and pyobjc is not.
 # --include-deps-of puikit pulls in PuiKit's own runtime deps (numpy, which the
@@ -236,7 +236,7 @@ if (Test-Path (Join-Path $ProjectRoot 'LICENSE')) {
 Info 'Step 5: Collecting third-party dependencies...'
 
 $SitePkgsDest = Join-Path $AppRoot 'Lib\site-packages'
-$SharedCollector = Join-Path $ProjectRoot 'macos_app\collect_dependencies.py'
+$SharedCollector = Join-Path $ProjectRoot 'tools\collect_dependencies.py'
 $Requirements = Join-Path $ProjectRoot 'requirements.txt'
 & $VenvPy $SharedCollector --requirements $Requirements --dest $SitePkgsDest --include-deps-of puikit
 if ($LASTEXITCODE -ne 0) { Fail 'Dependency collection failed.' }

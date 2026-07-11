@@ -259,7 +259,8 @@ PACKAGES_DEST="${RESOURCES_DIR_BUNDLE}/python_packages"
 mkdir -p "${PACKAGES_DEST}"
 
 REQUIREMENTS_FILE="${PROJECT_ROOT}/requirements.txt"
-COLLECT_SCRIPT="${SCRIPT_DIR}/collect_dependencies.py"
+# Shared, platform-agnostic collector (also used by windows_app/build.ps1).
+COLLECT_SCRIPT="${PROJECT_ROOT}/tools/collect_dependencies.py"
 
 if [ -f "${COLLECT_SCRIPT}" ]; then
     # Use venv's Python to run the collection script
