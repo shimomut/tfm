@@ -117,12 +117,14 @@ on a `python3XX._pth` file — so the layout is unambiguous:
   from `runtime\` via `LOAD_WITH_ALTERED_SEARCH_PATH`.
 - **Manifest** (`resources/TFM.manifest`): mirrors CPython 3.14's own
   `python.exe` manifest — `asInvoker`, the Vista→Win11 `supportedOS` GUIDs,
-  `longPathAware`, and Common-Controls v6, and **deliberately no `dpiAware`
-  setting**. TFM is developed and rendered against a DPI-*unaware* interpreter
-  today (the backend has no DPI-scaling path and always sees 96 DPI while Windows
-  bitmap-scales the window), so omitting `dpiAware` makes the bundle render
-  **identically** to `python tfm.py --backend gui`. Per-monitor scaling is a
-  future backend concern; this is the knob if it changes.
+  `longPathAware`, and Common-Controls v6, plus **Per-Monitor-V2 `dpiAware`/
+  `dpiAwareness`**. The WindowsBackend has a real DPI-scaling path (font sizes
+  and the base unit scale by the monitor's `GetDpiForWindow`; `WM_DPICHANGED`
+  rescales live), so declaring awareness lets text render at the display's true
+  pixel density instead of being bitmap-stretched. The backend also calls
+  `SetProcessDpiAwarenessContext` at startup, so plain `python tfm.py --backend
+  gui` is DPI-aware too and the two still render **identically**; the manifest
+  just fixes it at process start for the bundle.
 
 ---
 
@@ -235,8 +237,6 @@ make windows-app-clean
   cert like the macOS build's optional `CODESIGN_IDENTITY`.
 - **Installer** — an Inno Setup / MSIX wrapper around the folder for a Start-menu
   entry and uninstaller (the folder itself is already xcopy-deployable).
-- **Per-monitor DPI** — real HiDPI scaling in the Windows backend; the manifest's
-  `dpiAware` would then be switched on. Tracked as a backend concern, not here.
 
 ## Build gotchas (found live standing this up)
 

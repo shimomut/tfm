@@ -1,9 +1,13 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <!-- TFM.exe application manifest. Mirrors CPython's python.exe: asInvoker, the
-     Vista..Win11 supportedOS GUIDs, longPathAware, Common-Controls v6, and
-     intentionally no dpiAware element. Rationale and the DPI decision are in
-     doc/dev/WINDOWS_APP_BUILD_SYSTEM.md. NOTE: XML comments must not contain a
-     double-hyphen, which the Windows SxS manifest parser rejects. -->
+     Vista..Win11 supportedOS GUIDs, longPathAware, Common-Controls v6, plus
+     Per-Monitor-V2 DPI awareness so text renders at the display's true pixel
+     density instead of being bitmap-stretched. The WindowsBackend also sets
+     the same awareness at runtime (covering plain `python tfm.py`); declaring
+     it here fixes it at process start for the bundle. Rationale and the DPI
+     decision are in doc/dev/WINDOWS_APP_BUILD_SYSTEM.md. NOTE: XML comments
+     must not contain a double-hyphen, which the Windows SxS manifest parser
+     rejects. -->
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
     <security>
@@ -29,6 +33,8 @@
   <application xmlns="urn:schemas-microsoft-com:asm.v3">
     <windowsSettings>
       <longPathAware xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">true</longPathAware>
+      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true</dpiAware>
+      <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2</dpiAwareness>
     </windowsSettings>
   </application>
   <dependency>
