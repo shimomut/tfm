@@ -1,6 +1,6 @@
 # TFM Makefile
 
-.PHONY: help run run-gui test test-quick clean install uninstall dev-install lint format demo macos-app macos-app-clean macos-app-install macos-refresh-icon macos-dmg install-config venv venv-clean check-venv install-puikit
+.PHONY: help run run-gui test test-quick clean install uninstall dev-install lint format demo macos-app macos-app-clean macos-app-install macos-refresh-icon macos-dmg windows-app windows-app-clean windows-app-zip install-config venv venv-clean check-venv install-puikit
 
 # Python interpreter selection
 # All Python is run through the project virtual environment (.venv). There is no
@@ -53,6 +53,11 @@ help:
 	@echo "  macos-app-install - Install TFM.app to Applications folder"
 	@echo "  macos-refresh-icon - Refresh macOS icon cache (after icon changes)"
 	@echo "  macos-dmg         - Create DMG installer for distribution"
+	@echo ""
+	@echo "Windows App Bundle:"
+	@echo "  windows-app       - Build self-contained Windows application bundle"
+	@echo "  windows-app-clean - Clean Windows app build artifacts"
+	@echo "  windows-app-zip   - Build the bundle and zip it for distribution"
 	@echo ""
 	@echo "Examples:"
 	@echo "  make run                        # Run TFM in the terminal"
@@ -277,3 +282,21 @@ macos-dmg: macos-app
 	@echo "Creating DMG installer..."
 	@cd macos_app && ./create_dmg.sh
 	@echo "DMG installer created successfully"
+
+# ============================================================================
+# Windows App Bundle Targets
+# ============================================================================
+# Delegates to windows_app/build.ps1 (PowerShell). These targets are only
+# meaningful on Windows; on other platforms PowerShell won't be present.
+
+windows-app:
+	@echo "Building Windows application bundle..."
+	@powershell -ExecutionPolicy Bypass -File windows_app/build.ps1
+
+windows-app-zip:
+	@echo "Building Windows application bundle (+ zip)..."
+	@powershell -ExecutionPolicy Bypass -File windows_app/build.ps1 -Zip
+
+windows-app-clean:
+	@echo "Cleaning Windows app build artifacts..."
+	@powershell -ExecutionPolicy Bypass -File windows_app/build.ps1 -Clean

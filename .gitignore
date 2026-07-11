@@ -43,6 +43,10 @@ Thumbs.db
 *.tmp
 *.log
 
+# Windows app bundle build artifacts
+windows_app/build/
+windows_app/.cache/
+
 temp/
 
 # Test artifacts (but keep test fixtures)

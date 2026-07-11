@@ -332,6 +332,36 @@ Then run the existing `macos_app/README.md` / `doc/dev/MACOS_APP_TESTING.md`
 smoke tests against the rebuilt bundle, and update both docs + `build.sh`'s inline
 comments (they still describe copying ttk).
 
+### 2.10w Windows application bundle — new `windows_app/` build system
+**Status: scaffolded (branch `windows-app-bundle`).** The Windows counterpart of
+`macos_app/`: `windows_app/` builds a self-contained `build\TFM\` folder — a
+compiled C launcher (`TFM.exe`) that embeds the CPython **embeddable** package and
+runs `tfm.py --backend gui` on the Windows Direct2D backend, plus TFM's code,
+PuiKit, and all deps. Design: `doc/dev/WINDOWS_APP_BUILD_SYSTEM.md`.
+
+Mirrors macOS closely because the parallel holds: **nothing in TFM/PuiKit is
+compiled** on Windows either — the backend is pure Python on `ctypes` + `numpy`
+(only `numpy` ships DLLs). The one native artifact is `windows_app/src/launcher.c`
+(the analog of the Obj-C `main.m`/`TFMAppDelegate.m`): same `PyConfig` bootstrap,
+same `sys.path` shape (`app/` = macOS `Resources/`, `Lib\site-packages` =
+`python_packages`), same `sys.argv=("TFM","--backend","gui")` → `main()` call.
+
+Pieces: `build.ps1` (orchestrator), `collect_dependencies.py` (site-packages walk,
+skips build tools / editable shims / pyobjc), `make_icon.py` (`TFM.icns`→`.ico`),
+`resources/TFM.{manifest,rc}`. Makefile: `windows-app` / `windows-app-zip` /
+`windows-app-clean`.
+
+Open items before a 1.0 `.zip` ships:
+- **End-to-end build not yet run** — needs MSVC Build Tools + Windows SDK
+  installed (the Xcode-CLT analog); not on the dev box yet. Verify `cl.exe`/`rc.exe`
+  discovery, the embeddable download for the venv's exact version, and that the
+  launched bundle imports `numpy`/the Direct2D backend and shows a window.
+- **DPI** left unaware on purpose (matches CPython's own `python.exe` manifest and
+  the backend's 96-DPI assumption); revisit if per-monitor scaling lands in the
+  backend.
+- **Signing + installer** (`signtool`, Inno/MSIX) deferred, like the macOS
+  code-signing/DMG polish.
+
 ### 2.11 Wire GUI fonts from config — docs + config-key sweep
 **Status: essentially DONE** — GUI renders a configurable proportional UI face by
 default and a configurable mono face for aligned content, both from `~/.tfm/config.py`
