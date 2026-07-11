@@ -21,16 +21,26 @@
 .PARAMETER Clean
     Remove the build directory and exit.
 
+.PARAMETER Install
+    Install the already-built bundle to -InstallDir (default C:\Program Files\TFM),
+    self-elevating via UAC. Does not build; run the default build first.
+
+.PARAMETER InstallDir
+    Target directory for -Install (default C:\Program Files\TFM).
+
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File windows_app\build.ps1
     powershell -ExecutionPolicy Bypass -File windows_app\build.ps1 -Version 1.0.0 -Zip
+    powershell -ExecutionPolicy Bypass -File windows_app\build.ps1 -Install
 #>
 [CmdletBinding()]
 param(
     [string]$Version,
     [string]$PythonEmbedUrl,
     [switch]$Zip,
-    [switch]$Clean
+    [switch]$Clean,
+    [switch]$Install,
+    [string]$InstallDir = 'C:\Program Files\TFM'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -57,6 +67,77 @@ function Fail    ($m) { Write-Host "[ERROR] $m" -ForegroundColor Red; exit 1 }
 if ($Clean) {
     if (Test-Path $BuildDir) { Remove-Item -Recurse -Force $BuildDir; Info "Removed $BuildDir" }
     else { Info "Nothing to clean." }
+    return
+}
+
+# ---------------------------------------------------------------------------
+# Install action: copy the built bundle to $InstallDir (default Program Files).
+# Writing under Program Files needs elevation, so re-launch elevated via UAC if
+# we are not already an administrator; the (unelevated) parent then verifies the
+# result so the outcome is reported in the visible shell.
+# ---------------------------------------------------------------------------
+function Invoke-Install {
+    if (-not (Test-Path (Join-Path $AppRoot 'TFM.exe'))) {
+        Fail "No built bundle at $AppRoot. Run 'make windows-app' first."
+    }
+
+    $isAdmin = ([Security.Principal.WindowsPrincipal] `
+                [Security.Principal.WindowsIdentity]::GetCurrent()
+               ).IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)
+
+    if (-not $isAdmin) {
+        Info "Administrator rights are required to write to '$InstallDir'."
+        Info 'Requesting elevation (accept the UAC prompt)...'
+        $psExe = (Get-Process -Id $PID).Path
+        $argLine = "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" -Install -InstallDir `"$InstallDir`""
+        try {
+            Start-Process -FilePath $psExe -Verb RunAs -Wait -ArgumentList $argLine
+        } catch {
+            Fail "Elevation was declined or failed: $($_.Exception.Message)"
+        }
+        # Verify from the (unelevated) parent so success/failure is visible here.
+        if (Test-Path (Join-Path $InstallDir 'TFM.exe')) {
+            Success "Installed to $InstallDir"
+        } else {
+            Fail "Install did not complete (the elevated step failed or was cancelled)."
+        }
+        return
+    }
+
+    # --- Elevated: do the copy -------------------------------------------------
+    Info "Installing TFM to $InstallDir ..."
+    if (Test-Path $InstallDir) {
+        Info "Removing existing $InstallDir"
+        Remove-Item -Recurse -Force $InstallDir
+    }
+    New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
+    robocopy $AppRoot $InstallDir /E /NFL /NDL /NJH /NJS /NP | Out-Null
+    if ($LASTEXITCODE -ge 8) { Fail "robocopy failed copying the bundle (code $LASTEXITCODE)" }
+    $global:LASTEXITCODE = 0
+
+    # Start Menu shortcut (all users) for discoverability; non-fatal if it fails.
+    try {
+        $startMenu = [Environment]::GetFolderPath('CommonPrograms')
+        $lnkPath = Join-Path $startMenu 'TFM.lnk'
+        $exePath = Join-Path $InstallDir 'TFM.exe'
+        $shell = New-Object -ComObject WScript.Shell
+        $sc = $shell.CreateShortcut($lnkPath)
+        $sc.TargetPath = $exePath
+        $sc.WorkingDirectory = $InstallDir
+        $sc.IconLocation = "$exePath,0"
+        $sc.Description = 'TFM - TUI File Manager'
+        $sc.Save()
+        Info "Created Start Menu shortcut: $lnkPath"
+    } catch {
+        Warn "Could not create Start Menu shortcut: $($_.Exception.Message)"
+    }
+
+    Success "Installed to $InstallDir"
+    Info "Launch it from the Start Menu (TFM) or run: `"$($exePath)`""
+}
+
+if ($Install) {
+    Invoke-Install
     return
 }
 
@@ -179,15 +260,21 @@ if (-not (Test-Path $CachedZip)) {
     Info "Using cached $EmbedZipName"
 }
 
-Info "Extracting embeddable CPython into $AppRoot"
-Expand-Archive -Path $CachedZip -DestinationPath $AppRoot -Force
+# The whole embedded CPython goes under runtime\ (keeps the bundle root tidy).
+# TFM.exe delay-loads python3XX.dll from here after adding runtime\ to the DLL
+# search path - see launcher.c - so nothing from the runtime needs to sit at the
+# root next to the exe.
+$RuntimeDir = Join-Path $AppRoot 'runtime'
+New-Item -ItemType Directory -Force -Path $RuntimeDir | Out-Null
+Info "Extracting embedded CPython into $RuntimeDir"
+Expand-Archive -Path $CachedZip -DestinationPath $RuntimeDir -Force
 
 # The embeddable ships a python3XX._pth that would force an isolated sys.path if
-# someone ran the bundled python.exe. Our launcher configures paths explicitly
-# via PyConfig and ignores it; remove it so the two mechanisms can't disagree.
-Get-ChildItem -Path $AppRoot -Filter '*._pth' -File | Remove-Item -Force -ErrorAction SilentlyContinue
+# someone ran the bundled python.exe directly. Our launcher configures paths
+# explicitly via PyConfig; remove it so the two mechanisms can't disagree.
+Get-ChildItem -Path $RuntimeDir -Filter '*._pth' -File | Remove-Item -Force -ErrorAction SilentlyContinue
 
-if (-not (Test-Path (Join-Path $AppRoot "python$PyNoDot.dll"))) {
+if (-not (Test-Path (Join-Path $RuntimeDir "python$PyNoDot.dll"))) {
     Fail "python$PyNoDot.dll missing after extraction - the embeddable package may not match Python $PyFull."
 }
 
@@ -218,8 +305,9 @@ if ($LASTEXITCODE -ne 0 -or -not $PuikitSrc -or -not (Test-Path $PuikitSrc)) {
 Info "PuiKit source: $PuikitSrc"
 Copy-Tree $PuikitSrc (Join-Path $AppDir 'puikit')
 
+# TFM's own LICENSE goes at the bundle root, alongside THIRD_PARTY_NOTICES.txt.
 if (Test-Path (Join-Path $ProjectRoot 'LICENSE')) {
-    Copy-Item (Join-Path $ProjectRoot 'LICENSE') (Join-Path $AppDir 'LICENSE') -Force
+    Copy-Item (Join-Path $ProjectRoot 'LICENSE') (Join-Path $AppRoot 'LICENSE') -Force
 }
 
 # ---------------------------------------------------------------------------
@@ -256,8 +344,9 @@ if (-not (Test-Path $NoticesScript)) { Fail "Notices generator not found at $Not
 $NoticesOut = Join-Path $AppRoot 'THIRD_PARTY_NOTICES.txt'
 $NoticesExtras = @()
 
-# Embedded interpreter's PSF license (the embeddable ships LICENSE.txt at root).
-$PyLicense = Join-Path $AppRoot 'LICENSE.txt'
+# Embedded interpreter's PSF license (ships as the embeddable's LICENSE.txt,
+# now under runtime\ after the Step 3 consolidation).
+$PyLicense = Join-Path $RuntimeDir 'LICENSE.txt'
 if (Test-Path $PyLicense) {
     $NoticesExtras += @('--extra', "Python $PyXY interpreter and standard library (Python Software Foundation License Agreement)=$PyLicense")
 } else {
@@ -312,8 +401,8 @@ if (Test-Path (Join-Path $ResDir 'TFM.ico')) {
     & $VenvPy (Join-Path $ScriptDir 'make_icon.py') --out $IcoDest
     if ($LASTEXITCODE -ne 0) { Warn 'Icon generation failed; continuing without an icon file may break rc.exe.' }
 }
-# Mirror the final icon into the bundle root too (runtime window icon convenience).
-Copy-Item $IcoDest (Join-Path $AppRoot 'TFM.ico') -Force -ErrorAction SilentlyContinue
+# The icon is compiled into TFM.exe as a resource (see TFM.rc) and the window
+# icon loads from there at runtime, so no loose TFM.ico is shipped in the bundle.
 
 # Generate version_generated.h from $Version (major,minor,patch,build).
 $vparts = @($Version -split '[.\-+]') | Where-Object { $_ -match '^\d+$' }
@@ -335,9 +424,13 @@ $ResOut = Join-Path $ObjDir 'TFM.res'
 if ($LASTEXITCODE -ne 0) { Fail 'rc.exe failed.' }
 
 # Compile + link the launcher -> TFM.exe (GUI subsystem, no console).
+# /MT (static CRT) so TFM.exe has no load-time DLL dependency of its own - the
+# whole CPython runtime, CRT included, lives under runtime\. python3XX.dll is
+# delay-loaded (delayimp.lib) so it is not resolved until the launcher has added
+# runtime\ to the DLL search path.
 $ExeOut = Join-Path $AppRoot "$AppName.exe"
 $clArgs = @(
-    '/nologo', '/O2', '/MD', '/W3',
+    '/nologo', '/O2', '/MT', '/W3',
     "/I$PyInclude",
     (Join-Path $SrcDir 'launcher.c'),
     $ResOut,
@@ -346,6 +439,8 @@ $clArgs = @(
     '/link',
     "/LIBPATH:$PyLibs",
     '/SUBSYSTEM:WINDOWS',
+    "/DELAYLOAD:python$PyNoDot.dll",
+    'delayimp.lib',
     # We embed our own application manifest via TFM.rc (RT_MANIFEST). Suppress
     # the linker's auto-generated manifest so the exe doesn't end up with two
     # conflicting RT_MANIFEST resources (two <assembly> roots => the SxS loader

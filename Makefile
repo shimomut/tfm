@@ -1,6 +1,6 @@
 # TFM Makefile
 
-.PHONY: help run run-gui test test-quick clean install uninstall dev-install lint format demo macos-app macos-app-clean macos-app-install macos-refresh-icon macos-dmg windows-app windows-app-clean windows-app-zip install-config venv venv-clean check-venv install-puikit
+.PHONY: help run run-gui test test-quick clean install uninstall dev-install lint format demo macos-app macos-app-clean macos-app-install macos-refresh-icon macos-dmg windows-app windows-app-clean windows-app-zip windows-app-install install-config venv venv-clean check-venv install-puikit
 
 # Python interpreter selection
 # All Python is run through the project virtual environment (.venv). There is no
@@ -55,9 +55,10 @@ help:
 	@echo "  macos-dmg         - Create DMG installer for distribution"
 	@echo ""
 	@echo "Windows App Bundle:"
-	@echo "  windows-app       - Build self-contained Windows application bundle"
-	@echo "  windows-app-clean - Clean Windows app build artifacts"
-	@echo "  windows-app-zip   - Build the bundle and zip it for distribution"
+	@echo "  windows-app         - Build self-contained Windows application bundle"
+	@echo "  windows-app-clean   - Clean Windows app build artifacts"
+	@echo "  windows-app-zip     - Build the bundle and zip it for distribution"
+	@echo "  windows-app-install - Install the built bundle to Program Files (elevates via UAC)"
 	@echo ""
 	@echo "Examples:"
 	@echo "  make run                        # Run TFM in the terminal"
@@ -300,3 +301,9 @@ windows-app-zip:
 windows-app-clean:
 	@echo "Cleaning Windows app build artifacts..."
 	@powershell -ExecutionPolicy Bypass -File windows_app/build.ps1 -Clean
+
+# Install the built bundle to Program Files (override dir with INSTALLDIR=...).
+# Self-elevates via UAC; run 'make windows-app' first to produce the bundle.
+windows-app-install:
+	@echo "Installing Windows application bundle..."
+	@powershell -ExecutionPolicy Bypass -File windows_app/build.ps1 -Install $(if $(INSTALLDIR),-InstallDir "$(INSTALLDIR)")

@@ -12,11 +12,16 @@
  * through a MessageBox instead of being silently lost.
  *
  * Bundle layout this launcher assumes (all relative to the .exe directory =
- * <root>):
- *   <root>\TFM.exe                 this launcher
- *   <root>\python3XX.dll           embeddable CPython (implicitly linked)
- *   <root>\python3XX.zip           zipped standard library
- *   <root>\*.pyd, *.dll            stdlib C extensions + their support DLLs
+ * <root>). The whole CPython runtime lives under runtime\ to keep the root tidy;
+ * TFM.exe is built with a static CRT and *delay-loads* python3XX.dll, so it has
+ * no load-time dependency on anything in runtime\. Before the first Python call
+ * it adds runtime\ to the DLL search path (SetDefaultDllDirectories +
+ * AddDllDirectory) and pre-loads python3XX.dll from there; CPython's own
+ * extension loader then resolves each .pyd's sibling DLLs out of runtime\ too.
+ *   <root>\TFM.exe                 this launcher (static CRT, no external DLLs)
+ *   <root>\runtime\python3XX.dll   embeddable CPython + CRT + support DLLs
+ *   <root>\runtime\python3XX.zip   zipped standard library
+ *   <root>\runtime\*.pyd           stdlib C extensions
  *   <root>\Lib\site-packages\      third-party deps (numpy, pygments, ...)
  *   <root>\app\tfm.py              TFM entry script (imported as module "tfm")
  *   <root>\app\src\               TFM business-logic modules (tfm_*)
@@ -26,6 +31,9 @@
  */
 
 #define WIN32_LEAN_AND_MEAN
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT 0x0A00  /* Win10: SetDefaultDllDirectories / AddDllDirectory */
+#endif
 #include <windows.h>
 #include <stdio.h>   /* _snwprintf_s */
 #include <wchar.h>   /* wcsncpy_s, wcsrchr */
@@ -129,11 +137,39 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         *slash = L'\0';
     }
 
-    /* Derive the zipped stdlib name from the linked interpreter version, e.g.
-     * "python314.zip". PY_MAJOR/PY_MINOR come from the Python headers the
-     * launcher was compiled against (matched to the embeddable at build time). */
+    /* ---- Make the runtime\ folder loadable, then pre-load python3XX.dll ----
+     * The interpreter DLL is delay-linked and lives in <root>\runtime, so it is
+     * not resolved at process start. Add runtime\ to the secure DLL search path
+     * and load python3XX.dll from there by full path (which also lets its own
+     * dependencies - the CRT and support DLLs sharing that folder - resolve).
+     * Doing this up front turns a missing/blocked runtime into a clear message
+     * instead of an opaque delay-load crash on the first Python call. */
+    wchar_t runtime_dir[TFM_PATH_MAX];
+    _snwprintf_s(runtime_dir, TFM_PATH_MAX, _TRUNCATE, L"%ls\\runtime", root);
+    SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
+    AddDllDirectory(runtime_dir);
+
+    wchar_t python_dll[TFM_PATH_MAX];
+    _snwprintf_s(python_dll, TFM_PATH_MAX, _TRUNCATE,
+                 L"%ls\\python%d%d.dll", runtime_dir, PY_MAJOR_VERSION, PY_MINOR_VERSION);
+    if (!LoadLibraryExW(python_dll, NULL,
+                        LOAD_LIBRARY_SEARCH_DEFAULT_DIRS | LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR)) {
+        wchar_t msg[TFM_PATH_MAX];
+        _snwprintf_s(msg, TFM_PATH_MAX, _TRUNCATE,
+                     L"Failed to load the Python runtime:\n%ls\n\n"
+                     L"The application bundle appears to be incomplete.",
+                     python_dll);
+        fatal_box(msg);
+        return 1;
+    }
+
+    /* Derive the zipped stdlib path from the linked interpreter version, e.g.
+     * "runtime\python314.zip". PY_MAJOR/PY_MINOR come from the Python headers the
+     * launcher was compiled against (matched to the embeddable at build time).
+     * The CPython runtime (zip + extension .pyd + their DLLs) lives under
+     * runtime\ - see the layout note at the top of this file. */
     wchar_t stdlib_zip[64];
-    _snwprintf_s(stdlib_zip, 64, _TRUNCATE, L"python%d%d.zip", PY_MAJOR_VERSION, PY_MINOR_VERSION);
+    _snwprintf_s(stdlib_zip, 64, _TRUNCATE, L"runtime\\python%d%d.zip", PY_MAJOR_VERSION, PY_MINOR_VERSION);
 
     /* ---- Configure CPython ------------------------------------------------ */
     PyStatus status;
@@ -162,8 +198,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 
     /* Explicit module search path — order matters. */
     config.module_search_paths_set = 1;
-    if (!add_search_path(&config, root, stdlib_zip) ||   /* python3XX.zip (stdlib) */
-        !add_search_path(&config, root, L"") ||           /* root: *.pyd + DLLs     */
+    if (!add_search_path(&config, root, stdlib_zip) ||   /* runtime\python3XX.zip  */
+        !add_search_path(&config, root, L"runtime") ||    /* runtime\*.pyd + DLLs   */
         !add_search_path(&config, root, L"Lib\\site-packages") ||
         !add_search_path(&config, root, L"app") ||        /* tfm.py + puikit        */
         !add_search_path(&config, root, L"app\\src")) {   /* tfm_* modules          */

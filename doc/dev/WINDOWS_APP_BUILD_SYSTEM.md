@@ -44,25 +44,29 @@ The build produces `windows_app/build/TFM/`, a self-contained folder (this whole
 folder is what gets zipped for distribution):
 
 ```
-TFM/                              <- bundle root = the .exe's directory
-├── TFM.exe                       compiled C launcher (this repo)
-├── TFM.ico                       app icon (also embedded into TFM.exe)
+TFM/                              <- bundle root = the .exe's directory (5 entries)
+├── TFM.exe                       compiled C launcher (this repo); static CRT, no DLL deps
+├── LICENSE                       TFM's own license
 ├── THIRD_PARTY_NOTICES.txt       aggregated license text for bundled components
-├── LICENSE.txt                   embedded CPython's PSF license (from embeddable)
-├── python3XX.dll                 embeddable CPython (implicitly linked by TFM.exe)
-├── python3.dll                   stable-ABI forwarder (from embeddable)
-├── python3XX.zip                 zipped standard library (from embeddable)
-├── vcruntime140.dll, vcruntime140_1.dll
-├── _ctypes.pyd, _socket.pyd, select.pyd, ...   stdlib C extensions (embeddable)
-├── libffi-8.dll, libssl-3.dll, libcrypto-3.dll, ...  their support DLLs
+├── runtime/                      the entire embedded CPython, kept out of the root
+│   ├── python3XX.dll             CPython (delay-loaded by TFM.exe)
+│   ├── python3.dll               stable-ABI forwarder
+│   ├── python3XX.zip             zipped standard library
+│   ├── vcruntime140.dll, vcruntime140_1.dll   the CRT python3XX.dll needs
+│   ├── _ctypes.pyd, _ssl.pyd, ...             stdlib C extensions
+│   ├── libffi-8.dll, libssl-3.dll, ...        their support DLLs
+│   ├── python.exe, pythonw.exe                (usable standalone for debugging)
+│   └── LICENSE.txt               embedded CPython's PSF license
 ├── app/                          TFM's own code (mirror of macOS Resources/)
 │   ├── tfm.py                    entry script (imported as the `tfm` module)
 │   ├── src/                      tfm_* business-logic modules
-│   ├── puikit/                   PuiKit toolkit (copied from the sibling repo)
-│   └── LICENSE
+│   └── puikit/                   PuiKit toolkit (copied from the sibling repo)
 └── Lib/
     └── site-packages/            third-party deps: numpy, pygments, boto3, watchdog, ...
 ```
+
+The app icon is compiled **into** `TFM.exe` as a resource (`TFM.rc`) and the
+window icon loads from there, so no loose `TFM.ico` ships in the bundle.
 
 ### Path resolution at runtime
 
@@ -72,11 +76,11 @@ on a `python3XX._pth` file — so the layout is unambiguous:
 
 - `PyConfig.home = <root>`
 - `PyConfig.module_search_paths` (with `module_search_paths_set = 1`):
-  1. `<root>\python3XX.zip`  — standard library
-  2. `<root>`                — stdlib C extensions (`*.pyd`) and their DLLs
-  3. `<root>\Lib\site-packages` — third-party deps
-  4. `<root>\app`            — `tfm.py` and `puikit`
-  5. `<root>\app\src`        — `tfm_*` modules (also self-inserted by `tfm.py`)
+  1. `<root>\runtime\python3XX.zip`  — standard library
+  2. `<root>\runtime`                — stdlib C extensions (`*.pyd`) and their DLLs
+  3. `<root>\Lib\site-packages`      — third-party deps
+  4. `<root>\app`                    — `tfm.py` and `puikit`
+  5. `<root>\app\src`                — `tfm_*` modules (also self-inserted by `tfm.py`)
 - `PyConfig.site_import = 0`, `user_site_directory = 0` — fully deterministic
   path; no `site.py` global-path guessing, no user site-packages leaking in
   (the equivalent of the macOS bundle's `sitecustomize.py`).
@@ -102,8 +106,15 @@ on a `python3XX._pth` file — so the layout is unambiguous:
 - **No import library shipped**: `Python.h` auto-links `python3XX.lib` via
   `#pragma comment(lib, ...)`; the build only has to supply `/I<include>` and
   `/LIBPATH:<libs>` from the developer's full CPython install (`sys.base_prefix`).
-  At runtime the exe loads `python3XX.dll` from its own directory (default DLL
-  search includes the application directory).
+- **Static CRT + delay-loaded interpreter** so the whole runtime can live in
+  `runtime\` (see layout) with nothing beside the exe. `TFM.exe` is built `/MT`
+  (its only load-time deps are `kernel32`/`user32`), and `python3XX.dll` is
+  delay-loaded (`/DELAYLOAD:python3XX.dll` + `delayimp.lib`). At startup, before
+  the first Python call, the launcher `SetDefaultDllDirectories` +
+  `AddDllDirectory(<root>\runtime)` and pre-loads `python3XX.dll` by full path
+  (turning a missing runtime into a clear message box instead of a delay-load
+  crash); CPython's extension loader then resolves each `.pyd`'s sibling DLLs
+  from `runtime\` via `LOAD_WITH_ALTERED_SEARCH_PATH`.
 - **Manifest** (`resources/TFM.manifest`): mirrors CPython 3.14's own
   `python.exe` manifest — `asInvoker`, the Vista→Win11 `supportedOS` GUIDs,
   `longPathAware`, and Common-Controls v6, and **deliberately no `dpiAware`
@@ -176,7 +187,7 @@ directly). Steps:
    Visual Studio via `vswhere` and import `VsDevCmd.bat`'s environment. If neither
    MSVC nor the Windows SDK is present, fail with install instructions (this is
    the Windows analog of the macOS build's Xcode Command Line Tools requirement).
-3. **Fetch + extract** the matching embeddable CPython into the bundle root
+3. **Fetch + extract** the matching embeddable CPython into `<root>\runtime`
    (cached under `windows_app/.cache/`).
 4. **Assemble app code**: copy `tfm.py`, `src/`, the resolved `puikit/` package,
    and `LICENSE` into `app/`; `compileall` them.
