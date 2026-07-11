@@ -4,7 +4,7 @@ Test S3 Virtual Directory Optimization
 This test verifies that S3PathImpl instances store metadata as properties
 to avoid API calls for is_dir(), is_file(), and stat() methods.
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_s3_virtual_directory_optimization.py -v
+Run with: PYTHONPATH=.:src pytest test/test_s3_virtual_directory_optimization.py -v
 """
 
 import time

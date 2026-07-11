@@ -1,7 +1,7 @@
 """
 Test view_file fallback behavior for files without associations
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_view_file_fallback.py -v
+Run with: PYTHONPATH=.:src pytest test/test_view_file_fallback.py -v
 """
 
 

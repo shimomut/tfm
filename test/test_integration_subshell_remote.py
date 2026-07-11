@@ -4,7 +4,7 @@ Integration test for subshell remote directory fallback.
 This test verifies that the subshell remote fallback feature works correctly
 by testing the actual implementation with mock objects.
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_integration_subshell_remote.py -v
+Run with: PYTHONPATH=.:src pytest test/test_integration_subshell_remote.py -v
 """
 
 import os

@@ -7,7 +7,7 @@ Tests verify:
 - Memory usage optimization for large archives
 - Hot path optimization in ArchivePathImpl
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_archive_performance.py -v
+Run with: PYTHONPATH=.:src pytest test/test_archive_performance.py -v
 """
 
 import sys

@@ -31,14 +31,21 @@ setup(
     long_description_content_type="text/markdown",
     author="TFM Developer",
     url="https://github.com/shimomut/tfm",
-    packages=["tfm"],
-    package_dir={"tfm": "src"},
+    # The application is the top-level ``tfm.py`` at the repo root; its flat
+    # ``tfm_*`` modules live in ``src/`` and are shipped as the ``tfm_modules``
+    # package dir. ``tfm.py`` puts that dir on sys.path at import time (see its
+    # header), so ``from tfm_* import`` resolves once installed. The UI framework
+    # (PuiKit) is a separate, editable-installed dependency and is not vendored
+    # here — install it too (``pip install -e ../puikit``).
+    py_modules=["tfm"],
+    packages=["tfm_modules"],
+    package_dir={"tfm_modules": "src"},
     package_data={
-        "tfm": ["tools/*"],
+        "tfm_modules": ["tools/*"],
     },
     entry_points={
         "console_scripts": [
-            "tfm=tfm.tfm_main:cli_main",
+            "tfm=tfm:main",
         ],
     },
     install_requires=requirements,

@@ -1,7 +1,7 @@
 """
 Test script for the rename feature in TFM
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_rename_feature.py -v
+Run with: PYTHONPATH=.:src pytest test/test_rename_feature.py -v
 """
 
 from pathlib import Path

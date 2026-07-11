@@ -1,7 +1,7 @@
 """
 Test script for the sub-shell functionality
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_subshell.py -v
+Run with: PYTHONPATH=.:src pytest test/test_subshell.py -v
 """
 
 import os

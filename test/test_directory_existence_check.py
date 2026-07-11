@@ -5,7 +5,7 @@ This test verifies that TFM checks the existence of directories
 before restoring cursor positions and removes non-existing ones
 from the cursor history.
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_directory_existence_check.py -v
+Run with: PYTHONPATH=.:src pytest test/test_directory_existence_check.py -v
 """
 
 from pathlib import Path

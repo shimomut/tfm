@@ -1,7 +1,7 @@
 """
 Integration test to verify LogCapture works with LogManager
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_logcapture_integration.py -v
+Run with: PYTHONPATH=.:src pytest test/test_logcapture_integration.py -v
 """
 
 import sys

@@ -1,7 +1,7 @@
 """
 Test script for new confirmation options in TFM configuration system
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_confirmation_options.py -v
+Run with: PYTHONPATH=.:src pytest test/test_confirmation_options.py -v
 """
 
 

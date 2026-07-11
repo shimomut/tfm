@@ -1,7 +1,7 @@
 """
 Integration test for S3 Backspace key navigation in TFM
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_s3_backspace_navigation.py -v
+Run with: PYTHONPATH=.:src pytest test/test_s3_backspace_navigation.py -v
 """
 
 from tfm_path import Path

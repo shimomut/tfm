@@ -4,7 +4,7 @@ Test PaneManager integration with TTK-based TFM system.
 This test verifies that PaneManager works correctly with the TTK-migrated
 tfm_main.py and that all pane management functionality is intact.
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_pane_manager_ttk_integration.py -v
+Run with: PYTHONPATH=.:src pytest test/test_pane_manager_ttk_integration.py -v
 """
 
 import unittest

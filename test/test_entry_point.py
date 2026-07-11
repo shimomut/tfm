@@ -1,7 +1,7 @@
 """
 Test entry point functionality for TFM
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_entry_point.py -v
+Run with: PYTHONPATH=.:src pytest test/test_entry_point.py -v
 """
 
 import os

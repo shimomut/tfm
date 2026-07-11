@@ -4,7 +4,7 @@ Test for subshell remote directory fallback functionality.
 This test verifies that when subshell is opened while browsing a remote directory
 (like S3), TFM falls back to using TFM's working directory instead of failing.
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_subshell_remote_fallback.py -v
+Run with: PYTHONPATH=.:src pytest test/test_subshell_remote_fallback.py -v
 """
 
 import os

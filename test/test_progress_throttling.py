@@ -1,7 +1,7 @@
 """
 Test progress manager throttling functionality
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_progress_throttling.py -v
+Run with: PYTHONPATH=.:src pytest test/test_progress_throttling.py -v
 """
 
 import time

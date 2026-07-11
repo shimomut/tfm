@@ -4,7 +4,7 @@ Test S3 Caching Optimization
 This test verifies that the S3 caching optimization reduces API calls
 during directory listing and file stat operations.
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_s3_caching_optimization.py -v
+Run with: PYTHONPATH=.:src pytest test/test_s3_caching_optimization.py -v
 """
 
 import time

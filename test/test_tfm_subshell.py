@@ -1,7 +1,7 @@
 """
 Test TFM sub-shell functionality by simulating the environment setup
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_tfm_subshell.py -v
+Run with: PYTHONPATH=.:src pytest test/test_tfm_subshell.py -v
 """
 
 import os

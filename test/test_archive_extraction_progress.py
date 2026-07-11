@@ -1,7 +1,7 @@
 """
 Test archive extraction progress tracking
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_archive_extraction_progress.py -v
+Run with: PYTHONPATH=.:src pytest test/test_archive_extraction_progress.py -v
 """
 
 import tempfile

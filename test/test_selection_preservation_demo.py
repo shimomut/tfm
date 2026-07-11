@@ -2,7 +2,7 @@
 Demo: Selection Preservation in Jump Dialog
 Demonstrates that user selection is preserved during filtering and scanning
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_selection_preservation_demo.py -v
+Run with: PYTHONPATH=.:src pytest test/test_selection_preservation_demo.py -v
 """
 
 import tempfile

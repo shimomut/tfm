@@ -1,7 +1,7 @@
 """
 Tests for ArchivePathImpl class
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_archive_path_impl.py -v
+Run with: PYTHONPATH=.:src pytest test/test_archive_path_impl.py -v
 """
 
 import tempfile

@@ -4,7 +4,7 @@ Test suite for separate pane cursor histories
 Tests that left and right panes maintain completely separate cursor histories
 and do not interfere with each other.
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_separate_pane_histories.py -v
+Run with: PYTHONPATH=.:src pytest test/test_separate_pane_histories.py -v
 """
 
 import tempfile

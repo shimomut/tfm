@@ -2,7 +2,7 @@
 Integration tests for TFM logging handlers
 Verifies all requirements from Task 1
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_logging_handlers_integration.py -v
+Run with: PYTHONPATH=.:src pytest test/test_logging_handlers_integration.py -v
 """
 
 import sys

@@ -1,7 +1,7 @@
 """
 Test S3 caching functionality
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_s3_caching.py -v
+Run with: PYTHONPATH=.:src pytest test/test_s3_caching.py -v
 """
 
 import unittest

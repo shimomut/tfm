@@ -5,7 +5,7 @@ Test for SSH path normalization fix.
 This test verifies that paths with excessive ./ sequences are properly normalized
 before being passed to SFTP commands.
 
-Run with: PYTHONPATH=.:src:ttk python3 temp/test_ssh_path_normalization.py
+Run with: PYTHONPATH=.:src python3 temp/test_ssh_path_normalization.py
 """
 
 import sys

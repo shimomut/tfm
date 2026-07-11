@@ -1,7 +1,7 @@
 """
 Test script for S3PathImpl functionality
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_s3_path.py -v
+Run with: PYTHONPATH=.:src pytest test/test_s3_path.py -v
 """
 
 

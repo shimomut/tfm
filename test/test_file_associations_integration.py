@@ -1,7 +1,7 @@
 """
 Test file associations integration with TFM
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_file_associations_integration.py -v
+Run with: PYTHONPATH=.:src pytest test/test_file_associations_integration.py -v
 """
 
 

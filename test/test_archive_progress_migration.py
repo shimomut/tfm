@@ -1,7 +1,7 @@
 """
 Test that archive progress migration works correctly
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_archive_progress_migration.py -v
+Run with: PYTHONPATH=.:src pytest test/test_archive_progress_migration.py -v
 """
 
 from unittest.mock import Mock, MagicMock

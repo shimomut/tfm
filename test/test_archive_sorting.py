@@ -1,7 +1,7 @@
 """
 Test archive sorting support - verifies all sort modes work with archive entries
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_archive_sorting.py -v
+Run with: PYTHONPATH=.:src pytest test/test_archive_sorting.py -v
 """
 
 import tempfile

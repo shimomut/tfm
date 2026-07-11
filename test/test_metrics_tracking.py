@@ -3,7 +3,7 @@ Test that performance metrics are properly tracked during rendering.
 
 This test verifies that metrics counters are incremented when render_frame is called.
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_metrics_tracking.py -v
+Run with: PYTHONPATH=.:src pytest test/test_metrics_tracking.py -v
 """
 
 

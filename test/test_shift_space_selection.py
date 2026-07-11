@@ -1,6 +1,6 @@
 """Test Shift+Space key binding for selecting and moving up.
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_shift_space_selection.py -v
+Run with: PYTHONPATH=.:src pytest test/test_shift_space_selection.py -v
 """
 
 import pytest

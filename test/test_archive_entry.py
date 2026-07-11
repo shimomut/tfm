@@ -1,7 +1,7 @@
 """
 Tests for ArchiveEntry dataclass
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_archive_entry.py -v
+Run with: PYTHONPATH=.:src pytest test/test_archive_entry.py -v
 """
 
 import os

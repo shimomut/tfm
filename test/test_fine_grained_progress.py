@@ -1,7 +1,7 @@
 """
 Test fine-grained progress tracking for file operations
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_fine_grained_progress.py -v
+Run with: PYTHONPATH=.:src pytest test/test_fine_grained_progress.py -v
 """
 
 import os

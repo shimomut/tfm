@@ -1,7 +1,7 @@
 """
 Test that log updates trigger redraws
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_log_redraw_trigger.py -v
+Run with: PYTHONPATH=.:src pytest test/test_log_redraw_trigger.py -v
 """
 
 import sys

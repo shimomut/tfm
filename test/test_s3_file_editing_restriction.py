@@ -1,7 +1,7 @@
 """
 Test S3 file editing capability indicator
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_s3_file_editing_restriction.py -v
+Run with: PYTHONPATH=.:src pytest test/test_s3_file_editing_restriction.py -v
 """
 
 import unittest

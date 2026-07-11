@@ -1,7 +1,7 @@
 """
 Test dynamic reconfiguration of handlers
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_dynamic_reconfiguration.py -v
+Run with: PYTHONPATH=.:src pytest test/test_dynamic_reconfiguration.py -v
 """
 
 import logging

@@ -1,7 +1,7 @@
 """
 Test fine-grained progress tracking for delete operations
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_delete_fine_grained_progress.py -v
+Run with: PYTHONPATH=.:src pytest test/test_delete_fine_grained_progress.py -v
 """
 
 import os

@@ -4,7 +4,7 @@ Test Remote Log Monitoring Feature
 This test verifies that the LogManager can broadcast log messages
 to remote clients via TCP socket connections.
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_remote_log_monitoring.py -v
+Run with: PYTHONPATH=.:src pytest test/test_remote_log_monitoring.py -v
 """
 
 import time

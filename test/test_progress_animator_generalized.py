@@ -2,7 +2,7 @@
 Test file for generalized ProgressAnimator functionality
 Tests the new generalized animation system for various use cases
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_progress_animator_generalized.py -v
+Run with: PYTHONPATH=.:src pytest test/test_progress_animator_generalized.py -v
 """
 
 import time

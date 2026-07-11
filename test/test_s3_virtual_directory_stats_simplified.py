@@ -4,7 +4,7 @@ Test S3 Virtual Directory Stats Simplified
 This test verifies that the simplified _get_virtual_directory_stats() method
 works correctly with the new metadata caching system.
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_s3_virtual_directory_stats_simplified.py -v
+Run with: PYTHONPATH=.:src pytest test/test_s3_virtual_directory_stats_simplified.py -v
 """
 
 import time

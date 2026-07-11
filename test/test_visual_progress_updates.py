@@ -1,7 +1,7 @@
 """
 Test visual progress updates during delete operations
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_visual_progress_updates.py -v
+Run with: PYTHONPATH=.:src pytest test/test_visual_progress_updates.py -v
 """
 
 import os

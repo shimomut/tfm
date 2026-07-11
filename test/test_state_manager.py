@@ -8,7 +8,7 @@ Tests the persistent state management system including:
 - TFM-specific state operations
 - Error handling and recovery
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_state_manager.py -v
+Run with: PYTHONPATH=.:src pytest test/test_state_manager.py -v
 """
 
 import tempfile

@@ -3,7 +3,7 @@ Simple test for subshell remote directory fallback functionality.
 
 This test verifies the core logic without dealing with curses complexity.
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_subshell_remote_simple.py -v
+Run with: PYTHONPATH=.:src pytest test/test_subshell_remote_simple.py -v
 """
 
 import os

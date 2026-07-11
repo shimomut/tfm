@@ -1,7 +1,7 @@
 """
 Test script to verify BeyondCompare integration with TFM
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_bcompare.py -v
+Run with: PYTHONPATH=.:src pytest test/test_bcompare.py -v
 """
 
 import os

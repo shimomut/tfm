@@ -1,7 +1,7 @@
 """
 Test color system migration to TTK
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_colors_ttk_migration.py -v
+Run with: PYTHONPATH=.:src pytest test/test_colors_ttk_migration.py -v
 """
 
 from tfm_colors import (

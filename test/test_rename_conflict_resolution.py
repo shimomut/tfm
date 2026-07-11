@@ -2,7 +2,7 @@
 Test script for rename conflict resolution feature
 Tests the new "Rename" option in copy/move/extract operations
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_rename_conflict_resolution.py -v
+Run with: PYTHONPATH=.:src pytest test/test_rename_conflict_resolution.py -v
 """
 
 import tempfile

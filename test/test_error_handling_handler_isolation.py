@@ -8,7 +8,7 @@ Requirements tested:
 - 12.1: When a log handler fails, THE System SHALL continue operating with remaining handlers
 - 12.5: When an error occurs in logging, THE System SHALL attempt to log the error using a fallback mechanism
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_error_handling_handler_isolation.py -v
+Run with: PYTHONPATH=.:src pytest test/test_error_handling_handler_isolation.py -v
 """
 
 import sys

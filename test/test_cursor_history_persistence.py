@@ -3,7 +3,7 @@ Test suite for cursor history persistence in PaneManager
 
 Tests the integration of PaneManager with StateManager for persistent cursor history.
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_cursor_history_persistence.py -v
+Run with: PYTHONPATH=.:src pytest test/test_cursor_history_persistence.py -v
 """
 
 import tempfile

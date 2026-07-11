@@ -5,7 +5,7 @@ Performance validation for SFTP bulk stat optimization.
 This script measures the actual performance improvements from caching
 individual file stats during list_directory() operations.
 
-Run with: PYTHONPATH=.:src:ttk python temp/test_ssh_bulk_stat_performance.py
+Run with: PYTHONPATH=.:src python temp/test_ssh_bulk_stat_performance.py
 """
 
 import sys

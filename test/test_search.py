@@ -1,7 +1,7 @@
 """
 Test script for search functionality
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_search.py -v
+Run with: PYTHONPATH=.:src pytest test/test_search.py -v
 """
 
 def hello_world():

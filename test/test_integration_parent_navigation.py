@@ -4,7 +4,7 @@ Integration test for parent directory navigation cursor positioning.
 This test verifies the complete integration of the parent directory navigation
 feature within the TFM application context.
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_integration_parent_navigation.py -v
+Run with: PYTHONPATH=.:src pytest test/test_integration_parent_navigation.py -v
 """
 
 import unittest

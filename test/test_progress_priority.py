@@ -1,7 +1,7 @@
 """
 Test that progress display takes priority over quick choice bar
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_progress_priority.py -v
+Run with: PYTHONPATH=.:src pytest test/test_progress_priority.py -v
 """
 
 from unittest.mock import Mock

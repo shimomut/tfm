@@ -2,7 +2,7 @@
 Integration test for S3PathImpl with actual AWS operations
 This test requires AWS credentials to be configured
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_s3_integration.py -v
+Run with: PYTHONPATH=.:src pytest test/test_s3_integration.py -v
 """
 
 import sys

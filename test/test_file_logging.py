@@ -2,7 +2,7 @@
 """
 Test file logging functionality
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_file_logging.py -v
+Run with: PYTHONPATH=.:src pytest test/test_file_logging.py -v
 """
 
 import unittest

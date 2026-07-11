@@ -4,7 +4,7 @@ Test directory rename capability functionality.
 This test verifies that the new supports_directory_rename() method
 works correctly for different path implementations.
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_directory_rename_capability.py -v
+Run with: PYTHONPATH=.:src pytest test/test_directory_rename_capability.py -v
 """
 
 import unittest

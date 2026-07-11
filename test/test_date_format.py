@@ -1,7 +1,7 @@
 """
 Test script for flexible date-time formatting in file list panes
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_date_format.py -v
+Run with: PYTHONPATH=.:src pytest test/test_date_format.py -v
 """
 
 from datetime import datetime, timedelta

@@ -1,7 +1,7 @@
 """
 Integration test for archive sorting - verifies sorting works in FileManager context
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_archive_sorting_integration.py -v
+Run with: PYTHONPATH=.:src pytest test/test_archive_sorting_integration.py -v
 """
 
 import tempfile

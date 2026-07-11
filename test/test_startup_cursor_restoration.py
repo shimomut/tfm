@@ -4,7 +4,7 @@ Test suite for cursor position restoration on TFM startup
 Tests that cursor positions are properly restored when TFM starts up,
 not just when navigating between directories.
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_startup_cursor_restoration.py -v
+Run with: PYTHONPATH=.:src pytest test/test_startup_cursor_restoration.py -v
 """
 
 import tempfile

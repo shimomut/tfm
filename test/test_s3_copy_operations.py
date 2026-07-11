@@ -1,7 +1,7 @@
 """
 Test S3 Copy Fix - Verify that copying from local filesystem to S3 works correctly
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_s3_copy_operations.py -v
+Run with: PYTHONPATH=.:src pytest test/test_s3_copy_operations.py -v
 """
 
 import tempfile

@@ -4,7 +4,7 @@ Test for remote path cleanup optimization.
 This test verifies that the cleanup_non_existing_directories() function
 skips existence checks for remote storage paths to improve performance.
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_remote_path_cleanup_optimization.py -v
+Run with: PYTHONPATH=.:src pytest test/test_remote_path_cleanup_optimization.py -v
 """
 
 import time

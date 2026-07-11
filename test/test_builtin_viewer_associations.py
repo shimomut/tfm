@@ -1,7 +1,7 @@
 """
 Test that text files use built-in viewer when association is None
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_builtin_viewer_associations.py -v
+Run with: PYTHONPATH=.:src pytest test/test_builtin_viewer_associations.py -v
 """
 
 

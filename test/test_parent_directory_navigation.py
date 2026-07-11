@@ -4,7 +4,7 @@ Test for parent directory navigation cursor positioning behavior.
 This test verifies that when navigating to parent directory using Backspace,
 the cursor is positioned on the child directory we just came from.
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_parent_directory_navigation.py -v
+Run with: PYTHONPATH=.:src pytest test/test_parent_directory_navigation.py -v
 """
 
 import unittest

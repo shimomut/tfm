@@ -4,7 +4,7 @@ Thread Safety Verification Test
 This test verifies that the thread safety implementation in LogPaneHandler
 and RemoteMonitoringHandler works correctly under concurrent access.
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_thread_safety_verification.py -v
+Run with: PYTHONPATH=.:src pytest test/test_thread_safety_verification.py -v
 """
 
 import logging

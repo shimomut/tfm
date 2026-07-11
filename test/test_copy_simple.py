@@ -1,7 +1,7 @@
 """
 Simple test for copy functionality
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_copy_simple.py -v
+Run with: PYTHONPATH=.:src pytest test/test_copy_simple.py -v
 """
 
 import tempfile

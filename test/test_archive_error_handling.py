@@ -4,7 +4,7 @@ Test comprehensive error handling for archive virtual directory operations.
 This test file validates that all archive operations handle errors gracefully
 with user-friendly error messages and proper logging.
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_archive_error_handling.py -v
+Run with: PYTHONPATH=.:src pytest test/test_archive_error_handling.py -v
 """
 
 import pytest

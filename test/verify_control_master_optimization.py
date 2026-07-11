@@ -9,7 +9,7 @@ This test validates that:
 4. Operations still work correctly with caching enabled
 5. Connection errors trigger fresh checks
 
-Run with: PYTHONPATH=.:src:ttk python temp/verify_control_master_optimization.py
+Run with: PYTHONPATH=.:src python temp/verify_control_master_optimization.py
 """
 
 import sys

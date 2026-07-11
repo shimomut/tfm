@@ -6,7 +6,7 @@ This test verifies that:
 2. Remote client failures are handled gracefully
 3. Stream write failures are suppressed
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_error_handling.py -v
+Run with: PYTHONPATH=.:src pytest test/test_error_handling.py -v
 """
 
 import sys

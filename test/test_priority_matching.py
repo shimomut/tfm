@@ -4,7 +4,7 @@ Test priority-based matching in FILE_ASSOCIATIONS
 FILE_ASSOCIATIONS is checked from top to bottom.
 First matching entry wins.
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_priority_matching.py -v
+Run with: PYTHONPATH=.:src pytest test/test_priority_matching.py -v
 """
 
 

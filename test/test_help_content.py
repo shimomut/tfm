@@ -1,7 +1,7 @@
 """
 Test script to verify help content generation
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_help_content.py -v
+Run with: PYTHONPATH=.:src pytest test/test_help_content.py -v
 """
 
 

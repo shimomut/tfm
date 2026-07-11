@@ -6,7 +6,7 @@ This test suite validates:
 - Task 9.2: Server lifecycle (start_server, stop_server, _accept_connections)
 - Task 9.3: Broadcast to all clients with graceful failure handling
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_remote_monitoring_handler.py -v
+Run with: PYTHONPATH=.:src pytest test/test_remote_monitoring_handler.py -v
 """
 
 from pathlib import Path

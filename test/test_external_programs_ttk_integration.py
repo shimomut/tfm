@@ -1,7 +1,7 @@
 """
 Test TTK integration for tfm_external_programs.py
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_external_programs_ttk_integration.py -v
+Run with: PYTHONPATH=.:src pytest test/test_external_programs_ttk_integration.py -v
 """
 
 import unittest

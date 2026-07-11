@@ -1,7 +1,7 @@
 """
 Test file extension associations functionality
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_file_associations.py -v
+Run with: PYTHONPATH=.:src pytest test/test_file_associations.py -v
 """
 
 

@@ -4,7 +4,7 @@ Test startup directory cleanup integration.
 This test verifies that TFM properly cleans up non-existing directories
 from cursor history during the startup process.
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_startup_directory_cleanup.py -v
+Run with: PYTHONPATH=.:src pytest test/test_startup_directory_cleanup.py -v
 """
 
 import tempfile

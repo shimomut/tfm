@@ -1,6 +1,6 @@
 """Headless tests for the PuiKit directory diff viewer.
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_directory_diff_viewer.py -v
+Run with: PYTHONPATH=.:src pytest test/test_directory_diff_viewer.py -v
 
 Covers the backend-agnostic classification/tree logic and the widget's
 navigation + rendering on the MemoryBackend (TUI + GUI profiles), per the

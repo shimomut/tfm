@@ -1,7 +1,7 @@
 """
 Test script for cursor position history feature
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_cursor_history.py -v
+Run with: PYTHONPATH=.:src pytest test/test_cursor_history.py -v
 """
 
 from pathlib import Path

@@ -7,7 +7,7 @@ Tests:
 3. Configuration loading with desktop settings
 4. Configuration reload / persistence
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_config_backend_settings.py -v
+Run with: PYTHONPATH=.:src pytest test/test_config_backend_settings.py -v
 """
 
 from pathlib import Path

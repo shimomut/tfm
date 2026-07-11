@@ -3,7 +3,7 @@ Test S3 TTL Configuration
 
 Tests that S3 cache TTL can be configured through the Config class.
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_s3_ttl_configuration.py -v
+Run with: PYTHONPATH=.:src pytest test/test_s3_ttl_configuration.py -v
 """
 
 import sys

@@ -1,7 +1,7 @@
 """
 Test script for the move feature implementation
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_move_feature.py -v
+Run with: PYTHONPATH=.:src pytest test/test_move_feature.py -v
 """
 
 import os

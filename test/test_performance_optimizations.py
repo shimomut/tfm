@@ -6,7 +6,7 @@ Tests:
 - Visibility checking for log pane (Requirement 11.3)
 - Message retention limit (Requirement 11.4)
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_performance_optimizations.py -v
+Run with: PYTHONPATH=.:src pytest test/test_performance_optimizations.py -v
 """
 
 import sys

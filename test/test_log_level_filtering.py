@@ -4,7 +4,7 @@ Test log level filtering functionality.
 Tests that log levels are correctly applied to loggers and that
 messages are filtered based on the configured levels.
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_log_level_filtering.py -v
+Run with: PYTHONPATH=.:src pytest test/test_log_level_filtering.py -v
 """
 
 import logging

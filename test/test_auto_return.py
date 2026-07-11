@@ -1,7 +1,7 @@
 """
 Test script to verify the auto_return option functionality
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_auto_return.py -v
+Run with: PYTHONPATH=.:src pytest test/test_auto_return.py -v
 """
 
 

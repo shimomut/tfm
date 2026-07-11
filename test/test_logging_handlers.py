@@ -1,7 +1,7 @@
 """
 Tests for TFM logging handlers
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_logging_handlers.py -v
+Run with: PYTHONPATH=.:src pytest test/test_logging_handlers.py -v
 """
 
 import logging

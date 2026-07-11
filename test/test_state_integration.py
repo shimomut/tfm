@@ -3,7 +3,7 @@ Integration test for TFM State Manager with main application
 
 Tests the integration of state management with the main TFM application.
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_state_integration.py -v
+Run with: PYTHONPATH=.:src pytest test/test_state_integration.py -v
 """
 
 from pathlib import Path

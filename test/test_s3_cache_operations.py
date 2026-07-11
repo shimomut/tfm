@@ -4,7 +4,7 @@ Test S3 Cache Fix
 This test verifies that the S3 caching fix properly caches stat information
 from directory listings and avoids 404 errors.
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_s3_cache_operations.py -v
+Run with: PYTHONPATH=.:src pytest test/test_s3_cache_operations.py -v
 """
 
 import time

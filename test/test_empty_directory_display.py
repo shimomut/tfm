@@ -1,7 +1,7 @@
 """
 Test empty directory display functionality
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_empty_directory_display.py -v
+Run with: PYTHONPATH=.:src pytest test/test_empty_directory_display.py -v
 """
 
 import tempfile

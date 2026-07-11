@@ -31,7 +31,15 @@ import time
 import sys
 from pathlib import Path as _StdPath
 
-sys.path.insert(0, str(_StdPath(__file__).parent / "src"))
+# The flat ``tfm_*`` modules live in ./src when running from the source tree; when
+# this file is pip-installed as a top-level module they are installed alongside it
+# as the ``tfm_modules`` package dir. Put whichever exists on sys.path so the flat
+# ``from tfm_* import`` lines below resolve in both layouts.
+_here = _StdPath(__file__).parent
+for _modules_dir in (_here / "src", _here / "tfm_modules"):
+    if _modules_dir.is_dir():
+        sys.path.insert(0, str(_modules_dir))
+        break
 
 from puikit import EventType, Font, Item, Panel, PostEffect, Style, TextAttribute, Theme, VSplit, derive_theme, mix  # noqa: E402
 from puikit.posteffect import PRESETS as _POST_EFFECT_PRESETS  # noqa: E402

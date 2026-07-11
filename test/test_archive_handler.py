@@ -1,7 +1,7 @@
 """
 Test suite for ArchiveHandler classes
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_archive_handler.py -v
+Run with: PYTHONPATH=.:src pytest test/test_archive_handler.py -v
 """
 
 import tempfile

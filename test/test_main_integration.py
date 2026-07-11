@@ -1,7 +1,7 @@
 """
 Test file for integration of extended key bindings with TFM main functionality.
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_main_integration.py -v
+Run with: PYTHONPATH=.:src pytest test/test_main_integration.py -v
 """
 
 import unittest

@@ -1,7 +1,7 @@
 """
 Test script to verify dialog mode exclusivity
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_dialog_exclusivity.py -v
+Run with: PYTHONPATH=.:src pytest test/test_dialog_exclusivity.py -v
 """
 
 # Add src directory to Python path

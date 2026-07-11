@@ -301,13 +301,16 @@ python3 tfm.py --desktop
 # Install from source directory
 cd tfm
 
+# PuiKit is required and not on PyPI — install it (editable) first
+pip install -e ../puikit
+
 # Terminal mode only
 pip install .
 
 # With macOS desktop mode support
 pip install .[macos]
 
-# Run from anywhere
+# Run from anywhere (installs a `tfm` console command)
 tfm                # Terminal mode
 tfm --desktop      # Desktop mode (macOS only, if installed with [macos])
 ```
@@ -316,6 +319,9 @@ tfm --desktop      # Desktop mode (macOS only, if installed with [macos])
 ```bash
 # Install in editable mode (changes reflected immediately)
 cd tfm
+
+# PuiKit is required and not on PyPI — install it (editable) first
+pip install -e ../puikit
 
 # Terminal mode only
 pip install -e .

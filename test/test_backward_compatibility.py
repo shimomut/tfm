@@ -4,7 +4,7 @@ Test backward compatibility of add_message() routing through logging infrastruct
 This test verifies that the legacy add_message() method correctly routes messages
 through the new logging infrastructure, ensuring consistent handling with logger messages.
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_backward_compatibility.py -v
+Run with: PYTHONPATH=.:src pytest test/test_backward_compatibility.py -v
 """
 
 import sys

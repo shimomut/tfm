@@ -1,7 +1,7 @@
 """
 Test script to verify log scroll direction fix
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_log_scroll_direction.py -v
+Run with: PYTHONPATH=.:src pytest test/test_log_scroll_direction.py -v
 """
 
 import sys

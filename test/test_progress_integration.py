@@ -1,7 +1,7 @@
 """
 Integration test for the progress system with TFM operations
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_progress_integration.py -v
+Run with: PYTHONPATH=.:src pytest test/test_progress_integration.py -v
 """
 
 import tempfile

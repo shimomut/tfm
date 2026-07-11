@@ -22,27 +22,27 @@ case "$MODE" in
         echo -e "${GREEN}Running tests in isolated processes (one test per process)${NC}"
         echo "Each test gets 10 second timeout"
         echo ""
-        PYTHONPATH=.:src:ttk pytest "$PATTERN" --forked --timeout=10 -v
+        PYTHONPATH=.:src pytest "$PATTERN" --forked --timeout=10 -v
         ;;
     
     parallel)
         echo -e "${GREEN}Running tests in parallel (multiple processes)${NC}"
         echo "Each test gets 10 second timeout"
         echo ""
-        PYTHONPATH=.:src:ttk pytest "$PATTERN" -n auto --timeout=10 -v
+        PYTHONPATH=.:src pytest "$PATTERN" -n auto --timeout=10 -v
         ;;
     
     sequential)
         echo -e "${GREEN}Running tests sequentially (single process)${NC}"
         echo "Each test gets 10 second timeout"
         echo ""
-        PYTHONPATH=.:src:ttk pytest "$PATTERN" --timeout=10 -v
+        PYTHONPATH=.:src pytest "$PATTERN" --timeout=10 -v
         ;;
     
     quick)
         echo -e "${GREEN}Quick test run (fail fast, no timeout)${NC}"
         echo ""
-        PYTHONPATH=.:src:ttk pytest "$PATTERN" -x -v
+        PYTHONPATH=.:src pytest "$PATTERN" -x -v
         ;;
     
     *)

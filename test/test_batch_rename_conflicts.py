@@ -2,7 +2,7 @@
 Test script for batch rename conflict resolution
 Tests the one-by-one conflict resolution for multiple files
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_batch_rename_conflicts.py -v
+Run with: PYTHONPATH=.:src pytest test/test_batch_rename_conflicts.py -v
 """
 
 import tempfile

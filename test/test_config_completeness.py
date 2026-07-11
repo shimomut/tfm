@@ -2,7 +2,7 @@
 Test Configuration Completeness
 Verifies that all configuration parameters are properly defined
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_config_completeness.py -v
+Run with: PYTHONPATH=.:src pytest test/test_config_completeness.py -v
 """
 
 from pathlib import Path

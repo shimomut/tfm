@@ -1,7 +1,7 @@
 """
 Integration tests for TFM command line argument parsing
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_argparse_integration.py -v
+Run with: PYTHONPATH=.:src pytest test/test_argparse_integration.py -v
 """
 
 import subprocess

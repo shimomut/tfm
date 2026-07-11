@@ -1,7 +1,7 @@
 """
 Test the progress manager functionality
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_progress_manager.py -v
+Run with: PYTHONPATH=.:src pytest test/test_progress_manager.py -v
 """
 
 

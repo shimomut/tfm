@@ -1,7 +1,7 @@
 """
 Test script for dynamic date column width adjustment
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_date_column_width.py -v
+Run with: PYTHONPATH=.:src pytest test/test_date_column_width.py -v
 """
 
 import sys

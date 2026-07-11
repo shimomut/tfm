@@ -1,7 +1,7 @@
 """
 Test configuration management for LogManager
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_configuration_management.py -v
+Run with: PYTHONPATH=.:src pytest test/test_configuration_management.py -v
 """
 
 import logging

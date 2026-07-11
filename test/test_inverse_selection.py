@@ -1,7 +1,7 @@
 """
 Test inverse selection behavior for select_all_files and select_all_items
 
-Run with: PYTHONPATH=.:src:ttk pytest test/test_inverse_selection.py -v
+Run with: PYTHONPATH=.:src pytest test/test_inverse_selection.py -v
 """
 
 from pathlib import Path
