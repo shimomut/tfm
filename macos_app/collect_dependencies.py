@@ -237,23 +237,43 @@ def verify_pyobjc(dest_dir):
     return True
 
 
-def collect_dependencies(requirements_file, dest_dir):
-    """Resolve and copy the runtime dependency closure. Returns True on success."""
+def collect_dependencies(requirements_file, dest_dir, include_deps_of=None):
+    """
+    Resolve and copy the runtime dependency closure. Returns True on success.
+
+    *include_deps_of* is a list of distribution names that are bundled by some
+    other means (e.g. PuiKit, whose source ``build.sh`` copies in separately)
+    but whose declared runtime dependencies must still be collected. Their
+    dependency closure is included, but the named distributions themselves are
+    not copied. This is how the Windows bundle picks up PuiKit's ``numpy``
+    dependency (the win32 backend imports numpy; the macOS backend does not).
+    """
     dest_dir = Path(dest_dir)
     dest_dir.mkdir(parents=True, exist_ok=True)
 
+    deps_only = {_canonical(n) for n in (include_deps_of or [])}
+
     seeds = read_seed_requirements(requirements_file)
-    if not seeds:
+    if not seeds and not deps_only:
         log_error("No applicable requirements found; nothing to collect")
         return False
 
+    if deps_only:
+        log_info(f"Also including runtime deps of: {', '.join(sorted(deps_only))} "
+                 f"(these distributions are copied in separately, not here)")
+
     log_info("Resolving runtime dependency closure...")
-    resolved = resolve_runtime_closure(seeds)
+    resolved = resolve_runtime_closure(seeds + sorted(deps_only))
     log_info(f"Runtime closure: {len(resolved)} distribution(s)")
 
     total_files = 0
     failed = []
     for cname in sorted(resolved):
+        if cname in deps_only:
+            # Provided by another build step (e.g. PuiKit source); take its deps
+            # from the closure but do not copy the distribution itself.
+            log_info(f"Skipping copy of {cname} (bundled separately; deps kept)")
+            continue
         dist = resolved[cname]
         name = dist.metadata["Name"]
         version = dist.version
@@ -265,7 +285,8 @@ def collect_dependencies(requirements_file, dest_dir):
             log_warning(f"No files copied for {name} {version}")
             failed.append(name)
 
-    log_success(f"Collected {len(resolved)} distributions, {total_files} files "
+    copied_dists = len(resolved) - sum(1 for c in resolved if c in deps_only)
+    log_success(f"Collected {copied_dists} distributions, {total_files} files "
                 f"(skipped test/build tooling)")
 
     if not verify_pyobjc(dest_dir):
@@ -285,6 +306,10 @@ def main():
                         help="Path to requirements.txt file")
     parser.add_argument("--dest", required=True,
                         help="Destination directory for packages")
+    parser.add_argument("--include-deps-of", action="append", default=[], metavar="NAME",
+                        help="Collect the runtime deps of NAME (a package bundled "
+                             "separately, e.g. puikit) without copying NAME itself. "
+                             "Repeatable.")
     args = parser.parse_args()
 
     requirements_file = os.path.abspath(args.requirements)
@@ -294,7 +319,7 @@ def main():
     log_info(f"Requirements file: {requirements_file}")
     log_info(f"Destination directory: {dest_dir}")
 
-    if collect_dependencies(requirements_file, dest_dir):
+    if collect_dependencies(requirements_file, dest_dir, include_deps_of=args.include_deps_of):
         sys.exit(0)
     else:
         sys.exit(1)
