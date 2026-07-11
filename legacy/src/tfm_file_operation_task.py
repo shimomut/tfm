@@ -671,7 +671,12 @@ class FileOperationTask(BaseTask):
         # Add resolved conflicts from results['success']
         # These are already in (source, dest, overwrite) format for copy/move
         files_to_process.extend(self.context.results['success'])
-        
+
+        # Clear results['success'] so the executor's completion callback can
+        # populate it with the actual successful count without double-counting
+        # the resolved-conflict entries we just consumed.
+        self.context.results['success'] = []
+
         # Log what we're about to execute
         total_files = len(files_to_process)
         skipped_count = len(self.context.results['skipped'])
@@ -717,15 +722,18 @@ class FileOperationTask(BaseTask):
         def copy_worker():
             try:
                 # Separate files by overwrite flag
+                # Pass renamed entries as (source, dest) tuples so the executor uses
+                # the resolved destination path instead of recomputing from source.name.
                 files_no_overwrite = []
                 files_with_overwrite = []
-                
+
                 for source, dest, overwrite in files_to_copy:
+                    item = (source, dest) if dest.name != source.name else source
                     if overwrite:
-                        files_with_overwrite.append(source)
+                        files_with_overwrite.append(item)
                     else:
-                        files_no_overwrite.append(source)
-                
+                        files_no_overwrite.append(item)
+
                 # Get destination directory from first file
                 if files_to_copy:
                     destination_dir = files_to_copy[0][1].parent
@@ -830,15 +838,18 @@ class FileOperationTask(BaseTask):
         def move_worker():
             try:
                 # Separate files by overwrite flag
+                # Pass renamed entries as (source, dest) tuples so the executor uses
+                # the resolved destination path instead of recomputing from source.name.
                 files_no_overwrite = []
                 files_with_overwrite = []
-                
+
                 for source, dest, overwrite in files_to_move:
+                    item = (source, dest) if dest.name != source.name else source
                     if overwrite:
-                        files_with_overwrite.append(source)
+                        files_with_overwrite.append(item)
                     else:
-                        files_no_overwrite.append(source)
-                
+                        files_no_overwrite.append(item)
+
                 # Get destination directory from first file
                 if files_to_move:
                     destination_dir = files_to_move[0][1].parent
