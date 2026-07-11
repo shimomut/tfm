@@ -204,11 +204,46 @@ if [ -z "${PUIKIT_SRC}" ] || [ ! -d "${PUIKIT_SRC}" ]; then
     exit 1
 fi
 
+# The GUI backend defaults to a bundled Noto Sans + Noto Sans Mono pair
+# (puikit/fonts/), registered with Core Text at runtime so the app renders the
+# same on any Mac without the fonts installed. Those files are large,
+# OFL-licensed binaries kept out of git and fetched on demand, so an editable
+# PuiKit checkout may not have them yet. Fetch them into the source tree before
+# copying so the bundle ships them; the fetch is idempotent (skips files already
+# present) and stdlib-only. Fall back to the OS fonts is only acceptable as a
+# runtime safety net, not for a distributed build, so a missing font is a hard
+# error below rather than a silent OS-font substitution in the DMG.
+FETCH_FONTS="$(dirname "${PUIKIT_SRC}")/scripts/fetch_fonts.py"
+if [ -f "${FETCH_FONTS}" ]; then
+    log_info "Ensuring bundled Noto fonts are present..."
+    if ! "${VENV_PYTHON}" "${FETCH_FONTS}"; then
+        log_warning "Font fetch failed (offline?); relying on any fonts already in the checkout"
+    fi
+else
+    log_info "  PuiKit font-fetch script not found; relying on installed fonts"
+fi
+
 # Copy the whole package, then drop caches (compiled fresh below).
 rm -rf "${PUIKIT_DEST}"
 cp -R "${PUIKIT_SRC}" "${PUIKIT_DEST}"
 find "${PUIKIT_DEST}" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 log_info "  Copied PuiKit from ${PUIKIT_SRC}"
+
+# Verify the bundled default fonts made it into the app. Shipping a DMG that
+# silently falls back to the OS UI font is exactly the regression this guards
+# against, so fail the build (loudly, with the fix) rather than ship it.
+FONTS_DEST="${PUIKIT_DEST}/fonts"
+MISSING_FONTS=""
+for f in NotoSans-Regular.ttf NotoSans-Bold.ttf NotoSansMono-Regular.ttf NotoSansMono-Bold.ttf; do
+    [ -f "${FONTS_DEST}/${f}" ] || MISSING_FONTS="${MISSING_FONTS} ${f}"
+done
+if [ -n "${MISSING_FONTS}" ]; then
+    log_error "Bundled Noto fonts missing from ${FONTS_DEST}:${MISSING_FONTS}"
+    log_error "The app would fall back to OS fonts. Fetch them and rebuild:"
+    log_error "  ${VENV_PYTHON} ${FETCH_FONTS}"
+    exit 1
+fi
+log_info "  Bundled Noto fonts present in ${FONTS_DEST}"
 
 # Pre-compile PuiKit Python files
 log_info "Pre-compiling PuiKit Python files..."
