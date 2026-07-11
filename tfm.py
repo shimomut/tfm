@@ -33,7 +33,8 @@ from pathlib import Path as _StdPath
 
 sys.path.insert(0, str(_StdPath(__file__).parent / "src"))
 
-from puikit import EventType, Font, Item, Panel, Style, TextAttribute, Theme, VSplit, derive_theme, mix  # noqa: E402
+from puikit import EventType, Font, Item, Panel, PostEffect, Style, TextAttribute, Theme, VSplit, derive_theme, mix  # noqa: E402
+from puikit.posteffect import PRESETS as _POST_EFFECT_PRESETS  # noqa: E402
 from puikit.backends import create_backend  # noqa: E402
 from puikit.menu import Menu, MenuItem, SEPARATOR  # noqa: E402
 from puikit.text import elide  # noqa: E402
@@ -99,9 +100,30 @@ from tfm_text_viewer import show_text_viewer  # noqa: E402
 # whatever a recipe produces legible. See puikit ``docs/color_system.md`` §7.
 
 
+def _resolve_post_effect(value) -> "PostEffect | None":
+    """Turn a theme's ``post_effect`` recommendation into a ``PostEffect`` (or
+    ``None``). Accepts a named preset (``'crt'`` — see ``puikit.posteffect.PRESETS``),
+    a params dict (``{'bloom': 0.3, 'scanline': 0.15, ...}``), an already-built
+    ``PostEffect``, or ``None``/``''`` for "no effect". An unknown name or malformed
+    dict resolves to ``None`` so a typo in config.py degrades to "no effect" rather
+    than blocking startup."""
+    if value is None or value == "":
+        return None
+    if isinstance(value, PostEffect):
+        return value
+    if isinstance(value, str):
+        return _POST_EFFECT_PRESETS.get(value.strip().lower())
+    if isinstance(value, dict):
+        try:
+            return PostEffect(**value)
+        except TypeError:
+            return None
+    return None
+
+
 def _theme(bg, fg, muted, accent, surface, selection, *, accent2=None,
            status=None, footer=None, directory=None, isearch_match=None,
-           syntax=None, file_types=None, cursor=None) -> Theme:
+           syntax=None, file_types=None, cursor=None, post_effect=None) -> Theme:
     ac2 = accent if accent2 is None else accent2
     p = {"bg": bg, "fg": fg, "muted": muted, "accent": accent, "accent2": ac2,
          "surface": surface}
@@ -130,6 +152,12 @@ def _theme(bg, fg, muted, accent, surface, selection, *, accent2=None,
         extras["isearch_match"] = isearch_match(p) if callable(isearch_match) else isearch_match
     if syntax is not None:
         extras["syntax"] = dict(syntax)
+    # A theme may *recommend* a post-processing effect (a CRT/phosphor look): it
+    # rides in extras and TfmApp pushes it to the backend on theme switch, so a
+    # pixel backend (macOS GUI) auto-adjusts while a terminal ignores it.
+    effect = _resolve_post_effect(post_effect)
+    if effect is not None:
+        extras["post_effect"] = effect
     kw: dict = {}
     if surfaces:
         kw["surfaces"] = surfaces
@@ -205,7 +233,7 @@ _THEME_OVERRIDE_MAP = {
     "accent2": "accent2", "surface": "surface", "selection": "selection",
     "status": "status", "footer": "footer", "directory": "directory",
     "isearch_match": "isearch_match", "syntax": "syntax", "file_types": "file_types",
-    "cursor": "cursor",
+    "cursor": "cursor", "post_effect": "post_effect",
 }
 
 #: Sub-dict theme keys that deep-merge (the user recolors only the entries they
@@ -517,6 +545,9 @@ class TfmApp:
         self._theme_index = next(
             (i for i, (name, _t) in enumerate(self.themes) if name == start), 0)
         self.panel.theme = self.themes[self._theme_index][1]
+        # Apply the restored theme's recommended post effect at launch too (the
+        # backend stores it and re-attaches it once its window opens).
+        self._apply_post_effect(self.themes[self._theme_index][1])
         self.left_view = FilePane(
             self.pm.left_pane,
             config=self.config,
@@ -1757,8 +1788,17 @@ class TfmApp:
         self._theme_index = index % len(self.themes)
         name, theme = self.themes[self._theme_index]
         self.panel.theme = theme
+        self._apply_post_effect(theme)
         self.state_manager.set_state("theme", name)  # remember across restarts
         self.log_info(f"Theme: {name}")
+
+    def _apply_post_effect(self, theme: Theme) -> None:
+        """Push the theme's recommended post-processing effect (or ``None`` to
+        clear) to the backend, so switching to a CRT-style theme turns the effect
+        on and switching away turns it off. A backend without the ``post_effects``
+        capability (a terminal) inherits the base no-op, so this never branches on
+        the backend."""
+        self.backend.set_post_effect(theme.extras.get("post_effect"))
 
     def _cycle_theme(self) -> None:
         """Advance to the next palette (the ``toggle_color_scheme`` / T action)."""

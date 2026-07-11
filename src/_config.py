@@ -120,6 +120,14 @@ class Config:
     #              'comment': (106, 153, 85), 'number': (181, 206, 168),
     #              'operator': (212, 212, 212), 'builtin': (78, 201, 176),
     #              'name': (156, 220, 254)}
+    #   # --- recommended post-processing effect (GUI backend only) ---
+    #   #   A full-screen CRT / phosphor "look" composited over the rendered
+    #   #   frame. TFM turns it on when this theme becomes active and off when you
+    #   #   switch away. Only the GUI backend (`tfm.py --backend gui`) renders it;
+    #   #   a terminal has no pixels to filter and silently ignores it.
+    #   #     'post_effect': 'crt'       # preset: glow + bloom + scanlines + vignette + roll
+    #   #     'post_effect': {'bloom': 0.3, 'vignette': 0.15, 'glow': 0.22,
+    #   #                     'scanline': 0.15, 'roll': 0.1}  # custom (override any)
     #
     # Example:
     #
@@ -137,8 +145,10 @@ class Config:
     THEMES = {
         # Phosphor: a monochrome phosphor-green CRT terminal — every color is a
         # shade of green on a near-black screen. A ready-made example of a full
-        # custom theme; select it from View > Theme or with the T key.
+        # custom theme; select it from View > Theme or with the T key. On the GUI
+        # backend the 'post_effect' below adds a real CRT glow over the green.
         'Phosphor': {
+            'post_effect': 'crt',            # CRT glow/bloom/scanlines (GUI backend)
             'background': (4, 15, 7),        # dark CRT green-black
             'foreground': (51, 245, 121),    # phosphor green
             'muted':      (33, 138, 74),     # dim green (secondary text / dividers)
