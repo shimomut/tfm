@@ -3416,9 +3416,10 @@ def main() -> None:
     backend_kwargs = {"frame_autosave_name": "TFMMainWindow"} if backend_name == "gui" else {}
     # Ground the GUI base (grid) font in the user's config: the base unit — hence
     # the on-screen text size — is derived from this font's glyph box, so
-    # MONO_FONT_NAME and FONT_SIZE take effect here. The base font
-    # must be monospaced. Curses has one terminal font and no base_font parameter,
-    # so this is GUI-only. (The proportional UI-font default is a later step.)
+    # MONO_FONT_NAME and FONT_SIZE take effect here. The base font must be
+    # monospaced; MONO_FONT_NAME=None falls back to PuiKit's bundled Noto Sans
+    # Mono. Curses has one terminal font and no base_font parameter, so this is
+    # GUI-only.
     if backend_name == "gui":
         cfg = get_config()
         backend_kwargs["base_font"] = Font(
@@ -3428,8 +3429,10 @@ def main() -> None:
         )
         # The default proportional face that PuiKit's widgets (markdown, message
         # boxes, text fields) — and TFM's own proportional draws — resolve to via
-        # an unnamed Font(). family=None lets PuiKit fall back to the OS UI font;
-        # size comes from base_font (both share FONT_SIZE).
+        # an unnamed Font(). family=None lets PuiKit fall back to its bundled
+        # default (Noto Sans, metrics-matched with the mono grid font), or the OS
+        # UI font if the bundled files are unavailable; size comes from base_font
+        # (both share FONT_SIZE).
         backend_kwargs["ui_font"] = Font(family=cfg.UI_FONT_NAME)
     backend = create_backend(backend_name, **backend_kwargs)
     with backend:
