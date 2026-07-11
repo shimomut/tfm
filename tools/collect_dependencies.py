@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 """
-TFM Dependency Collection Script
+TFM Dependency Collection Script (shared, platform-agnostic)
 
-Collects the *runtime* Python dependencies of TFM into the app bundle's
-``python_packages`` directory.
+Collects the *runtime* Python dependencies of TFM into a bundle's packages
+directory. Shared by both bundle builds — ``macos_app/build.sh`` (into
+``Resources/python_packages``) and ``windows_app/build.ps1`` (into
+``Lib\\site-packages``); it makes no OS assumptions.
 
 Rather than copying the entire virtual environment (which drags in test/build
-tooling such as pytest, delocate, numpy and the retired ``ttk`` toolkit), this
-resolves the dependency closure of ``requirements.txt`` using the installed
-package metadata and copies only those distributions. Environment markers are
-honoured, so platform-specific requirements (``pyobjc; sys_platform ==
-"darwin"``) and extras are included/excluded correctly for the build machine.
+tooling such as pytest, delocate and the retired ``ttk`` toolkit), this resolves
+the dependency closure of ``requirements.txt`` using the installed package
+metadata and copies only those distributions. Environment markers are honoured,
+so platform-specific requirements (``pyobjc; sys_platform == "darwin"``,
+``windows-curses; sys_platform == "win32"``) and extras are included/excluded
+correctly for the build machine.
 
 Each distribution is copied file-for-file from its ``RECORD`` (via
 ``importlib.metadata``), so its ``.dist-info`` — including the bundled license
@@ -20,8 +23,10 @@ THIRD_PARTY_NOTICES file, so trimming to the real runtime set here also trims
 the notices to what is actually shipped.
 
 Note: PuiKit is installed editable during development and is copied into the
-bundle separately by ``build.sh`` (its editable shim would be broken on the
-target machine), so it is intentionally not collected here.
+bundle separately by each build script (its editable shim would be broken on the
+target machine), so it is intentionally not collected here. Pass
+``--include-deps-of puikit`` to still pull in PuiKit's own runtime deps (e.g.
+``numpy``, which the Windows Direct2D backend imports) without copying PuiKit.
 """
 
 import argparse

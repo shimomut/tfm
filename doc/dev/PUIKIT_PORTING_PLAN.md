@@ -346,10 +346,11 @@ compiled** on Windows either — the backend is pure Python on `ctypes` + `numpy
 same `sys.path` shape (`app/` = macOS `Resources/`, `Lib\site-packages` =
 `python_packages`), same `sys.argv=("TFM","--backend","gui")` → `main()` call.
 
-Pieces: `build.ps1` (orchestrator), `collect_dependencies.py` (site-packages walk,
-skips build tools / editable shims / pyobjc), `make_icon.py` (`TFM.icns`→`.ico`),
-`resources/TFM.{manifest,rc}`. Makefile: `windows-app` / `windows-app-zip` /
-`windows-app-clean`.
+Pieces: `build.ps1` (orchestrator), `make_icon.py` (`TFM.icns`→`.ico`),
+`resources/TFM.{manifest,rc}`. Dependency collection + `THIRD_PARTY_NOTICES.txt`
+reuse the shared `tools/collect_dependencies.py` (closure-based, `--include-deps-of
+puikit` → numpy) and `tools/generate_third_party_notices.py`. Makefile:
+`windows-app` / `windows-app-zip` / `windows-app-clean`.
 
 Open items before a 1.0 `.zip` ships:
 - **End-to-end build not yet run** — needs MSVC Build Tools + Windows SDK

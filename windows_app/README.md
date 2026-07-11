@@ -48,7 +48,6 @@ Run it:
 windows_app/
 ├── README.md
 ├── build.ps1                 # orchestrator (see design doc for the 8 steps)
-├── collect_dependencies.py   # copies venv site-packages -> bundle Lib\site-packages
 ├── make_icon.py              # TFM.icns -> TFM.ico (Pillow), else a placeholder
 ├── src/
 │   └── launcher.c            # the embedded-CPython launcher (-> TFM.exe)
@@ -62,6 +61,12 @@ windows_app/
     ├── obj/                  # launcher intermediates
     └── TFM-<version>-win64.zip
 ```
+
+Dependency collection and license notices are **not** duplicated here — `build.ps1`
+reuses the shared, platform-agnostic `tools/collect_dependencies.py`
+(`--include-deps-of puikit`, which pulls in `numpy`) and
+`tools/generate_third_party_notices.py`, which writes `THIRD_PARTY_NOTICES.txt`
+into the bundle root and fails the build if any bundled component lacks a license.
 
 ## Notes
 

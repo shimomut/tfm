@@ -47,6 +47,8 @@ folder is what gets zipped for distribution):
 TFM/                              <- bundle root = the .exe's directory
 ├── TFM.exe                       compiled C launcher (this repo)
 ├── TFM.ico                       app icon (also embedded into TFM.exe)
+├── THIRD_PARTY_NOTICES.txt       aggregated license text for bundled components
+├── LICENSE.txt                   embedded CPython's PSF license (from embeddable)
 ├── python3XX.dll                 embeddable CPython (implicitly linked by TFM.exe)
 ├── python3.dll                   stable-ABI forwarder (from embeddable)
 ├── python3XX.zip                 zipped standard library (from embeddable)
@@ -137,19 +139,29 @@ bundle root.
 
 ---
 
-## Dependency collection (`collect_dependencies.py`)
+## Dependency collection + license notices (shared with macOS)
 
-Same philosophy as the macOS collector: walk the venv `site-packages` and copy
-everything into `Lib\site-packages`, skipping:
+The Windows build reuses the **shared, platform-agnostic** scripts rather than
+maintaining Windows-specific copies:
 
-- build tools (`pip`, `setuptools`, `wheel`, `pkg_resources`, `_distutils_hack`),
-- editable-install shims (`__editable__*`, `*.pth`) — PuiKit is installed
-  editable, so its site-packages entry only *points at* the developer's checkout;
-  the real `puikit/` source is copied separately by `build.ps1`,
-- `pyobjc*` (macOS-only; not present on a Windows venv anyway).
-
-`numpy` carries its own DLLs under `numpy/` and `numpy.libs/` and registers them
-via `os.add_dll_directory` on import, so a plain directory copy is sufficient.
+- **`tools/collect_dependencies.py`** (platform-agnostic — its one PyObjC check
+  self-skips off `darwin`; shared with `macos_app/build.sh`). It resolves the
+  *runtime dependency closure* of `requirements.txt` from installed package
+  metadata (not a blanket `site-packages` copy), honouring environment markers
+  so `windows-curses; sys_platform=="win32"` is collected and `pyobjc; darwin`
+  is not. `build.ps1` passes **`--include-deps-of puikit`** so PuiKit's own
+  runtime deps — notably **`numpy`**, which the win32 Direct2D backend imports —
+  are collected *without* copying PuiKit itself (its source is copied into
+  `app\puikit` separately). Each distribution is copied file-for-file from its
+  `RECORD`, so its `.dist-info` (and bundled license text) travels along; `numpy`
+  brings its own `numpy.libs\` DLLs, registered via `os.add_dll_directory`.
+- **`tools/generate_third_party_notices.py`** then aggregates a
+  `THIRD_PARTY_NOTICES.txt` at the bundle root from every bundled distribution's
+  `.dist-info` license text, plus three `--extra` non-distribution components:
+  the embedded CPython (its `LICENSE.txt`), PuiKit (`MIT`), and the bundled Noto
+  fonts (`SIL OFL 1.1`). It runs in strict mode — the build **fails** if any
+  bundled distribution has no discoverable license, so an incomplete notice can
+  never ship. This mirrors `macos_app/build.sh` exactly.
 
 ---
 
@@ -168,7 +180,10 @@ directly). Steps:
    (cached under `windows_app/.cache/`).
 4. **Assemble app code**: copy `tfm.py`, `src/`, the resolved `puikit/` package,
    and `LICENSE` into `app/`; `compileall` them.
-5. **Collect dependencies** into `Lib\site-packages`.
+5. **Collect dependencies** into `Lib\site-packages` via the shared
+   `tools/collect_dependencies.py` (`--include-deps-of puikit`), then
+   **generate `THIRD_PARTY_NOTICES.txt`** at the bundle root via
+   `tools/generate_third_party_notices.py`. See the section above.
 6. **Generate resources**: `version_generated.h` (from `$VERSION` / tfm.py's
    `_VERSION`) and `TFM.ico` (via `make_icon.py`); compile `TFM.rc` → `TFM.res`.
 7. **Compile** `launcher.c` + `TFM.res` → `TFM.exe` (GUI subsystem).

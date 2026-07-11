@@ -109,7 +109,6 @@ rm -rf macos_app/build
 macos_app/
 ├── README.md                    # This file
 ├── build.sh                     # Main build script
-├── collect_dependencies.py      # Python dependency collector
 ├── create_dmg.sh               # DMG installer creator
 ├── test_single_process.sh      # Single-process architecture test
 ├── src/                        # Objective-C source files
@@ -203,24 +202,27 @@ CODESIGN_IDENTITY="Developer ID Application: Your Name" ./build.sh
 VERSION=1.0.0 ./build.sh
 ```
 
-### collect_dependencies.py
+### tools/collect_dependencies.py
 
-Python script that collects dependencies from `requirements.txt` and copies them to the bundle.
+Shared, platform-agnostic script that resolves the runtime dependency closure of
+`requirements.txt` and copies those distributions (with their `.dist-info`
+license text) into the bundle. Lives in the repo-root `tools/` directory because
+it is shared with the Windows build (`windows_app/build.ps1`).
 
 **What it does:**
 
-1. Reads `requirements.txt` and extracts package names
-2. Locates each package in site-packages
-3. Copies packages with proper directory structure
-4. Copies package metadata (.dist-info directories)
-5. Recursively collects dependencies of dependencies
-6. Verifies PyObjC frameworks are included
+1. Reads `requirements.txt` seeds and resolves their full runtime dependency
+   closure from installed package metadata (honouring environment markers)
+2. Copies each distribution file-for-file from its `RECORD`, preserving layout
+3. Skips build/test tooling (pip, setuptools, pytest, …) and editable shims
+4. `--include-deps-of NAME` pulls in a separately-bundled package's deps
+   (e.g. PuiKit's numpy) without copying the package itself
 
 **Usage:**
 
 ```bash
 # Collect dependencies
-python3 collect_dependencies.py \
+python3 ../tools/collect_dependencies.py \
     --requirements ../requirements.txt \
     --dest build/TFM.app/Contents/Resources/python_packages
 ```

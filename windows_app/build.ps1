@@ -225,11 +225,64 @@ if (Test-Path (Join-Path $ProjectRoot 'LICENSE')) {
 # ---------------------------------------------------------------------------
 # Step 5: Collect third-party dependencies into Lib\site-packages
 # ---------------------------------------------------------------------------
+# Uses the shared, platform-agnostic collector in tools/ (it makes no OS
+# assumptions; its PyObjC check self-skips off darwin). It resolves
+# the runtime closure of requirements.txt via installed metadata - honouring
+# environment markers, so windows-curses is picked up and pyobjc is not.
+# --include-deps-of puikit pulls in PuiKit's own runtime deps (numpy, which the
+# win32 Direct2D backend imports) without copying PuiKit itself (its source is
+# copied into app\puikit above). Each dist is copied with its .dist-info, whose
+# license text the notices generator reads in Step 5b.
 Info 'Step 5: Collecting third-party dependencies...'
 
 $SitePkgsDest = Join-Path $AppRoot 'Lib\site-packages'
-& $VenvPy (Join-Path $ScriptDir 'collect_dependencies.py') --site-packages $SitePkgs --dest $SitePkgsDest
+$SharedCollector = Join-Path $ProjectRoot 'tools\collect_dependencies.py'
+$Requirements = Join-Path $ProjectRoot 'requirements.txt'
+& $VenvPy $SharedCollector --requirements $Requirements --dest $SitePkgsDest --include-deps-of puikit
 if ($LASTEXITCODE -ne 0) { Fail 'Dependency collection failed.' }
+
+# ---------------------------------------------------------------------------
+# Step 5b: Generate aggregated THIRD_PARTY_NOTICES.txt
+# ---------------------------------------------------------------------------
+# Reproduces the license text of every bundled Python distribution (scanned from
+# their .dist-info under Lib\site-packages) plus the non-distribution components:
+# the embedded CPython, the copied-in PuiKit source, and the bundled Noto fonts.
+# The generator (shared with macos_app/build.sh) fails the build if any bundled
+# distribution has no discoverable license, so an incomplete notice can't ship.
+Info 'Step 5b: Generating third-party license notices...'
+
+$NoticesScript = Join-Path $ProjectRoot 'tools\generate_third_party_notices.py'
+if (-not (Test-Path $NoticesScript)) { Fail "Notices generator not found at $NoticesScript" }
+$NoticesOut = Join-Path $AppRoot 'THIRD_PARTY_NOTICES.txt'
+$NoticesExtras = @()
+
+# Embedded interpreter's PSF license (the embeddable ships LICENSE.txt at root).
+$PyLicense = Join-Path $AppRoot 'LICENSE.txt'
+if (Test-Path $PyLicense) {
+    $NoticesExtras += @('--extra', "Python $PyXY interpreter and standard library (Python Software Foundation License Agreement)=$PyLicense")
+} else {
+    Warn "Embedded Python LICENSE.txt not found at $PyLicense; interpreter will be omitted from notices."
+}
+
+# PuiKit's LICENSE lives at the checkout root, one level above the package dir.
+$PuikitLicense = Join-Path (Split-Path -Parent $PuikitSrc) 'LICENSE'
+if (Test-Path $PuikitLicense) {
+    $NoticesExtras += @('--extra', "PuiKit (MIT License)=$PuikitLicense")
+} else {
+    Fail "PuiKit LICENSE not found at $PuikitLicense"
+}
+
+# Bundled fonts (SIL OFL 1.1) - OFL.txt travels inside the copied puikit\fonts.
+$FontsOfl = Join-Path $AppDir 'puikit\fonts\OFL.txt'
+if (Test-Path $FontsOfl) {
+    $NoticesExtras += @('--extra', "Noto Sans & Noto Sans Mono fonts (SIL Open Font License 1.1)=$FontsOfl")
+} else {
+    Fail "Font license OFL.txt not found at $FontsOfl"
+}
+
+$NoticesArgs = @('--title', 'TFM', '--scan', $SitePkgsDest) + $NoticesExtras + @('--output', $NoticesOut)
+& $VenvPy $NoticesScript @NoticesArgs
+if ($LASTEXITCODE -ne 0) { Fail 'Failed to generate third-party license notices (see errors above).' }
 
 # ---------------------------------------------------------------------------
 # Step 6: Pre-compile app + deps to .pyc (launcher runs with write_bytecode=0)
