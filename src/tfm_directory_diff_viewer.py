@@ -1252,7 +1252,10 @@ class DirectoryDiffView(Widget):
         rows = self.visible  # atomic snapshot (worker swaps the list wholesale)
         first = int(self.top)
         vfrac = self.top - first
-        for vis in range(self._view_h + 1):
+        # Two extra rows: a fractional body height plus the fractional scroll
+        # offset can push the visible span up to two rows past the whole count,
+        # so the partial bottom row is drawn to be clipped, not dropped early.
+        for vis in range(self._view_h + 2):
             ri = first + vis
             if ri >= len(rows):
                 break

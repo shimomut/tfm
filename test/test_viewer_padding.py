@@ -111,6 +111,26 @@ def test_diff_viewer_footer_full_width_panes_inset():
     assert any(t[0] == PX and t[1] == fy for t in ctx.texts)
 
 
+def test_text_viewer_draws_rows_to_cover_fractional_bottom():
+    # With a fractional body height (the l/r-padded viewer rarely lands on a whole
+    # cell) plus a fractional scroll offset, the bottom partial row must still be
+    # drawn to be clipped — not vanish early (only one extra row would gap it).
+    d = tempfile.mkdtemp()
+    p = Path(d) / "f.txt"
+    p.write_text("\n".join(f"line{i}" for i in range(300)))
+    v = TextViewer(p)
+    v.draw(_GuiCtx(200.0, 100.0))     # establishes _view_h / content geometry
+    v.top = 5.7                        # scroll fraction (0.7) that exposes the gap
+    ys = []
+    v._draw_line = lambda ctx, y, li, c0: ys.append(y)  # record each row's top y
+    v._draw_rows(_GuiCtx(200.0, 100.0))
+    body_h = (100.0 - 1.0 - PY) - (1.0 + PY)   # fy - head_h (no h-scrollbar)
+    # The union of drawn rows must reach the body's bottom clip; the last row's
+    # bottom edge is max(top y) + 1.
+    assert max(ys) + 1.0 >= body_h
+    assert len(ys) == v._view_h + 2
+
+
 def test_dir_diff_viewer_bars_full_width_text_inset_and_hit_testing():
     d = tempfile.mkdtemp()
     ld = Path(d) / "L"; ld.mkdir()

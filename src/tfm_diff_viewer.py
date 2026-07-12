@@ -183,7 +183,10 @@ class _DiffPane(Widget):
         col0_int = int(v.left)
         xfrac = v.left - col0_int
         window_end = col0_int + content_w + (1 if xfrac > 0 else 0)
-        for vis in range(v._view_h + 1):
+        # Two extra rows: a fractional body height plus the fractional scroll
+        # offset can push the visible span up to two rows past the whole count,
+        # so the partial bottom row is drawn to be clipped, not dropped early.
+        for vis in range(v._view_h + 2):
             ri = first + vis
             if ri >= len(v.rows):
                 break

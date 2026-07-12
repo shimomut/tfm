@@ -465,8 +465,11 @@ class TextViewer(Widget):
         (smooth scroll); the body's clip trims them at the content edges."""
         first = int(self.top)
         frac = self.top - first
-        # One extra row so the partial bottom row is present to be clipped.
-        for vis in range(self._view_h + 1):
+        # Two extra rows, not one: a fractional body height (the l/r-padded viewer
+        # rarely lands on a whole cell) plus the fractional scroll offset can push
+        # the visible span up to two rows past the whole count, so the partial
+        # bottom row is always drawn to be clipped rather than vanishing early.
+        for vis in range(self._view_h + 2):
             row = first + vis
             if row >= self._total_rows():
                 break
