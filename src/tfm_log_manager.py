@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from typing import Dict, Optional
 from tfm_const import LOG_TIME_FORMAT, MAX_LOG_MESSAGES
 from tfm_colors import get_log_color, get_status_color
-from tfm_logging_handlers import LogPaneHandler, StreamOutputHandler, RemoteMonitoringHandler, FileLoggingHandler
+from tfm_logging_handlers import LogPaneHandler, StreamOutputHandler, FileLoggingHandler
 
 
 @dataclass
@@ -27,10 +27,6 @@ class LoggingConfig:
     stream_output_enabled: Optional[bool] = None  # None = auto-detect based on mode
     stream_output_desktop_default: bool = True
     stream_output_terminal_default: bool = False
-    
-    # Remote monitoring settings
-    remote_monitoring_enabled: bool = False
-    remote_monitoring_port: Optional[int] = None
     
     # File logging settings
     file_logging_enabled: bool = False
@@ -107,7 +103,7 @@ class LogCapture:
 class LogManager:
     """Manages logging system and log display"""
     
-    def __init__(self, config, remote_port=None, is_desktop_mode=False, log_file=None, no_log_pane=False):
+    def __init__(self, config, is_desktop_mode=False, log_file=None, no_log_pane=False):
         # Log scroll state
         self.log_scroll_offset = 0
         
@@ -128,8 +124,6 @@ class LogManager:
         max_log_messages = config.MAX_LOG_MESSAGES
         self._config = LoggingConfig()
         self._config.max_log_messages = max_log_messages
-        self._config.remote_monitoring_enabled = remote_port is not None
-        self._config.remote_monitoring_port = remote_port
         # Enable stream output in desktop mode, disable in terminal mode
         self._config.stream_output_enabled = is_desktop_mode
         # Configure file logging
@@ -147,7 +141,6 @@ class LogManager:
         # Handler instances
         self._log_pane_handler = None
         self._stream_output_handler = None
-        self._remote_monitoring_handler = None
         self._file_logging_handler = None
         
         # Store desktop mode flag
@@ -165,10 +158,9 @@ class LogManager:
         # This creates the LogPaneHandler by default unless no_log_pane is True
         self.configure_handlers()
     
-    def configure_handlers(self, 
+    def configure_handlers(self,
                           log_pane_enabled: Optional[bool] = None,
-                          stream_output_enabled: Optional[bool] = None,
-                          remote_enabled: Optional[bool] = None):
+                          stream_output_enabled: Optional[bool] = None):
         """
         Configure which handlers are active.
         Supports dynamic reconfiguration without restart.
@@ -176,16 +168,13 @@ class LogManager:
         Args:
             log_pane_enabled: Enable log pane display (None = keep current)
             stream_output_enabled: Enable original stream output (None = keep current)
-            remote_enabled: Enable remote monitoring (None = keep current)
         """
         # Update configuration
         if log_pane_enabled is not None:
             self._config.log_pane_enabled = log_pane_enabled
         if stream_output_enabled is not None:
             self._config.stream_output_enabled = stream_output_enabled
-        if remote_enabled is not None:
-            self._config.remote_monitoring_enabled = remote_enabled
-        
+
         # Configure log pane handler
         if self._config.log_pane_enabled:
             if self._log_pane_handler is None:
@@ -231,33 +220,6 @@ class LogManager:
                     if self._stream_output_handler in logger.handlers:
                         logger.removeHandler(self._stream_output_handler)
                 self._stream_output_handler = None
-        
-        # Configure remote monitoring handler
-        if self._config.remote_monitoring_enabled:
-            if self._remote_monitoring_handler is None and self._config.remote_monitoring_port:
-                # Create new handler
-                self._remote_monitoring_handler = RemoteMonitoringHandler(self._config.remote_monitoring_port)
-                # Start the server
-                self._remote_monitoring_handler.start_server()
-                # Add to stream logger
-                if self._remote_monitoring_handler not in self._stream_logger.handlers:
-                    self._stream_logger.addHandler(self._remote_monitoring_handler)
-                # Add to all existing loggers
-                for logger in self._loggers.values():
-                    if self._remote_monitoring_handler not in logger.handlers:
-                        logger.addHandler(self._remote_monitoring_handler)
-        else:
-            if self._remote_monitoring_handler is not None:
-                # Stop the server
-                self._remote_monitoring_handler.stop_server()
-                # Remove from stream logger
-                if self._remote_monitoring_handler in self._stream_logger.handlers:
-                    self._stream_logger.removeHandler(self._remote_monitoring_handler)
-                # Remove from all existing loggers
-                for logger in self._loggers.values():
-                    if self._remote_monitoring_handler in logger.handlers:
-                        logger.removeHandler(self._remote_monitoring_handler)
-                self._remote_monitoring_handler = None
         
         # Configure file logging handler
         if self._config.file_logging_enabled:
@@ -307,8 +269,6 @@ class LogManager:
             logger.addHandler(self._log_pane_handler)
         if self._stream_output_handler is not None:
             logger.addHandler(self._stream_output_handler)
-        if self._remote_monitoring_handler is not None:
-            logger.addHandler(self._remote_monitoring_handler)
         if self._file_logging_handler is not None:
             logger.addHandler(self._file_logging_handler)
         
@@ -357,8 +317,6 @@ class LogManager:
             logger.addHandler(self._log_pane_handler)
         if self._stream_output_handler is not None:
             logger.addHandler(self._stream_output_handler)
-        if self._remote_monitoring_handler is not None:
-            logger.addHandler(self._remote_monitoring_handler)
         if self._file_logging_handler is not None:
             logger.addHandler(self._file_logging_handler)
         
@@ -458,11 +416,6 @@ class LogManager:
         """Get the stream output handler instance."""
         return self._stream_output_handler
     
-    @property
-    def remote_handler(self):
-        """Get the remote monitoring handler instance."""
-        return self._remote_monitoring_handler
-    
     def has_log_updates(self):
         """Check if there are new log messages since last check"""
         if self._log_pane_handler is None:
@@ -521,7 +474,7 @@ class LogManager:
         
         # Route through the stream logger's handler pipeline
         # This ensures the message goes through all configured handlers
-        # (LogPaneHandler, StreamOutputHandler, RemoteMonitoringHandler)
+        # (LogPaneHandler, StreamOutputHandler, FileLoggingHandler)
         self._stream_logger.handle(record)
     
     def add_startup_messages(self, version, github_url, app_name):
@@ -688,17 +641,7 @@ class LogManager:
                 text = text[width:]
         
         return wrapped
-    
-    def stop_remote_server(self):
-        """
-        Stop the remote monitoring server (backward compatibility method).
-        
-        This method maintains backward compatibility with existing code.
-        Remote monitoring is now handled by RemoteMonitoringHandler.
-        """
-        if self._remote_monitoring_handler:
-            self._remote_monitoring_handler.stop_server()
-    
+
     def restore_stdio(self):
         """Restore stdout/stderr to original state"""
         if hasattr(self, 'original_stdout') and sys.stdout != self.original_stdout:
@@ -708,10 +651,6 @@ class LogManager:
     
     def __del__(self):
         """Cleanup when object is destroyed"""
-        # Stop remote monitoring handler if active
-        if hasattr(self, '_remote_monitoring_handler') and self._remote_monitoring_handler:
-            self._remote_monitoring_handler.stop_server()
-        
         # Close file logging handler if active
         if hasattr(self, '_file_logging_handler') and self._file_logging_handler:
             self._file_logging_handler.close()
