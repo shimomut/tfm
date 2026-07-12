@@ -57,7 +57,7 @@ When extracting an archive to a directory where the extraction folder already ex
 Source: /home/user/documents/report.pdf
 Destination: /home/user/backup/report.pdf (already exists)
 
-1. Press F5 to copy
+1. Press C to copy
 2. Dialog appears: "report.pdf already exists in destination"
 3. Press 'r' for Rename
 4. Input dialog shows: "Rename 'report.pdf' to:"
@@ -71,7 +71,7 @@ Destination: /home/user/backup/report.pdf (already exists)
 Source: /home/user/temp/data.csv
 Destination: /home/user/archive/data.csv (already exists)
 
-1. Press F6 to move
+1. Press M to move
 2. Dialog appears: "data.csv already exists in destination"
 3. Press 'r' for Rename
 4. Input dialog shows: "Rename 'data.csv' to:"

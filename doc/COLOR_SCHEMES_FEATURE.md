@@ -39,13 +39,10 @@ Press `t` to toggle between Dark and Light color schemes while TFM is running. T
 
 ### Set Default Color Scheme
 
-Set your preferred default in your configuration file (`~/.tfm/config.py`):
-
-```python
-class Config:
-    # Choose your default color scheme
-    COLOR_SCHEME = 'dark'  # Options: 'dark' or 'light'
-```
+TFM starts on the **Dark+** theme and remembers whichever theme you last switched
+to (with `T`, or **View → Theme**) across restarts — there is no single
+default-scheme setting. To add or customize themes, use the `THEMES` dict in
+`~/.tfm/config.py` (see [Configuration](CONFIGURATION_FEATURE.md)).
 
 ### Change the Toggle Key
 
@@ -95,7 +92,7 @@ TFM automatically detects what your terminal supports:
 
 You can see detailed color information:
 
-- **In TFM**: Press '?' for help, which mentions the 't' key
+- **In TFM**: Press '?' for help, which mentions the 'T' key
 - **Command line**: Run `python3 show_color_schemes.py` to see all available schemes
 - **Log messages**: TFM shows what type of colors your terminal supports
 

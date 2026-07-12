@@ -23,19 +23,18 @@ The help dialog is organized into clear sections:
 
 #### File Operations
 - File selection (Space)
-- Bulk operations (a, A for select all)
-- File operations menu (m/M)
-- Text viewing and editing (v/V, e/E)
-- File details (i/I)
+- Bulk operations (A for all files, Shift-A for all items)
+- File operations (C copy, M move, K delete, R rename)
+- Text viewing and editing (V view, E edit)
+- File details (I)
 
 #### Search & Sorting
-- Search functionality (f/F)
-- Sort options and quick sort keys (1/2/3)
-- Sort direction toggle (r/R)
+- Search (F incremental, Shift-F filename, Shift-G content)
+- Sort options and quick sort keys (S, 1-4)
 
 #### View Options
 - Hidden files toggle (.)
-- Pane synchronization (o/O)
+- Pane synchronization (O, Shift-O)
 - Layout adjustments
 
 #### Log Pane Controls
@@ -43,8 +42,8 @@ The help dialog is organized into clear sections:
 - Log scrolling (Shift+Up/Down)
 
 #### General Controls
-- Help access (? or h)
-- Quit application (q/Q)
+- Help access (?)
+- Quit application (Q)
 - Cancel operations (ESC)
 
 #### Configuration

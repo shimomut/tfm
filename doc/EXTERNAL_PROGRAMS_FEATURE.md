@@ -43,7 +43,7 @@ Your scripts can use these variables to work with your current selection and loc
 
 ## Usage
 
-1. Press **x** or **X** to open the programs dialog
+1. Press **X** to open the programs dialog
 2. Use the searchable list to find and select a program
 3. Press Enter to execute the selected program
 4. The program runs in the current pane's directory
@@ -98,7 +98,7 @@ echo "Selected files: $TFM_THIS_SELECTED"
 
 ## Quick Reference
 
-- **x/X**: Open external programs dialog
-- **z/Z**: Open sub-shell mode (different feature)
+- **X**: Open external programs dialog
+- **Shift-X**: Open sub-shell mode (different feature)
 - Use external programs for quick, specific tasks
 - Use sub-shell mode for interactive command-line work

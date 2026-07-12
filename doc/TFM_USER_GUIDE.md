@@ -283,7 +283,7 @@ Desktop mode provides excellent performance:
 **Font issues:**
 - Verify font name is correct (case-sensitive)
 - Use `Font Book.app` to check installed fonts
-- Fall back to default: Remove `DESKTOP_FONT_NAME` from config
+- Fall back to default: Remove `MONO_FONT_NAME` from config (or set it to `None`)
 
 **Performance issues:**
 - Desktop mode should run at 60 FPS
@@ -307,7 +307,7 @@ When you first run TFM, you'll see:
 - **Enter**: Enter directory or view text file
 - **Backspace**: Go to parent directory
 - **?**: Show help dialog
-- **q**: Quit TFM
+- **Q**: Quit TFM
 
 ---
 
@@ -341,13 +341,12 @@ When you first run TFM, you'll see:
 ### Basic Operations
 ```
 Space    - Select/deselect file
-c/C      - Copy selected files to other pane
-m/M      - Move selected files to other pane
-k/K      - Delete selected files
-r/R      - Rename file (or batch rename multiple)
-e        - Edit file with external editor
-E        - Create new file and edit
-F7       - Create new directory
+C        - Copy selected files to the other pane
+M        - Move selected files (or create a directory when nothing is selected)
+K        - Delete selected files (also the Delete key)
+R        - Rename file (or batch-rename multiple)
+E        - Edit file with the external editor
+Shift-E  - Create a new file
 ```
 
 **See detailed documentation**: 
@@ -396,11 +395,11 @@ Page Up/Down - Navigate by page
 
 ### Quick Navigation
 ```
-j        - Show favorite directories
-J        - Jump to directory dialog
-h/H      - Show directory history
-o        - Sync current pane to other pane
-O        - Sync other pane to current pane
+J        - Show favorite directories
+Shift-J  - Jump to directory dialog
+H        - Show directory history
+O        - Sync current pane to the other pane
+Shift-O  - Sync other pane to the current pane
 ```
 
 **See detailed documentation**: 
@@ -413,16 +412,16 @@ O        - Sync other pane to current pane
 
 ### Search Methods
 ```
-f        - Incremental search (filter as you type)
-F        - Threaded filename search dialog
-G        - Content search (grep) dialog
+F        - Incremental search (filter as you type)
+Shift-F  - Threaded filename search dialog
+Shift-G  - Content search (grep) dialog
 ;        - Filter by pattern (*.py, test_*, etc.)
 :        - Clear current filter
 ```
 
 ### Sorting
 ```
-s/S      - Show sort options menu
+S        - Show sort options menu
 1        - Quick sort by name
 2        - Quick sort by extension
 3        - Quick sort by size
@@ -444,8 +443,8 @@ s/S      - Show sort options menu
 
 ### Built-in Text Viewer
 ```
-v/V      - View text file in built-in viewer
-Enter    - View text file (same as v)
+V        - View text file in built-in viewer
+Enter    - Open item (views a text file)
 ```
 
 ### Text Viewer Controls
@@ -544,7 +543,7 @@ _        - Reset log pane height (Shift+-)
 ```
 =        - View diff between two selected text files (requires 2 files selected)
 @        - Compare directories recursively (Shift+2)
-w/W      - Show file and directory comparison options
+W        - Show file and directory comparison options
 ```
 
 **See detailed documentation**: [Diff Viewer Feature](DIFF_VIEWER_FEATURE.md), [Directory Diff Viewer Feature](DIRECTORY_DIFF_VIEWER_FEATURE.md)
@@ -580,28 +579,26 @@ TFM supports powerful key binding customization with modifier keys and multiple 
 
 ```python
 KEY_BINDINGS = {
-    # Simple character keys
-    'quit': ['q', 'Q'],
+    # An action can have several keys — add your own alongside the defaults
+    'quit': ['Q'],
     'help': ['?'],
-    
-    # KeyCode names for special keys
-    'move_up': ['UP', 'k'],
-    'move_down': ['DOWN', 'j'],
-    
+
+    # e.g. add vim-style movement next to the arrow keys
+    'cursor_up': ['UP', 'k'],
+    'cursor_down': ['DOWN', 'j'],
+
     # Modifier key combinations
     'page_up': ['PAGE_UP', 'Shift-UP'],
     'page_down': ['PAGE_DOWN', 'Shift-DOWN'],
-    'jump_to_top': ['Command-UP'],
-    'jump_to_bottom': ['Command-DOWN'],
-    
-    # Selection requirements
+
+    # Extended form with a selection requirement
     'delete_files': {
-        'keys': ['DELETE', 'Command-Backspace'],
-        'selection': 'required'  # Only when files selected
+        'keys': ['K', 'DELETE'],
+        'selection': 'required'  # only when files are selected
     },
     'create_directory': {
-        'keys': ['m', 'M'],
-        'selection': 'none'  # Only when no files selected
+        'keys': ['M'],
+        'selection': 'none'      # only when nothing is selected
     },
 }
 ```
@@ -610,17 +607,16 @@ KEY_BINDINGS = {
 - **Modifier keys**: Shift, Control, Alt, Command
 - **Multiple keys per action**: Assign several keys to the same action
 - **Selection requirements**: Control when actions are available
-- **Case-insensitive**: 'ENTER', 'enter', 'Enter' all work
+- **Special key names are case-insensitive** ('ENTER' = 'enter'); **letter keys are case-sensitive** ('Q' ≠ 'q')
 - **Order-independent modifiers**: 'Command-Shift-X' = 'Shift-Command-X'
 
 **See detailed documentation**: [Key Bindings Feature](KEY_BINDINGS_FEATURE.md)
 
-### Color Schemes
-```python
-COLOR_SCHEME = 'dark'  # or 'light'
-```
-
-Switch at runtime with **t** key.
+### Themes
+TFM ships with several built-in themes (Dark+, Light+, Monokai, Dracula, Nord,
+Solarized, Gruvbox Dark, Solarized Light) and remembers the last one you used.
+Cycle themes at runtime with the **T** key, or pick one from **View → Theme**.
+Define your own with the `THEMES` dict in config.
 
 **See detailed documentation**: [Color Schemes Feature](COLOR_SCHEMES_FEATURE.md)
 
@@ -778,110 +774,106 @@ TFM provides extensive keyboard shortcuts for efficient file management. All sho
 
 | Key | Action |
 |-----|--------|
-| ↑↓ or j/k | Move cursor up/down |
-| ←→ or h/l | Switch between panes |
-| Enter | Enter directory or open file |
-| Backspace | Go to parent directory |
-| Home/End | Go to first/last item |
-| Page Up/Down | Scroll by page |
-| Tab | Switch active pane |
+| ↑ / ↓ | Move cursor up / down |
+| ← / → | Switch to the left / right pane |
+| Tab | Switch the active pane |
+| Enter | Open item (enter directory, open file, or enter archive) |
+| Backspace | Go to the parent directory |
+| Page Up / Page Down | Scroll by a page |
+| Cmd+Enter | Open with the OS default application |
+| Alt+Enter | Reveal in the OS file manager |
 
-### File Selection
+### Selection
 
 | Key | Action |
 |-----|--------|
-| Space | Toggle file selection |
-| HOME | Select all items |
-| END | Unselect all items |
-| a | Toggle all files selection |
-| A | Toggle all items selection |
-| w, W | Compare selection (select files/directories matching other pane) |
+| Space | Toggle selection and move down |
+| Shift+Space | Toggle selection and move up |
+| Home | Select all items |
+| End | Unselect all |
+| A | Toggle all *files* |
+| Shift+A | Toggle all *items* (files + directories) |
+| W | Compare-and-select against the other pane |
 
 ### File Operations
 
-| Key | Action | Selection Required |
-|-----|--------|-------------------|
-| c, C | Copy selected files | Yes |
-| m, M | Move selected files | Yes |
-| k, K | Delete selected files | Yes |
-| r, R | Rename file/directory | No |
-| m, M | Create new directory | No (only when no files selected) |
-| E | Create new file | No |
+| Key | Action | Selection |
+|-----|--------|-----------|
+| C | Copy selection to the other pane | required |
+| M | Move selection to the other pane | required |
+| M | Create a new directory | only when nothing is selected |
+| K or Delete | Delete selection | required |
+| R | Rename the focused file/directory | any |
+| Shift+E | Create a new file | any |
+| E | Edit the file (external editor) | any |
+| V | View the file (built-in viewer) | any |
+| I | Show file details | any |
+| = | Diff two selected files | 2 files |
+| Shift+= | Diff two directories recursively | 2 dirs |
+| Cmd+Shift+C | Copy name(s) to the clipboard | any |
+| Cmd+Shift+P | Copy path(s) to the clipboard | any |
 
-### View and Search
-
-| Key | Action |
-|-----|--------|
-| v, V | View file content |
-| e | Edit file |
-| f | Search files (isearch) |
-| ; | Filter files by pattern |
-| : | Clear file filter |
-| F | Filename search dialog |
-| J | Jump to path |
-| G | Content search dialog (grep) |
-| i, I | Show file details |
-| = | View diff between two selected text files (requires 2 files selected) |
-| @ | Compare directories recursively |
-
-### Pane Operations
+### Search, Filter and Sort
 
 | Key | Action |
 |-----|--------|
-| o | Sync current pane directory to other pane |
-| O | Sync other pane directory to current pane |
-| [ | Make left pane smaller (adjust boundary left) |
-| ] | Make left pane larger (adjust boundary right) |
-| - | Reset pane split to 50% \| 50% |
-
-### Log Pane Controls
-
-| Key | Action |
-|-----|--------|
-| { | Make log pane larger (Shift+[) |
-| } | Make log pane smaller (Shift+]) |
-| _ | Reset log pane height to default (Shift+-) |
-| Shift+Up | Scroll log up (toward older messages) |
-| Shift+Down | Scroll log down (toward newer messages) |
-| Shift+Left | Fast scroll up (toward older messages) |
-| Shift+Right | Fast scroll down (toward newer messages) |
-
-### Sorting
-
-| Key | Action |
-|-----|--------|
-| s, S | Show sort options menu |
-| 1 | Quick sort by filename |
-| 2 | Quick sort by file extension |
-| 3 | Quick sort by file size |
-| 4 | Quick sort by modification date |
+| F | Incremental search (isearch) |
+| Shift+F | Filename search dialog |
+| Shift+G | Content (grep) search dialog |
+| ; | Filter the pane by pattern |
+| : | Clear the filter |
+| S | Sort menu |
+| 1 / 2 / 3 / 4 | Quick sort by name / extension / size / date |
 
 ### Archive Operations
 
-| Key | Action | Selection Required |
-|-----|--------|-------------------|
-| p, P | Create archive from selected files | Yes |
-| u, U | Extract selected archive | No |
+| Key | Action | Selection |
+|-----|--------|-----------|
+| P | Create an archive from the selection | required |
+| U | Extract the focused/selected archive | any |
 
-### Other Operations
+### Panes and Log
 
 | Key | Action |
 |-----|--------|
-| ? | Show help dialog |
-| q, Q | Quit TFM |
-| Ctrl+R | Refresh file list |
-| Ctrl+L | Redraw screen (always available; recovers display after terminal multiplexer switch) |
-| F5 | Redraw screen (configurable in config.py) |
-| . | Toggle visibility of hidden files |
-| t | Switch color schemes |
-| T | Toggle fallback color mode |
-| j | Show favorite directories |
-| h, H | Show history for current pane |
-| d, D | Show drives/storage selection dialog |
-| x | Show external programs menu |
-| X | Enter subshell (command line) mode |
-| z | Show view options menu |
-| Z | Show settings and configuration menu |
+| [ / ] | Make the left pane smaller / larger |
+| - | Reset the pane split |
+| { / } | Make the log pane larger / smaller |
+| _ | Reset the log-pane height |
+| Shift+↑ / Shift+↓ | Scroll the log up / down |
+| Shift+← / Shift+→ | Page the log up / down |
+| O | Sync the current pane's directory to the other pane |
+| Shift+O | Sync the other pane's directory to the current pane |
+
+### Places and Dialogs
+
+| Key | Action |
+|-----|--------|
+| J | Favorite directories |
+| Shift+J | Jump to a path |
+| H | History for the current pane |
+| D | Drives / storage selection dialog |
+
+### Other
+
+| Key | Action |
+|-----|--------|
+| ? | Show the help dialog |
+| Q | Quit TFM |
+| . | Toggle hidden files |
+| T | Cycle the color theme |
+| Shift+T | Toggle fallback color mode |
+| X | External programs menu |
+| Shift+X | Enter subshell (command line) mode |
+| Z | View options menu |
+| Shift+Z | Settings / configuration menu |
+| Ctrl+L | Redraw the screen (always available; recovers the display after a terminal-multiplexer switch) |
+| F5 | Redraw the screen (rebindable via `redraw` in config) |
+
+> **Letter keys are case-sensitive.** Most file-operation bindings use the
+> **uppercase** letter (e.g. `C`, `M`, `K`, `R`), and their variants use `Shift`
+> (e.g. `Shift-F`, `Shift-E`). All bindings are customizable — see below.
+
 
 ### Customizing Key Bindings
 
@@ -890,15 +882,15 @@ All key bindings can be customized in your configuration file (`~/.tfm/config.py
 - **Modifier keys**: Shift, Control, Alt, Command (e.g., 'Shift-UP', 'Command-Q')
 - **Multiple keys per action**: Assign several keys to the same action
 - **Selection requirements**: Control when actions are available based on file selection
-- **Case-insensitive matching**: 'ENTER', 'enter', 'Enter' all work
+- **Case-sensitivity**: special key names (`ENTER`) are case-insensitive; letter keys (`Q` vs `q`) are not
 
 **Examples:**
 ```python
 KEY_BINDINGS = {
     'page_up': ['PAGE_UP', 'Shift-UP'],  # Two ways to page up
-    'jump_to_top': ['Command-UP'],       # Modifier combination
+    'cursor_up': ['UP', 'k'],            # add a vim-style alternative
     'delete_files': {
-        'keys': ['DELETE', 'Command-Backspace'],
+        'keys': ['K', 'DELETE'],
         'selection': 'required'          # Only when files selected
     },
 }

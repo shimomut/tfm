@@ -28,7 +28,7 @@ The jump dialog scans your filesystem and presents a searchable list of director
 
 ### Performance Optimization
 
-- Configurable directory limit (MAX_JUMP_DIRECTORIES)
+- Bounded directory scan (internal cap; keeps the dialog responsive)
 - Background scanning with progress indicator
 - Cancellable search operation
 - Efficient directory traversal
@@ -37,7 +37,7 @@ The jump dialog scans your filesystem and presents a searchable list of director
 
 ### Basic Usage
 
-1. Press **J** (Shift+j) to open the jump dialog
+1. Press **Shift-J** to open the jump dialog
 2. Wait for directory scanning to complete
 3. Start typing to filter directories
 4. Use arrow keys to select a directory
@@ -78,12 +78,8 @@ Matches: ~/.config, ~/backup/.config, etc.
 
 ### Maximum Directories
 
-Control how many directories are scanned:
-
-```python
-# In ~/.tfm/config.py
-MAX_JUMP_DIRECTORIES = 5000  # Default: 5000
-```
+The number of directories scanned is bounded internally to keep the dialog
+responsive; it is not a user-configurable setting.
 
 **Considerations:**
 - Higher values: More complete results, slower scanning
@@ -106,19 +102,18 @@ The jump dialog searches from the current directory:
    - Navigate to ~/Documents before opening jump dialog
    - Avoids scanning entire home directory
 
-2. **Reduce MAX_JUMP_DIRECTORIES:**
-   - Set to 1000-2000 for faster scanning
-   - Still provides good coverage for most use cases
+2. **Start from a more specific directory:**
+   - Fewer directories to scan means faster results
 
 3. **Use favorites for common directories:**
-   - Press **j** for favorites dialog
+   - Press **J** for favorites dialog
    - Faster than jump dialog for known locations
 
 ### For Network Filesystems
 
 - Jump dialog may be slow on network mounts
 - Consider using favorites or manual navigation
-- Increase MAX_JUMP_DIRECTORIES timeout if needed
+- Start from a closer parent directory to reduce the scan
 
 ## Comparison with Other Navigation Features
 
@@ -157,7 +152,7 @@ The jump dialog searches from the current directory:
 **Problem:** Jump dialog takes a long time to scan directories
 
 **Solutions:**
-1. Reduce MAX_JUMP_DIRECTORIES in config
+1. Use the search filter to narrow results
 2. Start from a more specific directory
 3. Use favorites for frequently accessed directories
 4. Exclude large directories (not currently supported)
@@ -167,7 +162,7 @@ The jump dialog searches from the current directory:
 **Problem:** Expected directory doesn't appear in results
 
 **Solutions:**
-1. Check if directory is within MAX_JUMP_DIRECTORIES limit
+1. The directory may be beyond the internal scan cap — start from a closer parent
 2. Verify directory exists and is accessible
 3. Check search filter isn't too restrictive
 4. Try starting from a higher-level directory
@@ -190,8 +185,8 @@ The jump dialog searches from the current directory:
 ## Related Features
 
 - **Favorite Directories** (j) - Quick access to pre-configured directories
-- **Drives Dialog** (d/D) - Access storage locations and S3 buckets
-- **History Navigation** (h/H) - Navigate to previously visited directories
+- **Drives Dialog** (D) - Access storage locations and S3 buckets
+- **History Navigation** (H) - Navigate to previously visited directories
 
 ## See Also
 

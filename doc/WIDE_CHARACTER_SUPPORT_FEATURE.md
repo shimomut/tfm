@@ -37,52 +37,11 @@ TFM automatically detects and handles wide characters in:
 - Graceful fallback for terminals with limited Unicode support
 - Configurable Unicode handling modes for different environments
 
-## Configuration Options
+## Configuration
 
-You can customize wide character handling in your TFM configuration file (`~/.tfm/config.py`):
-
-### Unicode Mode Settings
-
-```python
-# Unicode handling mode
-UNICODE_MODE = 'auto'  # Options: 'auto', 'full', 'basic', 'ascii'
-```
-
-**Mode Options:**
-- **`'auto'`** (recommended): Automatically detect terminal capabilities
-- **`'full'`**: Full Unicode support with wide character handling
-- **`'basic'`**: Basic Unicode support, treat all characters as single-width
-- **`'ascii'`**: ASCII-only fallback mode for limited terminals
-
-### Warning and Error Handling
-
-```python
-# Show warnings for Unicode processing errors
-UNICODE_WARNINGS = True
-
-# Character to use for unrepresentable characters in ASCII mode
-UNICODE_FALLBACK_CHAR = '?'
-```
-
-### Performance Settings
-
-```python
-# Enable caching of display width calculations for better performance
-UNICODE_ENABLE_CACHING = True
-
-# Maximum number of cached width calculations
-UNICODE_CACHE_SIZE = 1000
-```
-
-### Terminal Detection
-
-```python
-# Enable automatic terminal capability detection
-UNICODE_TERMINAL_DETECTION = True
-
-# Force ASCII fallback mode regardless of terminal capabilities
-UNICODE_FORCE_FALLBACK = False
-```
+Wide-character handling is **automatic** — TFM measures each glyph's display width
+and aligns columns accordingly, with no configuration required. There are no
+`UNICODE_*` settings to tune.
 
 ## Supported Character Types
 
@@ -147,9 +106,8 @@ export LC_ALL=en_US.UTF-8
 **Problem**: TFM feels slow when displaying directories with many Unicode filenames.
 
 **Solutions**:
-1. Ensure caching is enabled: `UNICODE_ENABLE_CACHING = True`
-2. Adjust cache size: `UNICODE_CACHE_SIZE = 2000`
-3. Use 'basic' mode for better performance: `UNICODE_MODE = 'basic'`
+1. Display-width calculations are already cached internally — there is nothing to tune
+2. Very large directories are inherently slower to render; narrow the view with a filter
 
 ### Terminal Compatibility Issues
 
@@ -157,9 +115,8 @@ export LC_ALL=en_US.UTF-8
 
 **Solutions**:
 1. Update to a modern terminal application
-2. Check terminal's Unicode settings
-3. Use ASCII fallback mode: `UNICODE_MODE = 'ascii'`
-4. Force fallback mode: `UNICODE_FORCE_FALLBACK = True`
+2. Check your terminal's Unicode / font settings
+3. Ensure the terminal uses a font with good Unicode coverage
 
 ### SSH and Remote Sessions
 
@@ -176,49 +133,6 @@ export LC_ALL=en_US.UTF-8
    export LANG=en_US.UTF-8
    export LC_ALL=en_US.UTF-8
    ```
-
-## Configuration Examples
-
-### Maximum Compatibility (Recommended)
-
-```python
-# Automatic detection with fallback
-UNICODE_MODE = 'auto'
-UNICODE_WARNINGS = True
-UNICODE_TERMINAL_DETECTION = True
-UNICODE_ENABLE_CACHING = True
-UNICODE_FORCE_FALLBACK = False
-```
-
-### Performance Optimized
-
-```python
-# Basic Unicode with caching for speed
-UNICODE_MODE = 'basic'
-UNICODE_WARNINGS = False
-UNICODE_ENABLE_CACHING = True
-UNICODE_CACHE_SIZE = 2000
-```
-
-### Legacy Terminal Support
-
-```python
-# ASCII-only mode for old terminals
-UNICODE_MODE = 'ascii'
-UNICODE_FORCE_FALLBACK = True
-UNICODE_FALLBACK_CHAR = '?'
-UNICODE_WARNINGS = False
-```
-
-### Development/Debugging
-
-```python
-# Full Unicode with detailed warnings
-UNICODE_MODE = 'full'
-UNICODE_WARNINGS = True
-UNICODE_TERMINAL_DETECTION = True
-UNICODE_ENABLE_CACHING = False  # Disable caching for debugging
-```
 
 ## Testing Your Setup
 

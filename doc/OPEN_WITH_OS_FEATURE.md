@@ -91,6 +91,6 @@ Both features work across all supported platforms:
 ## Related Features
 
 - **File Associations**: Configure custom programs for file types in `_config.py`
-- **View File** (`F3`): View files in TFM's built-in text viewer
+- **View File** (`V`): View files in TFM's built-in text viewer
 - **Edit File** (`F4`): Edit files with TFM's configured editor
 - **External Programs** (`Command+P`): Launch files with specific external programs

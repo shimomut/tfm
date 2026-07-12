@@ -146,11 +146,11 @@ All your settings, favorites, and history are shared between modes.
 All keyboard shortcuts work identically in desktop mode:
 
 - **Navigation**: Arrow keys, Tab, Enter, Backspace
-- **File Operations**: c/C (copy), m/M (move), k/K (delete), r/R (rename)
-- **Selection**: Space, a (all files), A (all items)
-- **Search**: f (incremental), F (filename), G (content)
+- **File Operations**: C (copy), M (move), K (delete), R (rename)
+- **Selection**: Space, A (all files), Shift-A (all items)
+- **Search**: F (incremental), Shift-F (filename), Shift-G (content)
 - **Help**: ? (help dialog)
-- **Quit**: q/Q
+- **Quit**: Q
 
 **Desktop Mode Exclusive**:
 - **Cmd-Plus** or **Cmd-=**: Increase font size

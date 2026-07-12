@@ -68,10 +68,8 @@ State is stored in JSON format for human readability:
 
 ### State File Location
 
-State files are stored in platform-specific locations:
-
-- **Linux/macOS**: `~/.config/tfm/state.json`
-- **Windows**: `%APPDATA%\tfm\state.json`
+State is stored in a SQLite database at `~/.tfm/state.db` (resolved from
+`Path.home()`, so the same relative location on Linux, macOS, and Windows).
 
 ### State Lifecycle
 

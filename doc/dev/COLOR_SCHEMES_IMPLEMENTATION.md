@@ -192,8 +192,7 @@ python3 show_color_schemes.py light
 
 ### Colors Not Changing
 - Ensure your terminal supports color changes
-- Check that `USE_COLORS = True` in configuration
-- Verify terminal has sufficient color support
+- Verify terminal has sufficient color support (true-color / 256-color)
 
 ### Wrong Colors Displayed
 - Terminal may not support RGB colors (using fallbacks)

@@ -127,7 +127,7 @@ FileManager → Components → Task → UI/Executor
 ```
 User          FileOperationsUI    FileOperationTask    FileOperationsExecutor
  │                   │                    │                      │
- │ Press F5 (copy)   │                    │                      │
+ │ Press C (copy)    │                    │                      │
  ├──────────────────>│                    │                      │
  │                   │                    │                      │
  │                   │ create task        │                      │

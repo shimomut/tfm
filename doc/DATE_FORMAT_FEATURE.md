@@ -137,7 +137,6 @@ class Config:
     
     # Other settings...
     DEFAULT_SORT_MODE = 'name'
-    COLOR_SCHEME = 'dark'
 ```
 
 ## Tips

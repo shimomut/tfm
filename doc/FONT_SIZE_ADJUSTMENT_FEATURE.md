@@ -114,8 +114,8 @@ Change font size on the fly:
 Set your preferred default font size in `~/.tfm/config.py`:
 
 ```python
-# Desktop mode settings
-DESKTOP_FONT_SIZE = 14  # Your preferred default (8-72)
+# GUI font size — applies to both the mono and UI faces (8-72)
+FONT_SIZE = 14  # Your preferred default
 ```
 
 This sets the initial font size when TFM starts. You can then adjust it dynamically during the session.
@@ -125,11 +125,8 @@ This sets the initial font size when TFM starts. You can then adjust it dynamica
 The font size adjustment works with any configured font:
 
 ```python
-# Single font
-DESKTOP_FONT_NAME = 'Menlo'
-
-# Multiple fonts with fallback
-DESKTOP_FONT_NAME = ['SF Mono', 'Menlo', 'Monaco']
+# Monospaced face used for the aligned grid (None = PuiKit's bundled default)
+MONO_FONT_NAME = 'Menlo'
 ```
 
 ## Technical Details

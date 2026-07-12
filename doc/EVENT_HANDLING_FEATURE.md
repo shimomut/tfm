@@ -49,10 +49,10 @@ When no dialog is open, TFM is in command mode:
 - **Enter**: Open file or directory
 - **F3**: View file
 - **F4**: Edit file
-- **F5**: Copy files
-- **F6**: Move/rename files
-- **F7**: Create directory
-- **F8**: Delete files
+- **C**: Copy files
+- **M**: Move files (or create a directory when nothing is selected)
+- **R**: Rename file
+- **K**: Delete files
 
 ### Text Input Mode (Dialogs)
 
@@ -79,7 +79,7 @@ Some features like search combine both modes:
 
 ### Example 1: Renaming a File
 
-1. Select a file and press **F6** (rename)
+1. Select a file and press **R** (rename)
 2. Dialog opens with current filename
 3. Type new filename (e.g., "report.txt")
    - Characters are inserted into text field
@@ -90,7 +90,7 @@ Some features like search combine both modes:
 
 ### Example 2: Creating a Directory
 
-1. Press **F7** (create directory)
+1. Press **M** (create directory, when nothing is selected)
 2. Dialog opens with empty text field
 3. Type directory name (e.g., "projects")
 4. Press **Enter** to confirm

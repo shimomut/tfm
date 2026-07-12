@@ -1069,12 +1069,7 @@ FILE_MONITORING_FALLBACK_POLL_INTERVAL_S = 10  # Poll every 10 seconds
 
 ### Logging
 
-All file monitoring operations are logged using TFM's unified logging system. Enable debug logging to see detailed information:
-
-```bash
-# Run TFM with debug logging
-python3 tfm.py --debug
-```
+All file monitoring operations are logged using TFM's unified logging system (via `getLogger`), so their messages appear in the in-app log pane alongside everything else.
 
 **Key Log Messages**:
 

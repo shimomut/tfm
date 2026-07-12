@@ -224,7 +224,7 @@ from tfm_config import config_manager
 
 # Test normal loading
 config = config_manager.get_config()
-assert hasattr(config, 'PREFERRED_BACKEND')
+assert hasattr(config, 'KEY_BINDINGS')
 
 # Test missing field handling
 # (create minimal config, verify fields get added)

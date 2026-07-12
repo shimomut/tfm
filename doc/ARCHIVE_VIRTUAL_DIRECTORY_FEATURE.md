@@ -64,7 +64,7 @@ Once inside an archive, you can navigate using standard TFM keys:
 To view a text file within an archive:
 
 1. Navigate to the file within the archive
-2. Press **F3** (or your configured view key)
+2. Press **V** (or your configured view key)
 3. The file will be extracted to a temporary location and displayed in the built-in text viewer
 4. The viewer title shows the full archive path
 5. When you close the viewer, temporary files are automatically cleaned up
@@ -75,18 +75,18 @@ You can copy files from archives to your local filesystem or S3:
 
 #### Copy Single File
 1. Navigate to the file within the archive
-2. Press **F5** (or your configured copy key)
+2. Press **C** (or your configured copy key)
 3. Specify the destination directory
 4. The file will be extracted to the destination
 
 #### Copy Multiple Files
-1. Select multiple files using **Insert** or **Space**
-2. Press **F5** to copy
+1. Select multiple files using **Space**
+2. Press **C** to copy
 3. All selected files will be extracted to the destination
 
 #### Copy Directories
 1. Navigate to a directory within the archive
-2. Press **F5** to copy
+2. Press **C** to copy
 3. The entire directory structure and all contained files will be extracted recursively
 
 #### Cross-Storage Copy
@@ -205,7 +205,7 @@ Archive browsing uses the same key bindings as regular file browsing in TFM. The
 
 ### Cannot View Files
 
-**Problem**: Pressing F3 on a file within an archive doesn't open the viewer.
+**Problem**: Pressing V on a file within an archive doesn't open the viewer.
 
 **Solutions**:
 - Ensure the file is a text file (binary files may not be viewable)

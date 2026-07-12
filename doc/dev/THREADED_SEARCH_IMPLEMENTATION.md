@@ -24,11 +24,10 @@ The SearchDialog component has been enhanced with threading support to provide n
 - Proper synchronization between UI and search threads
 - No race conditions or data corruption
 
-### Configurable Result Limiting
-- Maximum search results limit to prevent memory issues
-- Configurable via `MAX_SEARCH_RESULTS` in config
-- Default limit: 10,000 results
-- Real-time indication when limit is reached
+### Result Limiting
+- Results are bounded internally to prevent memory issues (a `result_cap`, plus a recursive-scan `node_cap` of ~50,000)
+- These caps are internal — not user-configurable
+- Real-time indication when the limit is reached
 
 ## Technical Implementation
 
@@ -57,15 +56,11 @@ def _cancel_current_search(self):
         self.search_thread.join(timeout=0.1)
 ```
 
-## Configuration
+## Result Bounding
 
-### MAX_SEARCH_RESULTS
-Controls the maximum number of search results to prevent memory exhaustion:
-
-```python
-class Config:
-    MAX_SEARCH_RESULTS = 10000  # Adjust based on system resources
-```
+Search is bounded internally to prevent memory exhaustion: the results list has a
+`result_cap`, and the recursive scan stops after a large `node_cap` (~50,000
+entries). These caps are internal, not user-configurable settings.
 
 ## User Experience Improvements
 
@@ -201,7 +196,7 @@ search_dialog.exit()
 ## Troubleshooting
 
 ### Common Issues
-1. **High memory usage**: Reduce MAX_SEARCH_RESULTS
+1. **High memory usage**: results are already capped internally; narrow the search pattern
 2. **Slow searches**: Check file system performance
 3. **Thread errors**: Verify Python threading support
 4. **UI freezing**: Ensure proper lock usage

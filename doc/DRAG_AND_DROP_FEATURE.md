@@ -49,7 +49,7 @@ Drag-and-drop is **fully supported** when running TFM in desktop mode on macOS:
 Drag-and-drop is **not available** in terminal mode:
 - Terminal environments don't support graphical drag-and-drop
 - This applies to all platforms when running in terminal mode
-- Use traditional copy/move commands instead (`F5` for copy, `F6` for move)
+- Use traditional copy/move commands instead (`C` for copy, `M` for move)
 
 ### Other Platforms
 
@@ -91,7 +91,7 @@ You **cannot drag more than 1,000 files** at once:
 Drag operations **validate file existence**:
 - If a selected file no longer exists, drag is cancelled
 - Error message: "File no longer exists: [filename]"
-- Refresh the file list (`Ctrl+R`) if files have changed
+- The file list reloads automatically when files change on disk
 
 ## Common Use Cases
 
@@ -158,7 +158,7 @@ Drag files to the Dock or application launchers:
 
 **"File no longer exists: [filename]"**
 - A selected file was deleted or moved
-- Refresh the file list with `Ctrl+R`
+- The file list reloads automatically when files change on disk
 
 ## Tips and Best Practices
 

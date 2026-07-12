@@ -71,7 +71,7 @@ tfm s3://my-bucket-name/
 
 Or navigate to S3 from within TFM:
 
-1. Press the key for "Jump to Directory" (default: `g`)
+1. Press the key for "Jump to Path" (default: `Shift-J`)
 2. Enter: `s3://my-bucket-name/`
 3. Press Enter
 
@@ -128,35 +128,32 @@ To see all available buckets:
 
 ### Copying Files
 
+TFM copies the selected files from the active pane straight to the **other**
+pane's current directory — there is no separate clipboard/paste step.
+
 #### From S3 to Local
 
-1. Navigate to S3 file
-2. Press copy key (default: `F5`)
-3. Navigate to local destination
-4. Press paste key (default: `F6`)
+1. Open the S3 file's directory in one pane and the local destination in the other
+2. Select the file(s) in the S3 pane with `Space`
+3. Press `C` to copy them to the other (local) pane
 
 #### From Local to S3
 
-1. Navigate to local file
-2. Press copy key (default: `F5`)
-3. Navigate to S3 destination (e.g., `s3://my-bucket/uploads/`)
-4. Press paste key (default: `F6`)
+1. Open the local file's directory in one pane and the S3 destination (e.g. `s3://my-bucket/uploads/`) in the other
+2. Select the file(s) with `Space`
+3. Press `C` to copy them to the S3 pane
 
 #### Between S3 Locations
 
-1. Navigate to S3 file
-2. Press copy key (default: `F5`)
-3. Navigate to different S3 location
-4. Press paste key (default: `F6`)
+Same as above with both panes on S3 paths: select in one pane, press `C` to copy to the other.
 
 ### Moving Files
 
-Move files using the move operation:
+Move works like copy — it sends the selection to the other pane's directory:
 
-1. Navigate to file
-2. Press move key (default: `F6`)
-3. Navigate to destination
-4. Confirm move
+1. Open the destination in the other pane
+2. Select the file(s) and press `M`
+3. Confirm the move
 
 **Note:** Moving between S3 and local storage performs copy + delete.
 
@@ -164,8 +161,8 @@ Move files using the move operation:
 
 Delete S3 objects:
 
-1. Navigate to file
-2. Press delete key (default: `F8` or `Delete`)
+1. Navigate to (or select) the file
+2. Press the delete key (`K` or `Delete`)
 3. Confirm deletion
 
 **Warning:** Deleted S3 objects cannot be recovered unless versioning is enabled on the bucket.
@@ -174,9 +171,9 @@ Delete S3 objects:
 
 View S3 file contents:
 
-1. Navigate to file
-2. Press view key (default: `F3`)
-3. TFM downloads file to temporary location and opens viewer
+1. Navigate to the file
+2. Press the view key (`V`)
+3. TFM downloads the file to a temporary location and opens the viewer
 
 **Note:** Large files may take time to download.
 
@@ -192,14 +189,11 @@ TFM caches S3 API responses to improve performance:
 
 ### Cache Configuration
 
-Configure caching in `~/.config/tfm/config.py`:
+Configure caching in `~/.tfm/config.py`:
 
 ```python
-# S3 cache timeout (seconds)
-S3_CACHE_TIMEOUT = 60
-
-# S3 cache size (number of entries)
-S3_CACHE_SIZE = 1000
+# S3 cache TTL in seconds (how long directory listings are cached)
+S3_CACHE_TTL = 60
 ```
 
 ### Cache Behavior
@@ -211,10 +205,10 @@ S3_CACHE_SIZE = 1000
 
 ### Refresh Cache
 
-Force cache refresh:
+Get fresh data:
 
-1. Press refresh key (default: `Ctrl+R` or `F5`)
-2. TFM fetches fresh data from S3
+1. Re-enter the directory (navigate away and back), or wait for `S3_CACHE_TTL` to expire
+2. TFM then fetches fresh data from S3
 
 ## Limitations and Considerations
 
@@ -279,7 +273,7 @@ Required S3 permissions:
 **Problem:** Files don't appear in bucket listing.
 
 **Solutions:**
-1. Press refresh to clear cache
+1. Re-enter the directory to re-list it (the cache also auto-invalidates after `S3_CACHE_TTL`)
 2. Check if files exist: `aws s3 ls s3://bucket-name/`
 3. Verify you have `s3:ListBucket` permission
 4. Check if bucket has many objects (pagination may be slow)
@@ -366,7 +360,7 @@ TFM works with all S3 storage classes:
 
 ### Enable/Disable S3 Support
 
-In `~/.config/tfm/config.py`:
+In `~/.tfm/config.py`:
 
 ```python
 # Enable S3 support
@@ -376,11 +370,8 @@ S3_ENABLED = True
 ### Cache Settings
 
 ```python
-# Cache timeout in seconds
-S3_CACHE_TIMEOUT = 60
-
-# Maximum cache entries
-S3_CACHE_SIZE = 1000
+# S3 cache TTL in seconds
+S3_CACHE_TTL = 60
 ```
 
 ### Performance Tuning
@@ -401,10 +392,8 @@ S3_MULTIPART_CHUNKSIZE = 5 * 1024 * 1024  # 5MB
 # Start TFM
 tfm
 
-# Navigate to local directory
-# Press copy key on files
-# Navigate to s3://my-backup-bucket/
-# Press paste key
+# Open the local directory in one pane and s3://my-backup-bucket/ in the other
+# Select files in the local pane, then press C to copy them to the S3 pane
 ```
 
 ### Example 2: Download S3 Files
@@ -413,10 +402,8 @@ tfm
 # Start TFM with S3 path
 tfm s3://my-bucket/downloads/
 
-# Navigate to files
-# Press copy key
-# Navigate to local directory
-# Press paste key
+# Open the S3 directory in one pane and the local destination in the other
+# Select files, then press C to copy them to the local pane
 ```
 
 ### Example 3: Organize S3 Objects

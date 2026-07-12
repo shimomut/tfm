@@ -8,17 +8,9 @@ This document outlines the configuration parameters that were added to ensure bo
 
 ### Performance Settings
 
-#### `MAX_SEARCH_RESULTS = 10000`
-- **Purpose**: Maximum number of search results to prevent memory issues
-- **Used by**: Search dialog (`SearchDialog`)
-- **Default value**: 10,000 results
-- **Impact**: Prevents memory exhaustion during large directory searches
-
-#### `MAX_JUMP_DIRECTORIES = 5000`
-- **Purpose**: Maximum directories to scan for jump dialog
-- **Used by**: Jump dialog (`JumpDialog`)
-- **Default value**: 5,000 directories
-- **Impact**: Prevents memory issues and ensures responsive UI during directory scanning
+> Note: search-result and jump-directory bounds exist but are **internal caps**,
+> not configuration keys (there is no `MAX_SEARCH_RESULTS` / `MAX_JUMP_DIRECTORIES`
+> setting).
 
 #### `MAX_HISTORY_ENTRIES = 100`
 - **Purpose**: Maximum number of history entries to keep
@@ -71,8 +63,6 @@ This document outlines the configuration parameters that were added to ensure bo
 class DefaultConfig:
     # Performance settings
     MAX_LOG_MESSAGES = 1000
-    MAX_SEARCH_RESULTS = 10000
-    MAX_JUMP_DIRECTORIES = 5000
     
     # History settings
     MAX_HISTORY_ENTRIES = 100
@@ -129,7 +119,7 @@ class Config:
 
 ### Search Dialog Configuration Tests
 - **File**: `test/test_search_dialog_config.py`
-- **Purpose**: Verifies search dialog can access MAX_SEARCH_RESULTS
+- **Purpose**: Verifies search dialog configuration access
 - **Coverage**: Configuration access and value validation
 
 ### Integration Tests

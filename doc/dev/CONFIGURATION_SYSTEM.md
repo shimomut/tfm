@@ -54,8 +54,6 @@ class Config:
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
-| `USE_COLORS` | bool | `True` | Enable color display |
-| `COLOR_SCHEME` | str | `'default'` | Color scheme: 'default', 'dark', 'light' |
 
 ### Behavior Settings
 

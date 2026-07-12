@@ -34,7 +34,7 @@ The TFM text viewer provides comprehensive TAB character handling with automatic
 Simply open any text file containing TAB characters:
 
 1. Navigate to a file in TFM
-2. Press **Enter** or **F3** to view the file
+2. Press **Enter** or **V** to view the file
 3. TABs are automatically expanded to spaces
 4. Use **← →** arrow keys to scroll horizontally if needed
 

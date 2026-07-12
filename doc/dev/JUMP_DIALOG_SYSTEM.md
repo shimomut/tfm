@@ -198,10 +198,10 @@ KEY_BINDINGS = {
 ```
 
 ### Performance Settings
-```python
-# Maximum directories to scan (prevents memory issues)
-MAX_JUMP_DIRECTORIES = 5000
+The number of directories scanned is bounded by an internal cap (not a config
+key), which keeps the dialog responsive on large trees.
 
+```python
 # Hidden files behavior (inherited from main application)
 SHOW_HIDDEN_FILES = False  # Default: hide hidden directories
 ```
@@ -260,7 +260,7 @@ PROGRESS_ANIMATION_SPEED = 0.2
 - **Small directories** (< 100 dirs): Instant results
 - **Medium directories** (100-1000 dirs): < 1 second
 - **Large directories** (1000+ dirs): 1-3 seconds with progress feedback
-- **Memory usage**: Bounded by `MAX_JUMP_DIRECTORIES` setting
+- **Memory usage**: Bounded by an internal directory-scan cap
 
 ### Hidden Files Impact
 - **Minimal performance impact** when `show_hidden = True` (no filtering)
@@ -305,12 +305,12 @@ PROGRESS_ANIMATION_SPEED = 0.2
 
 #### 1. **Slow Scanning**
 - **Cause**: Large directory trees or slow storage
-- **Solution**: Adjust `MAX_JUMP_DIRECTORIES` limit
+- **Solution**: Narrow the starting directory or use the filter
 - **Workaround**: Use filtering to narrow results
 
 #### 2. **Memory Usage**
 - **Cause**: Very large directory structures
-- **Solution**: Lower `MAX_JUMP_DIRECTORIES` setting
+- **Solution**: Start from a more specific directory
 - **Prevention**: Regular cleanup of unused directories
 
 #### 3. **Hidden Files Not Filtering**

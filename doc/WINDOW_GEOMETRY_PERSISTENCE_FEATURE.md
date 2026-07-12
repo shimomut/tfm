@@ -30,7 +30,7 @@ Simply use TFM as you normally would:
 That's it! No additional steps required.
 
 ### First Launch
-On your first launch of TFM, the window will appear at the default size (1200x800 pixels) positioned near the top-left of your screen. After you adjust it to your preference, TFM will remember your settings.
+On your first launch of TFM, the window appears at a default size positioned near the top-left of your screen. After you adjust it to your preference, TFM will remember your settings.
 
 ## Resetting Window Geometry
 
@@ -81,16 +81,15 @@ If you rearrange your monitors (change their relative positions):
 **Solution**:
 1. Resize the window to your preferred size
 2. The new size will be saved automatically
-3. Alternatively, reset to default size using the demo script
+3. Alternatively, use the manual reset command (see "Manual Reset" above)
 
 ### Window is Off-Screen
 
 **Problem**: The window is positioned off-screen and you can't see it.
 
 **Solution**:
-macOS should automatically detect this and reposition the window. If it doesn't:
-1. Use the manual reset command (see "Manual Reset" above)
-2. Or run the demo script to reset the geometry
+macOS should automatically detect this and reposition the window. If it doesn't,
+use the manual reset command (see "Manual Reset" above).
 
 ### Feature Not Working
 
@@ -103,7 +102,7 @@ macOS should automatically detect this and reposition the window. If it doesn't:
 **Solution**:
 1. Verify you're running TFM in desktop mode: `python tfm.py --backend gui`
 2. Check console output for any warning messages about persistence failures
-3. Try resetting the window geometry using the demo script
+3. Try the manual reset command (see "Manual Reset" above)
 
 ### Corrupted Preferences
 
@@ -156,8 +155,7 @@ This feature is only available when running TFM in desktop mode with the CoreGra
 ## Related Features
 
 - **Desktop Mode**: Window geometry persistence is part of TFM's desktop mode functionality
-- **Configuration System**: Default window size can be configured in `src/_config.py`
-- **State Management**: Window geometry is separate from TFM's file manager state (cursor positions, etc.)
+- **State Management**: Window geometry (stored by macOS in the app's user defaults) is separate from TFM's own file-manager state (cursor positions, etc.)
 
 ## See Also
 

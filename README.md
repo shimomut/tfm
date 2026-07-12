@@ -74,10 +74,10 @@ next to TFM and lets the Makefile wire everything into a virtualenv.
 ### Essential Controls
 - **Navigate:** `↑↓` to move up/down, `←→` to switch panes/navigate directories
 - **Enter archives:** Press `Enter` on `.zip`, `.tar`, `.tar.gz` files to browse contents
-- **Select:** `Space` to select/deselect files, `a` for all files, `A` for all items
-- **File operations:** `c/C` (copy), `m/M` (move), `k/K` (delete), `r/R` (rename)
+- **Select:** `Space` to select/deselect files, `A` for all files, `Shift-A` for all items
+- **File operations:** `C` (copy), `M` (move), `K` (delete), `R` (rename)
 - **Help:** `?` for comprehensive help dialog
-- **Quit:** `q/Q` to exit
+- **Quit:** `Q` to exit
 
 ### Help System
 Press `?` to open the comprehensive help dialog with all key bindings and features organized by category. The help dialog is your quick reference guide - no need to memorize all shortcuts!
@@ -106,17 +106,17 @@ All key bindings are fully customizable through the configuration system. For co
 ### Core Operations
 - **Navigation:** Arrow keys, Tab to switch panes, Enter to open directories/files/archives
 - **Archive Browsing:** Press Enter on `.zip`, `.tar`, `.tar.gz`, `.tgz`, `.tar.bz2`, `.tar.xz` files to browse as virtual directories
-- **File Operations:** Copy (`c/C`), Move (`m/M`), Delete (`k/K`), Rename (`r/R`)
-- **Selection:** Space to select files, `a` for all files, `A` for all items
-- **Search:** `f` for incremental search, `F` for filename search, `G` for content search
-- **Archives:** `p/P` to create archives, `u/U` to extract, Enter to browse contents
-- **Text Viewer:** `v/V` to view files with syntax highlighting (works inside archives)
+- **File Operations:** Copy (`C`), Move (`M`), Delete (`K`), Rename (`R`)
+- **Selection:** Space to select files, `A` for all files, `Shift-A` for all items
+- **Search:** `F` for incremental search, `Shift-F` for filename search, `Shift-G` for content search
+- **Archives:** `P` to create archives, `U` to extract, Enter to browse contents
+- **Text Viewer:** `V` to view files with syntax highlighting (works inside archives)
 
 ### Advanced Features
-- **Favorite Directories:** `j` for quick access to bookmarked locations
-- **External Programs:** `x` for custom program integration
-- **Sub-shell Mode:** `X` to enter shell with TFM environment variables
-- **Configuration:** `Z` for settings menu
+- **Favorite Directories:** `J` for quick access to bookmarked locations
+- **External Programs:** `X` for custom program integration
+- **Sub-shell Mode:** `Shift-X` to enter shell with TFM environment variables
+- **Configuration:** `Shift-Z` for settings menu (`Z` opens view options)
 - **SFTP Support:** Navigate remote servers using `ssh://hostname/path` syntax
 - **AWS S3 Support:** Navigate S3 buckets using `s3://bucket/path` syntax
 
@@ -135,7 +135,7 @@ TFM lets you browse archive files as if they were regular directories - no extra
 2. Press `Enter` to browse its contents
 3. Navigate directories inside the archive with arrow keys
 4. Press `Enter` on files to view them
-5. Copy files out with `F5` (or your copy key)
+5. Copy files out with `C` (or your copy key)
 6. Search within archives with `Alt+F7`
 7. Press `Backspace` to exit the archive
 
@@ -166,7 +166,7 @@ pip install pygments
 
 ## Sub-shell Mode
 
-Press `X` to temporarily suspend TFM and enter a shell with environment variables providing access to current directories and selected files:
+Press `Shift-X` to temporarily suspend TFM and enter a shell with environment variables providing access to current directories and selected files:
 
 - `TFM_LEFT_DIR`, `TFM_RIGHT_DIR` - Directory paths for each pane
 - `TFM_THIS_DIR`, `TFM_OTHER_DIR` - Current and other pane directories  
@@ -323,7 +323,7 @@ tfm
 
 ## Configuration
 
-TFM is highly configurable through `~/.tfm/config.py`. Access configuration via the Settings menu (`Z` key) or edit manually.
+TFM is highly configurable through `~/.tfm/config.py`. Access configuration via the Settings menu (`Shift-Z` key) or edit manually.
 
 **Key areas:**
 - Color schemes and display preferences

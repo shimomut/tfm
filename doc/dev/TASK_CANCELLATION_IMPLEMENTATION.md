@@ -170,7 +170,7 @@ class BaseTask(ABC):
 
 ### Normal Operation
 
-1. User starts a file operation (F5 to copy or File > Copy menu)
+1. User starts a file operation (C to copy or File > Copy menu)
 2. Operation begins in background
 3. User can see progress in log pane
 4. User can press ESC to cancel

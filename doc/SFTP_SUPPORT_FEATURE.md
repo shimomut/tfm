@@ -32,13 +32,13 @@ ssh://server.example.com:2222/opt/data
 ### Quick Access Methods
 
 **Method 1: Jump to Path Dialog**
-1. Press `j` (Jump to path)
+1. Press `Shift-J` (Jump to path)
 2. Enter: `ssh://hostname/path`
 3. Press Enter
 
 **Method 2: Favorite Directories**
 1. Add SFTP paths to favorites in config: `~/.tfm/config.py`
-2. Press `j` to access favorites
+2. Press `J` to access favorites
 3. Select your SFTP bookmark
 
 **Method 3: Command Line**
@@ -101,12 +101,12 @@ Once SSH key authentication works, TFM will use it automatically.
 
 All standard file operations work on SFTP paths:
 
-- **Copy** (`F5` or `c/C`): Copy files/directories between local and remote
-- **Move** (`F6` or `m/M`): Move files/directories on remote server
-- **Delete** (`F8` or `k/K`): Delete remote files/directories
-- **Rename** (`Shift+F6` or `r/R`): Rename remote files/directories
-- **Create Directory** (`F7`): Create directories on remote server
-- **View Files** (`F3` or `v/V`): View remote text files with syntax highlighting
+- **Copy** (`C`): Copy files/directories between local and remote
+- **Move** (`M`): Move files/directories on remote server
+- **Delete** (`K`): Delete remote files/directories
+- **Rename** (`R`): Rename remote files/directories
+- **Create Directory** (`M` when nothing is selected): Create directories on remote server
+- **View Files** (`V`): View remote text files with syntax highlighting
 
 ### Cross-Storage Operations
 
@@ -180,7 +180,7 @@ TFM includes several optimizations for SFTP operations:
 View remote text files with full syntax highlighting:
 
 1. Navigate to a text file on SFTP
-2. Press `Enter` or `v` to open viewer
+2. Press `Enter` or `V` to open viewer
 3. Use arrow keys to scroll
 4. Press `/` to search within file
 5. Press `q` to close viewer
@@ -194,17 +194,11 @@ View remote text files with full syntax highlighting:
 Add to `~/.tfm/config.py`:
 
 ```python
-# SFTP cache TTL (seconds)
-SSH_CACHE_TTL = 30  # Default: 30 seconds
+# SFTP cache TTL for successful results (seconds)
+SSH_CACHE_TTL = 30
 
-# SSH connection timeout (seconds)
-SSH_CONNECT_TIMEOUT = 10  # Default: 10 seconds
-
-# SSH command timeout (seconds)
-SSH_COMMAND_TIMEOUT = 30  # Default: 30 seconds
-
-# Maximum search results
-MAX_SEARCH_RESULTS = 10000  # Default: 10000
+# SFTP cache TTL for cached errors (seconds)
+SSH_CACHE_ERROR_TTL = 300
 ```
 
 ### Favorite SFTP Directories
@@ -249,8 +243,8 @@ ssh -O check user@hostname
 Select multiple files and perform batch operations:
 
 1. Use `Space` to select files
-2. Use `a` to select all files in directory
-3. Press operation key (`F5` for copy, `F8` for delete, etc.)
+2. Use `A` to select all files in directory
+3. Press the operation key (`C` for copy, `K` for delete, etc.)
 4. Confirm operation
 5. Watch progress bar for completion
 
@@ -258,14 +252,14 @@ Select multiple files and perform batch operations:
 ```
 1. Navigate to ssh://server/data
 2. Select directories with Space
-3. Press F5 (Copy)
+3. Press C (Copy)
 4. Navigate to ~/backup
 5. Press Enter to confirm
 ```
 
 ### Sub-shell with SFTP
 
-Press `X` to enter sub-shell mode with SFTP environment variables:
+Press `Shift-X` to enter sub-shell mode with SFTP environment variables:
 
 ```bash
 # Environment variables available:
@@ -334,14 +328,14 @@ Solutions:
 **Problem: Directory listing not updating**
 
 Solutions:
-1. Press `Ctrl+R` to force refresh
+1. Navigate out of and back into the directory to re-list it
 2. Reduce SSH_CACHE_TTL in config
 3. Restart TFM to clear all caches
 
 **Problem: Deleted files still showing**
 
 Solution:
-- Press `Ctrl+R` to refresh the current directory
+- Navigate out of and back into the directory to re-list it
 - Cache will auto-invalidate after TTL expires
 
 ## Best Practices

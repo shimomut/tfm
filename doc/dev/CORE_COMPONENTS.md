@@ -220,8 +220,8 @@ help_content = [
     "",
     "File Operations:",
     "  Space   - Select/deselect file",
-    "  c/C     - Copy files",
-    "  m/M     - Move files"
+    "  C       - Copy files",
+    "  M       - Move files"
 ]
 info_dialog.show("Help", help_content)
 ```

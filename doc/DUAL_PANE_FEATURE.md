@@ -54,7 +54,7 @@ Each pane maintains its own:
 
 ### Pane Synchronization
 
-#### Sync Current to Other (o)
+#### Sync Current to Other (O)
 
 Copies the current pane's directory to the other pane:
 
@@ -62,13 +62,13 @@ Copies the current pane's directory to the other pane:
 Before:
 Left: /home/user/documents    Right: /home/user/downloads
 
-Press 'o' in left pane:
+Press 'O' in left pane:
 
 After:
 Left: /home/user/documents    Right: /home/user/documents
 ```
 
-#### Sync Other to Current (O)
+#### Sync Other to Current (Shift-O)
 
 Copies the other pane's directory to the current pane:
 
@@ -76,7 +76,7 @@ Copies the other pane's directory to the current pane:
 Before:
 Left: /home/user/documents    Right: /home/user/downloads
 
-Press 'O' (Shift+o) in left pane:
+Press 'Shift-O' in left pane:
 
 After:
 Left: /home/user/downloads    Right: /home/user/downloads
@@ -86,9 +86,9 @@ Left: /home/user/downloads    Right: /home/user/downloads
 
 Many operations work between panes:
 
-- **Copy (c/C)** - Copy selected files to other pane's directory
-- **Move (m/M)** - Move selected files to other pane's directory
-- **Compare (w/W)** - Compare files between panes
+- **Copy (C)** - Copy selected files to other pane's directory
+- **Move (M)** - Move selected files to other pane's directory
+- **Compare (W)** - Compare files between panes
 
 ## Usage Patterns
 
@@ -97,18 +97,18 @@ Many operations work between panes:
 1. Navigate left pane to source directory
 2. Navigate right pane to destination directory
 3. Select files in left pane (Space key)
-4. Press **c** or **C** to copy to right pane
+4. Press **C** to copy to right pane
 
 ### Moving Files
 
 1. Navigate panes to source and destination
 2. Select files in source pane
-3. Press **m** or **M** to move to other pane
+3. Press **M** to move to other pane
 
 ### Comparing Directories
 
 1. Navigate both panes to directories you want to compare
-2. Press **w** or **W** to open compare selection menu
+2. Press **W** to open compare selection menu
 3. Choose comparison option:
    - Files in current pane not in other
    - Files in other pane not in current
@@ -120,7 +120,7 @@ Many operations work between panes:
 Sometimes you want both panes in the same directory:
 
 1. Navigate one pane to desired directory
-2. Press **o** to sync other pane
+2. Press **O** to sync the current directory to the other pane
 3. Now both panes show the same directory
 4. Useful for: Selecting files, viewing different parts of large directory
 
