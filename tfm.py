@@ -3524,6 +3524,11 @@ def main() -> None:
     args = create_parser().parse_args()
 
     backend_name = _BACKENDS.get(args.backend, args.backend)
+    # Publish the resolved backend so is_desktop_mode() (used by the config,
+    # e.g. TEXT_EDITOR = 'code' in GUI vs 'vim' in terminal) reads it directly
+    # rather than re-sniffing sys.argv. Set before get_config()/TfmApp load the
+    # config below.
+    os.environ["TFM_BACKEND"] = backend_name
     # The GUI backend persists and restores the window's position and size via
     # the native NSWindow frame-autosave feature; the curses backend ignores it.
     backend_kwargs = {"frame_autosave_name": "TFMMainWindow"} if backend_name == "gui" else {}
