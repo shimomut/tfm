@@ -23,8 +23,9 @@ logger = getLogger("Config")
 # --------------------------------------------------------------------------- #
 # Key-binding tables (PuiKit keyboard contract)
 #
-# Key matching follows doc/dev/PUIKIT_KEYBOARD_CONTRACT.md: events carry a
-# canonical ``key`` string, the produced ``char``, and a ``modifiers`` set.
+# Key matching follows the PuiKit keyboard contract (puikit/docs/keyboard_contract.md;
+# TFM's side in doc/dev/KEY_BINDINGS_IMPLEMENTATION.md): events carry a canonical
+# ``key`` string, the produced ``char``, and a ``modifiers`` set.
 # A config token resolves to (identity, modifiers, mode):
 #   mode "key"  -> match on event.key + exact modifiers (shift significant);
 #                  letters and named keys.
@@ -103,7 +104,8 @@ class KeyBindings:
     def _parse_key_expression(self, key_expr: str) -> tuple:
         """
         Parse a config key token into ``(identity, modifiers, mode)`` per the
-        PuiKit keyboard contract (doc/dev/PUIKIT_KEYBOARD_CONTRACT.md §2).
+        PuiKit keyboard contract (puikit/docs/keyboard_contract.md §2; TFM's
+        token map in doc/dev/KEY_BINDINGS_IMPLEMENTATION.md).
 
         Returns:
             Tuple ``(identity, modifiers, mode)``

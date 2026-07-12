@@ -2,16 +2,22 @@
 
 ## Overview
 
-This document describes the implementation of TFM's enhanced key bindings system, which supports KeyCode names, modifier key combinations, and flexible configuration formats.
+TFM maps **config key tokens** (`"q"`, `"Shift-Down"`, `"Command-ENTER"`) to
+**actions**, matching them against PuiKit key events. It supports named keys,
+modifier chords, punctuation and shifted-symbol identities, and per-action
+selection requirements.
+
+The **normative cross-backend keyboard contract** — the `Event(KEY, key, char,
+modifiers)` shape and how each backend (curses / macOS / Windows) normalizes a
+keypress into it — lives in PuiKit: `puikit/docs/keyboard_contract.md`. This
+document covers **TFM's side**: how a config token is parsed and matched against
+that contract.
 
 ## Architecture
 
-### Component Hierarchy
-
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     TFM Application                          │
-│                  (tfm.py, etc.)                        │
+│                     TFM Application (tfm.py)                 │
 └────────────────────────┬────────────────────────────────────┘
                          │ Uses
                          ↓
@@ -24,423 +30,189 @@ This document describes the implementation of TFM's enhanced key bindings system
                          │ Delegates to
                          ↓
 ┌─────────────────────────────────────────────────────────────┐
-│                  KeyBindings Class                           │
-│  - Parses key expressions                                   │
-│  - Matches KeyEvents against bindings                       │
-│  - Enforces selection requirements                          │
+│                  KeyBindings class                           │
+│  - Parses tokens to (identity, modifiers, mode)             │
+│  - Reduces an event to (key, char, modifiers)               │
+│  - Matches the two against each other                        │
 └────────────────────────┬────────────────────────────────────┘
-                         │ Uses
+                         │ Consumes
                          ↓
 ┌─────────────────────────────────────────────────────────────┐
-│                PuiKit key events (Event/EventType)           │
-│  - KeyCode enum (StrEnum)                                   │
-│  - ModifierKey flags (IntFlag)                              │
+│                PuiKit key event (puikit.event)               │
+│  - key:       canonical identity string ("a", "enter")      │
+│  - char:      produced glyph, or None                        │
+│  - modifiers: set ⊆ {"shift","ctrl","alt","cmd"}            │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## KeyBindings Class
+A legacy ttk `KeyEvent` is still accepted transitionally (see
+`_event_identity`), but the model below is the PuiKit one.
+
+## The keyboard contract (TFM's view)
+
+A key event reduces to a triple: `key` (canonical identity), `char` (produced
+glyph or `None`), and `modifiers` (a set of `shift` / `ctrl` / `alt` / `cmd`). A
+parsed config token carries `(identity, modifiers, mode)` and matches in one of
+two **modes**:
+
+- **`key` mode** — letters and named keys. Match iff `event.key == identity`
+  **and** `event.modifiers == modifiers` (exact set equality, so `Shift-A` differs
+  from `a`).
+- **`char` mode** — digits and punctuation. Match iff `event.char == identity`
+  (case-sensitive), **ignoring** `shift`/`alt` (the produced glyph already encodes
+  them); `ctrl`/`cmd` are still significant iff the binding named them.
+
+> **Shifted symbols are their own identity.** A shifted digit/punctuation binds to
+> the glyph it produces — `Shift-EQUAL` → `"+"`, `Shift-1` → `"!"` — matched in
+> `char` mode with `shift` dropped, so it reports the same on every backend.
+>
+> **Bare uppercase letters do not imply shift.** A bare `"J"` parses to key `j`
+> with no modifier (identical to `"j"`); only `"Shift-J"` keeps the modifier.
+> Alphabetical bindings are case-insensitive **by design** (the parser lowercases
+> the letter).
+
+## Config token → identity map
+
+| Config token(s) | Resolves to | Match mode |
+|---|---|---|
+| `a`…`z` / `A`…`Z` | lowercase letter | `key` + exact mods (`Shift-` adds `shift`) |
+| `ENTER`/`RETURN`, `ESCAPE`/`ESC`, `TAB`, `BACKSPACE`, `DELETE`/`DEL`, `INSERT`, `SPACE` | named identity (`enter`, `escape`, `space`, …) | `key` + exact mods |
+| `UP` / `DOWN` / `LEFT` / `RIGHT` / `HOME` / `END` | same, lowercased | `key` + exact mods |
+| `PAGE_UP`/`PAGEUP`, `PAGE_DOWN`/`PAGEDOWN` | `pageup` / `pagedown` | `key` + exact mods |
+| `F1`…`F12` | `f1`…`f12` | `key` + exact mods |
+| named punctuation (`MINUS`, `EQUAL`, `LEFT_BRACKET`, `SEMICOLON`, `SLASH`, …) | base glyph (`-`, `=`, `[`, `;`, `/`, …) | `char` (ignore shift/alt) |
+| digit / punctuation literal (`?`, `.`, `:`, `1`, …) | the produced glyph | `char` |
+| `Shift-<named punct / digit>` | the **shifted** glyph (`Shift-EQUAL` → `+`, `Shift-1` → `!`) | `char` |
+| `Shift-X` (letter) | `x` + `shift` | `key` + exact mods |
+| `Command-X` / `Alt-X` | `x` + `cmd` / `alt` | `key` + exact mods (curses can't deliver `cmd`; such chords are GUI-only) |
+
+The maps that back this table live at the top of `src/tfm_config.py`:
+`_MODIFIER_ALIASES`, `_NAMED_KEYS`, `_PUNCT_NAMES`, `_SHIFT_SYMBOL`, `_KEY_ALIASES`.
+
+## KeyBindings class
 
 ### Location
 `src/tfm_config.py`
 
-### Purpose
-Encapsulates all key binding logic, providing:
-- Key expression parsing
-- KeyEvent matching
-- Action lookup
-- Display formatting
+### Key methods
 
-### Key Methods
+#### `_parse_key_expression(key_expr) -> (identity, modifiers, mode)`
+Parses a config token to its parsed triple.
 
-#### `__init__(key_bindings_config: dict)`
-Initializes the KeyBindings instance with configuration and builds a reverse lookup table.
-
-#### `_parse_key_expression(key_expr: str) -> tuple[str, int]`
-Parses a key expression into main key and modifier flags.
-
-**Examples:**
-- `"q"` → `("Q", 0)` (alphabet, uppercased)
-- `"?"` → `("?", 0)` (non-alphabet, preserved)
-- `"Shift-Down"` → `("DOWN", ModifierKey.SHIFT)`
-- `"Command-Shift-X"` → `("X", ModifierKey.COMMAND | ModifierKey.SHIFT)`
+- `identity` — PuiKit key name (`"a"`, `"enter"`, `"pageup"`) for `mode == "key"`,
+  or the produced glyph (`"?"`, `"="`, `"+"`) for `mode == "char"`.
+- `modifiers` — `frozenset` of contract modifier names.
+- `mode` — `"key"` or `"char"`.
 
 **Algorithm:**
-1. If single character:
-   - If alphabet (a-z, A-Z): return uppercase with no modifiers
-   - If non-alphabet: return as-is with no modifiers
-2. Split on hyphen to separate modifiers from main key
-3. Parse each modifier name (case-insensitive)
-4. Combine modifiers using bitwise OR
-5. Return tuple of (main_key, modifier_flags)
+1. Single-character token: a **letter** → `(lower, frozenset(), "key")`; anything
+   else (digit / punctuation) → `(char, frozenset(), "char")`.
+2. Otherwise split on `-`: the last part is the key, earlier parts are modifiers
+   (resolved case-insensitively via `_MODIFIER_ALIASES`; unknown ones warn and are
+   skipped). Then, on the key part:
+   - a **named key** (`_NAMED_KEYS`) → `(identity, mods, "key")`;
+   - **named punctuation** (`_PUNCT_NAMES`) → `_punct_binding` (`char` mode);
+   - a single **letter** → `(lower, mods, "key")`;
+   - a single **digit / punctuation literal** → `_punct_binding`.
 
-#### `_keycode_from_string(key_str: str) -> Optional[int]`
-Converts a KeyCode name string to its integer value.
+#### `_punct_binding(glyph, mods) -> (glyph, modifiers, "char")`
+Builds a `char`-mode binding, folding a `Shift` modifier into the produced
+(shifted) glyph via `_SHIFT_SYMBOL` and dropping `shift`, so the identity is the
+character the key actually emits.
 
-Uses `getattr(KeyCode, key_str, None)` to access KeyCode enum values by name.
+#### `_event_identity(event) -> (key, char, modifiers)`
+Reduces a key event to the contract triple. Accepts a PuiKit `Event` (native:
+`event.key` / `event.char` / `event.modifiers`) or a legacy ttk `KeyEvent`
+(transitional: a `key_code` StrEnum plus integer modifier flags decoded via
+`_TTK_MOD_BITS`). Aliases `page_up` / `page_down` → `pageup` / `pagedown`.
 
-#### `_match_key_event(event, main_key: str, modifiers: int) -> bool`
-Checks if a KeyEvent matches a key expression.
+#### `_matches(parsed, key, char, mods) -> bool`
+Applies the two match modes described in *The keyboard contract* above.
 
-**Matching logic:**
-1. For single-character keys, match against `event.char` (ignore modifiers for backward compatibility):
-   - If alphabet (a-z, A-Z): case-insensitive comparison
-   - If non-alphabet: case-sensitive comparison
-2. For multi-character keys:
-   - Check modifiers match exactly
-   - Match against `event.key_code`
+#### `find_action_for_event(event, has_selection=False) -> str | None`
+Reduces the event, scans the reverse-lookup table for a matching parsed binding,
+and returns the first action whose selection requirement is satisfied.
 
-#### `find_action_for_event(event, has_selection: bool) -> Optional[str]`
-Finds the action bound to a KeyEvent, respecting selection requirements.
+#### `get_keys_for_action(action) -> (key_expressions, selection_requirement)`
+Returns the raw config tokens and selection requirement for an action (used by the
+help dialog).
 
-**Algorithm:**
-1. Iterate through reverse lookup table
-2. For each key binding, check if event matches
-3. If match found, check selection requirement
-4. Return first action that satisfies all conditions
+#### `format_key_for_display(key_expr) -> str`
+Formats a token for UI display: single literals pass through; named tokens map to
+conventional labels via `_KEY_DISPLAY` (`ENTER` → `Enter`, `UP` → `↑`,
+`PAGE_UP` → `PgUp`); modifiers abbreviate via `_MOD_DISPLAY` (`Command` → `Cmd`,
+`Option` → `Opt`). E.g. `"Command-Shift-X"` → `"Cmd-Shift-X"`.
 
-#### `get_keys_for_action(action: str) -> tuple[list[str], str]`
-Returns all key expressions and selection requirement for an action.
+## Public API functions
 
-Used by help dialog to display key bindings.
-
-#### `format_key_for_display(key_expr: str) -> str`
-Formats a key expression for display in UI.
-
-**Formatting rules:**
-- Single characters: return as-is
-- Multi-character: capitalize modifiers, uppercase main key
-- Abbreviate "Command" to "Cmd"
-
-## Public API Functions
-
-### `find_action_for_event(event, has_selection: bool = False) -> Optional[str]`
-**Primary API for key binding lookup.**
-
-Replaces all deprecated functions:
-- `is_key_bound_to()`
-- `is_special_key_bound_to()`
-- `is_input_event_bound_to()`
-- And their `_with_selection` variants
-
-**Usage:**
-```python
-from tfm_config import find_action_for_event
-
-action = find_action_for_event(event, has_selection)
-if action == 'quit':
-    # Handle quit
-elif action == 'delete_files':
-    # Handle delete
-```
-
-### `get_keys_for_action(action: str) -> tuple[list[str], str]`
-Returns key expressions and selection requirement for an action.
-
-**Usage:**
-```python
-from tfm_config import get_keys_for_action
-
-keys, selection_req = get_keys_for_action('delete_files')
-# keys = ['DELETE', 'Command-Backspace']
-# selection_req = 'required'
-```
-
-### `format_key_for_display(key_expr: str) -> str`
-Formats a key expression for display.
-
-**Usage:**
-```python
-from tfm_config import format_key_for_display
-
-display = format_key_for_display('Command-Shift-X')
-# display = 'Cmd-Shift-X'
-```
-
-## Deprecated API Functions
-
-The following functions are deprecated but maintained for backward compatibility:
-
-- `is_key_bound_to(key_char, action)`
-- `is_key_bound_to_with_selection(key_char, action, has_selection)`
-- `is_special_key_bound_to(key_code, action)`
-- `is_special_key_bound_to_with_selection(key_code, action, has_selection)`
-- `is_input_event_bound_to(event, action)`
-- `is_input_event_bound_to_with_selection(event, action, has_selection)`
-- `get_action_for_key(key)`
-
-All deprecated functions emit `DeprecationWarning` when called.
-
-**Migration:**
-```python
-# OLD
-if is_input_event_bound_to_with_selection(event, 'quit', has_selection):
-    # handle quit
-
-# NEW
-action = find_action_for_event(event, has_selection)
-if action == 'quit':
-    # handle quit
-```
-
-## Data Structures
-
-### Key Expression Lookup Table
-
-The `KeyBindings` class builds a reverse lookup table:
+Module-level wrappers in `tfm_config.py` delegate to the `ConfigManager`'s cached
+`KeyBindings` instance:
 
 ```python
-_key_to_actions = {
-    ('Q', 0): [('quit', 'any')],
-    ('UP', 0): [('move_up', 'any')],
-    ('UP', ModifierKey.SHIFT): [('page_up', 'any')],
-    ('DELETE', 0): [('delete_files', 'required')],
-}
+from tfm_config import find_action_for_event, get_keys_for_action, format_key_for_display
+
+action = find_action_for_event(event, has_selection)   # -> 'quit' | None
+keys, sel_req = get_keys_for_action('delete_files')     # -> (['DELETE', 'Command-Backspace'], 'required')
+label = format_key_for_display('Command-Shift-X')       # -> 'Cmd-Shift-X'
 ```
 
-**Key:** `(main_key, modifier_flags)` tuple
-**Value:** List of `(action, selection_requirement)` tuples
+## Configuration formats
 
-This enables O(1) lookup of actions from key events.
-
-### Configuration Formats
-
-**Simple format:**
+**Simple** (keys only, selection defaults to `'any'`):
 ```python
 'action_name': ['key1', 'key2']
 ```
 
-**Extended format:**
+**Extended** (with selection requirement):
 ```python
-'action_name': {
-    'keys': ['key1', 'key2'],
-    'selection': 'required'  # or 'none' or 'any'
+'action_name': {'keys': ['key1', 'key2'], 'selection': 'required'}  # or 'none' | 'any'
+```
+
+## Selection requirements
+
+- `'required'` — action available only when files are selected.
+- `'none'` — action available only when **no** files are selected.
+- `'any'` — always available (default).
+
+Enforced in `find_action_for_event` via `_check_selection_requirement`, so a token
+can map to different actions depending on selection state.
+
+## Data structures
+
+`KeyBindings` builds a reverse lookup once at init (`_build_key_lookup`), keyed by
+the **parsed triple**:
+
+```python
+_key_to_actions = {
+    ("q",      frozenset(), "key"):  [("quit", "any")],
+    ("pageup", frozenset(), "key"):  [("page_up", "any")],       # from token "PAGE_UP"
+    ("delete", frozenset(), "key"):  [("delete_files", "required")],
+    ("?",      frozenset(), "char"): [("help", "any")],
+    ("=",      frozenset(), "char"): [("diff_files", "any")],    # from token "EQUAL"
+    ("+",      frozenset(), "char"): [("diff_directories", "any")],  # from token "Shift-EQUAL"
 }
 ```
 
-Both formats are supported for backward compatibility.
+Lookup is a linear scan over this table applying `_matches` (the table is small);
+the `ConfigManager` caches the `KeyBindings` instance and rebuilds it only on
+`reload_config()`.
 
-## Key Expression Parsing
+## Error handling
 
-### Grammar
-
-```
-key_expression := single_char | modified_key
-single_char := any single character
-modified_key := modifier_list "-" main_key
-modifier_list := modifier | modifier "-" modifier_list
-modifier := "Shift" | "Control" | "Ctrl" | "Alt" | "Option" | "Command" | "Cmd"
-main_key := keycode_name | single_char
-keycode_name := "UP" | "DOWN" | "ENTER" | ... (any KeyCode name)
-```
-
-### Parsing Algorithm
-
-1. Check length: if 1, treat as single character
-2. Split on hyphen: `parts = key_expr.split('-')`
-3. Last part is main key: `main_key = parts[-1]`
-4. Earlier parts are modifiers: `modifiers = parts[:-1]`
-5. Parse each modifier name (case-insensitive)
-6. Combine modifiers with bitwise OR
-7. Return `(main_key, modifier_flags)`
-
-### Case Sensitivity Rules
-
-**Case-insensitive:**
-- Modifier names: `'Shift'`, `'SHIFT'`, `'shift'` all work
-- KeyCode names: `'ENTER'`, `'enter'`, `'Enter'` all work
-- Single alphabet characters: 'a' and 'A' are treated as the same
-
-**Case-sensitive:**
-- Single non-alphabet characters: '?' and '/' are different keys
-
-### Order Independence
-
-Modifier order doesn't matter:
-- `'Command-Shift-X'` equals `'Shift-Command-X'`
-- Both parse to `('X', ModifierKey.COMMAND | ModifierKey.SHIFT)`
-
-## KeyEvent Matching
-
-### Matching Algorithm
-
-1. **Check modifiers:** `event.modifiers == expected_modifiers`
-2. **Check main key:**
-   - Single character: `event.char.upper() == main_key`
-   - KeyCode name: `event.key_code == keycode_value`
-
-### Single Character Matching
-
-Single-character keys match against `KeyEvent.char` with special handling for alphabet vs non-alphabet:
-
-```python
-if len(main_key) == 1:
-    if main_key.isalpha():
-        # Alphabet: case-insensitive
-        return event.char and event.char.upper() == main_key
-    else:
-        # Non-alphabet: case-sensitive
-        return event.char == main_key
-```
-
-**Rationale:**
-- **Alphabet characters (a-z, A-Z)**: Case-insensitive to avoid redundant bindings ('q' matches both 'q' and 'Q')
-- **Non-alphabet characters (?, /, ., etc.)**: Case-sensitive to allow different bindings for different symbols
-- **Uppercase-specific bindings**: Users must use "Shift-A" instead of just "A"
-
-This maintains backward compatibility while reducing configuration redundancy.
-
-### KeyCode Matching
-
-Multi-character keys match against `KeyEvent.key_code`:
-```python
-expected_keycode = self._keycode_from_string(main_key)
-return event.key_code == expected_keycode
-```
-
-## Selection Requirements
-
-### Requirement Types
-
-- `'required'`: Action only available when `has_selection == True`
-- `'none'`: Action only available when `has_selection == False`
-- `'any'`: Action always available (default)
-
-### Enforcement
-
-Selection requirements are checked in `find_action_for_event()`:
-
-```python
-for action, selection_req in actions:
-    if self._check_selection_requirement(selection_req, has_selection):
-        return action
-```
-
-This ensures actions are only triggered when appropriate.
-
-## Error Handling
-
-### Invalid Key Expressions
-
-- Log warning
-- Skip binding
-- Continue processing other bindings
-- Don't crash application
-
-### Unknown Modifiers
-
-- Log warning
-- Ignore unknown modifier
-- Continue parsing rest of expression
-
-### Unknown KeyCode Names
-
-- Log warning
-- Return None from `_keycode_from_string()`
-- Skip binding in matching logic
-
-### Missing Configuration
-
-- Fall back to `DefaultConfig.KEY_BINDINGS`
-- Log info message
-- Continue normal operation
-
-## Performance Considerations
-
-### Reverse Lookup Table
-
-The `_key_to_actions` lookup table enables O(1) action lookup:
-- Built once during initialization
-- Indexed by `(main_key, modifiers)` tuple
-- No linear search through all bindings
-
-### Caching
-
-The `ConfigManager` caches the `KeyBindings` instance:
-- Created once per configuration
-- Cleared on `reload_config()`
-- Avoids rebuilding lookup table on every key press
+Parsing is defensive — an unknown modifier or key token logs a warning and is
+skipped rather than crashing; a missing `KEY_BINDINGS` config falls back to
+`DefaultConfig.KEY_BINDINGS`.
 
 ## Testing
 
-### Unit Tests
-
-Located in `test/test_key_bindings.py`:
-- KeyBindings class initialization
-- Key expression parsing
-- KeyEvent matching
-- Selection requirement enforcement
-
-### Property-Based Tests
-
-Located in `test/test_key_bindings_properties.py`:
-- KeyCode name recognition (all cases)
-- Modifier key support (all combinations)
-- Single character backward compatibility
-- Configuration format support
-
-### Integration Tests
-
-Located in `test/test_key_bindings_integration.py`:
-- Application-level key handling
-- Help dialog display
-- Configuration loading
-
-## Migration Guide
-
-### For Application Code
-
-**Before:**
-```python
-from tfm_config import is_input_event_bound_to_with_selection
-
-if is_input_event_bound_to_with_selection(event, 'quit', has_selection):
-    self.quit()
-elif is_input_event_bound_to_with_selection(event, 'delete_files', has_selection):
-    self.delete_files()
-```
-
-**After:**
-```python
-from tfm_config import find_action_for_event
-
-action = find_action_for_event(event, has_selection)
-if action == 'quit':
-    self.quit()
-elif action == 'delete_files':
-    self.delete_files()
-```
-
-### For Help Dialog
-
-**Before:**
-```python
-from tfm_config import config_manager
-
-keys = config_manager.get_key_for_action('delete_files')
-# keys = ['DELETE', 'Command-Backspace']
-```
-
-**After:**
-```python
-from tfm_config import get_keys_for_action, format_key_for_display
-
-keys, selection_req = get_keys_for_action('delete_files')
-formatted_keys = [format_key_for_display(k) for k in keys]
-# formatted_keys = ['DELETE', 'Cmd-Backspace']
-```
-
-## Future Enhancements
-
-Possible future improvements:
-
-1. **Key sequence support**: Multi-key sequences like "g g" for jump to top
-2. **Context-sensitive bindings**: Different bindings for different modes
-3. **Dynamic rebinding**: Change bindings at runtime
-4. **Conflict detection**: Warn about conflicting key bindings
-5. **Key recording**: Record key sequences for custom bindings
+- `test/test_keybindings_puikit_contract.py` — TFM's matcher (`_parse_key_expression`
+  / `_matches`) against the real keymap.
+- `test/test_puikit_keyboard_contract.py` — the per-backend translation TFM relies
+  on (the contract's guarantees hold on each backend).
 
 ## See Also
 
-- [Key Bindings Feature](../KEY_BINDINGS_FEATURE.md) - User documentation
-- [Configuration System](CONFIGURATION_SYSTEM.md) - Configuration architecture
-- [PuiKit event system](https://github.com/crftwr/puikit) - key/char event details (`puikit/event.py`)
+- [Key Bindings Feature](../KEY_BINDINGS_FEATURE.md) — user documentation
+- [Configuration System](CONFIGURATION_SYSTEM.md) — configuration architecture
+- PuiKit keyboard contract — `puikit/docs/keyboard_contract.md` (event shape,
+  per-backend normalization, IME focus-gating)
