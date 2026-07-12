@@ -37,11 +37,12 @@ from tfm_progress_manager import OperationType, ProgressManager
 from tfm_task import Cancelled, Task, TaskManager
 
 #: Operation kind -> (verb label, progress-manager op type).
-_VERB = {"copy": "Copy", "move": "Move", "delete": "Delete"}
+_VERB = {"copy": "Copy", "move": "Move", "delete": "Delete", "duplicate": "Duplicate"}
 _OP_TYPE = {
     "copy": OperationType.COPY,
     "move": OperationType.MOVE,
     "delete": OperationType.DELETE,
+    "duplicate": OperationType.COPY,
 }
 
 #: Copy in 1 MiB chunks; files at least this large are chunk-copied so the byte
@@ -138,6 +139,15 @@ class FileOperationService:
         """Move ``targets`` into ``dest_dir``, confirming per ``CONFIRM_MOVE``."""
         self._start(panel, "move", targets, dest_dir, on_complete, log, z, background)
 
+    def duplicate(self, panel: Any, targets: list, dest_dir: Path, *,
+                  on_complete: Optional[Callable[[dict], None]] = None,
+                  log: Optional[Callable[[str], None]] = None,
+                  z: int = 70, background: bool = True) -> None:
+        """Duplicate ``targets`` in place inside ``dest_dir`` (the source's own
+        directory), auto-renaming each with the shared ` (N)` scheme — no conflict
+        prompt, since an in-place copy always collides. Honors ``CONFIRM_DUPLICATE``."""
+        self._start(panel, "duplicate", targets, dest_dir, on_complete, log, z, background)
+
     def delete(self, panel: Any, targets: list, *,
                on_complete: Optional[Callable[[dict], None]] = None,
                log: Optional[Callable[[str], None]] = None,
@@ -173,6 +183,12 @@ class FileOperationService:
             lines += _item_list_md(targets)
             lines += ["", "**This cannot be undone.**"]
             buttons, icon, default = ("Delete", "Cancel"), "warning", 1
+        elif kind == "duplicate":
+            # In-place copy: the destination is the source's own directory, so name
+            # it as "in <dir>" rather than the copy/move "to <dir>".
+            lines = [f"Duplicate **{len(targets)}** item(s) in {_code(str(dest_dir))}?", ""]
+            lines += _item_list_md(targets)
+            buttons, icon, default = ("Duplicate", "Cancel"), "info", 0
         else:
             lines = [f"{verb} **{len(targets)}** item(s) to {_code(str(dest_dir))}?", ""]
             lines += _item_list_md(targets)
@@ -219,6 +235,13 @@ class FileOperationService:
             # recursive count only covers what will actually be processed.
             if kind == "delete":
                 plan = [(t, None, False) for t in targets]
+            elif kind == "duplicate":
+                # In-place copy always collides with itself — never prompt; pre-plan
+                # every target to a fresh ` (N)` name. Distinct target names ⇒
+                # distinct slots, so computing all up front is collision-free.
+                plan = [(t, _unique_dest(dest_dir, t.name, is_dir=t.is_dir()), False)
+                        for t in targets]
+                result["created"] = [dest.name for _t, dest, _o in plan]
             else:
                 plan, result["skipped"] = self._resolve(task, targets, dest_dir, z, panel)
 
@@ -349,8 +372,9 @@ class FileOperationService:
                 return 0
             _log_op(log, "Moved", target, dest_base)  # atomic: one line per target
             return 1
-        # Copy, or a cross-storage move (copy the tree, then drop the source).
-        verb = "Moved" if kind == "move" else "Copied"
+        # Copy, duplicate, or a cross-storage move (copy the tree, then — move only
+        # — drop the source).
+        verb = {"move": "Moved", "duplicate": "Duplicated"}.get(kind, "Copied")
         before = len(errors)
         ok = self._copy_tree(task, target, dest_base, overwrite, prog, log, verb, errors)
         if kind == "move" and ok > 0 and len(errors) == before:

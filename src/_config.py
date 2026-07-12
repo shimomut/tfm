@@ -183,6 +183,7 @@ class Config:
     CONFIRM_QUIT = True     # Show confirmation dialog before quitting TFM
     CONFIRM_COPY = True     # Show confirmation dialog before copying files/directories
     CONFIRM_MOVE = True     # Show confirmation dialog before moving files/directories
+    CONFIRM_DUPLICATE = True  # Show confirmation dialog before duplicating files/directories
     CONFIRM_EXTRACT_ARCHIVE = True  # Show confirmation dialog before extracting archives
     CONFIRM_ARCHIVE_CREATE = True   # Show confirmation dialog before creating archives
     

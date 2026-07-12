@@ -1416,6 +1416,8 @@ class TfmApp:
             return self.copy_files()
         elif action == "move_files":
             return self.move_files()
+        elif action == "duplicate_files":
+            return self.duplicate_files()
         elif action == "delete_files":
             return self.delete_files()
         elif action == "create_archive":
@@ -1535,6 +1537,8 @@ class TfmApp:
             MenuItem("New Folder…", on_select=self.create_directory, shortcut=sc("create_directory")),
             MenuItem("New File…", on_select=self.create_file, shortcut=sc("create_file")),
             MenuItem("Rename…", on_select=self.rename, enabled=has_files, shortcut=sc("rename_file")),
+            MenuItem("Duplicate", on_select=self.duplicate_files,
+                     enabled=has_files, shortcut=sc("duplicate_files")),
             MenuItem("Copy to Other Pane", on_select=self.copy_files,
                      enabled=has_files, shortcut=sc("copy_files")),
             MenuItem("Move to Other Pane", on_select=self.move_files,
@@ -2623,6 +2627,46 @@ class TfmApp:
         Returns True when a guard bailed out synchronously (see ``_transfer``)."""
         return self._transfer("move")
 
+    def duplicate_files(self) -> bool:
+        """Duplicate the active pane's selection (or cursor entry) in place — a
+        Finder-style copy into the same directory, auto-renamed with the shared
+        ` (N)` scheme. Reachable from the menu bar and context menu (no default
+        key). Returns True when a guard bailed out synchronously (see
+        ``_transfer`` for why the caller then needs to redraw), False once the
+        operation is handed off to the shared engine."""
+        pane = self.active_pane()
+        if pane.get("virtual"):
+            # A search-results feed spans many directories — there is no single
+            # directory to duplicate into. Reveal a real directory first.
+            self.log_info("Cannot duplicate: this pane is a search-results view")
+            return True
+        if self._is_archive(pane["path"]):
+            self.log_info("Cannot duplicate inside a read-only archive")
+            return True
+        targets = self._selected_or_focused(pane)
+        if not targets:
+            self.log_info("No file to duplicate")
+            return True
+        return self._run_duplicate(pane, targets)
+
+    def _run_duplicate(self, pane: dict, targets: list) -> bool:
+        """Hand a duplicate off to the shared engine, refreshing ``pane`` and
+        landing the cursor on the new copy on completion. Callers must have
+        already validated the pane (real directory, writable). Always returns
+        False — the confirm dialog then drives its own redraws."""
+        def on_complete(result: dict) -> None:
+            pane["selected_files"].clear()
+            created = result.get("created") or []
+            on_ready = (lambda p: self._select_by_name(p, created[0])) if created else None
+            self._refresh(pane, on_ready=on_ready)
+            self.log_info(format_op_summary("Duplicate", result))
+            self._report_op_failures("Duplicate", result)
+            self.panel.render()
+
+        self._fileops.duplicate(self.panel, targets, pane["path"],
+                                on_complete=on_complete, log=self.log_info)
+        return False
+
     def _report_op_failures(self, verb: str, result: dict, z: int = 70) -> None:
         """Pop a message box naming the items that failed (and why), so a failure
         buried in a long run of per-file log lines isn't missed."""
@@ -2666,6 +2710,11 @@ class TfmApp:
         # A virtual source spans many directories, so the single "same directory"
         # guard doesn't apply — the per-target dest-exists check below still holds.
         if not src_pane.get("virtual") and str(dest_dir) == str(src_pane["path"]):
+            if kind == "copy":
+                # Copying into the source's own directory is a duplicate: auto-rename
+                # with ` (N)` instead of erroring (the dest/archive guards above have
+                # already cleared this directory as writable).
+                return self._run_duplicate(src_pane, targets)
             self.log_info(f"Cannot {kind}: source and destination are the same directory")
             return True
 
@@ -3337,6 +3386,7 @@ class TfmApp:
                      on_select=lambda: self._menu("select_file")),
             SEPARATOR,
             MenuItem("Rename…", on_select=self.rename, enabled=entry is not None),
+            MenuItem("Duplicate", on_select=self.duplicate_files, enabled=entry is not None),
             SEPARATOR,
             MenuItem("Copy to Other Pane", on_select=self.copy_files, enabled=entry is not None),
             MenuItem("Move to Other Pane", on_select=self.move_files, enabled=entry is not None),

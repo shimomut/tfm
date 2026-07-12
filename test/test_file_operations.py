@@ -26,6 +26,7 @@ def cfg():
     """Config with confirmation prompts off, so sync ops run without a panel."""
     c = _config.Config()
     c.CONFIRM_COPY = c.CONFIRM_MOVE = c.CONFIRM_DELETE = False
+    c.CONFIRM_DUPLICATE = False
     return c
 
 
@@ -103,6 +104,51 @@ def test_move_same_storage_is_atomic(tmp_path, svc):
     assert res["done"] == 1
     assert (dst / "m.txt").read_text() == "move"
     assert not (src / "m.txt").exists()
+
+
+def test_duplicate_renames_file_in_place(tmp_path, svc):
+    d = tmp_path / "d"
+    d.mkdir()
+    (d / "a.txt").write_text("hello")
+    res = _run_sync(svc, svc.duplicate, [_P(d / "a.txt")], _P(d))
+    assert res["done"] == 1 and res["failed"] == 0 and res["errors"] == []
+    assert res["created"] == ["a (1).txt"]
+    # Original untouched; the copy sits beside it with the same contents.
+    assert (d / "a.txt").read_text() == "hello"
+    assert (d / "a (1).txt").read_text() == "hello"
+
+
+def test_duplicate_directory_appends_suffix(tmp_path, svc):
+    d = tmp_path / "d"
+    (d / "sub").mkdir(parents=True)
+    (d / "sub" / "f.txt").write_text("x")
+    res = _run_sync(svc, svc.duplicate, [_P(d / "sub")], _P(d))
+    assert res["created"] == ["sub (1)"]
+    assert (d / "sub").is_dir() and (d / "sub (1)").is_dir()
+    assert (d / "sub (1)" / "f.txt").read_text() == "x"
+
+
+def test_duplicate_multiple_each_get_own_suffix(tmp_path, svc):
+    d = tmp_path / "d"
+    d.mkdir()
+    (d / "a.txt").write_text("a")
+    (d / "b.log").write_text("b")
+    res = _run_sync(svc, svc.duplicate, [_P(d / "a.txt"), _P(d / "b.log")], _P(d))
+    assert res["done"] == 2
+    assert res["created"] == ["a (1).txt", "b (1).log"]
+    assert (d / "a (1).txt").read_text() == "a"
+    assert (d / "b (1).log").read_text() == "b"
+
+
+def test_duplicate_logs_as_duplicated(tmp_path, svc):
+    d = tmp_path / "d"
+    d.mkdir()
+    (d / "a.txt").write_text("x")
+    logs = []
+    svc.duplicate(None, [_P(d / "a.txt")], _P(d),
+                  on_complete=lambda r: None, log=logs.append, background=False)
+    # The rename is visible: source name → the ` (N)` destination name.
+    assert any("Duplicated 'a.txt' → 'a (1).txt'" in m for m in logs)
 
 
 def test_copy_logs_each_file_with_src_and_dest(tmp_path, svc):
