@@ -24,6 +24,7 @@ from puikit.panel import Rect
 from puikit.widgets import Splitter
 from puikit.widgets.base import Widget
 
+from tfm_config import find_action_for_event, keys_label_for_action
 from tfm_file_pane import CONTENT_PAD_CELLS  # same l/r content inset as the main panes
 from tfm_text_dialog import keys_markdown, show_markdown
 from tfm_text_viewer import (MONO, _ScrollBody, _content_bg, _header_bg, _highlight,
@@ -404,8 +405,15 @@ class DiffViewer(Widget):
         if event.type is not EventType.KEY:
             return True
         key = event.key
-        if key in ("escape", "q") or event.char == "q":
+        # Close and help resolve through the shared, config-driven KEY_BINDINGS so
+        # they honour the user's rebinds, matching the main file manager. Esc is the
+        # universal modal dismiss and stays hardcoded; the viewer-only keys below
+        # (scroll, next-diff) remain local to the viewer.
+        action = find_action_for_event(event)
+        if key == "escape" or action == "quit":
             self._close()
+        elif action == "help":
+            self._show_help()
         elif key == "down":
             self.top += 1
         elif key == "up":
@@ -426,8 +434,6 @@ class DiffViewer(Widget):
             self._step_block(1)
         elif event.char == "N":
             self._step_block(-1)
-        elif event.char == "?":
-            self._show_help()
         self._clamp()
         return True
 
@@ -441,8 +447,8 @@ class DiffViewer(Widget):
             ("← / →", "scroll horizontally"),
             ("n / N", "next / prev diff block"),
             ("Drag gutter", "move centre split"),
-            ("?", "this help"),
-            ("q / Esc", "close"),
+            (keys_label_for_action("help", "?"), "this help"),
+            (keys_label_for_action("quit", "q") + " / Esc", "close"),
         ]
         show_markdown(self._panel, keys_markdown(rows),
                       title="File Diff — Keys", z=self._child_z)

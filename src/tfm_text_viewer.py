@@ -28,6 +28,7 @@ from puikit.panel import Rect
 from puikit.text import elide
 from puikit.widgets.base import Widget
 
+from tfm_config import find_action_for_event, keys_label_for_action
 from tfm_text_dialog import keys_markdown, show_markdown
 
 try:
@@ -581,8 +582,15 @@ class TextViewer(Widget):
         if self.searching:
             self._handle_search_key(event)
             return True
-        if key in ("escape", "q") or event.char == "q":
+        # Close and help resolve through the shared, config-driven KEY_BINDINGS so
+        # they honour the user's rebinds, matching the main file manager. Esc is the
+        # universal modal dismiss and stays hardcoded; the viewer-only keys below
+        # (scroll, wrap, search, next-match) remain local to the viewer.
+        action = find_action_for_event(event)
+        if key == "escape" or action == "quit":
             self._close()
+        elif action == "help":
+            self._show_help()
         elif key == "down":
             self.top += 1
         elif key == "up":
@@ -612,8 +620,6 @@ class TextViewer(Widget):
             self._step_match(1)
         elif event.char == "N":
             self._step_match(-1)
-        elif event.char == "?":
-            self._show_help()
         self._clamp()
         return True
 
@@ -628,8 +634,8 @@ class TextViewer(Widget):
             ("w", "toggle line wrap"),
             ("/", "search"),
             ("n / N", "next / prev match"),
-            ("?", "this help"),
-            ("q / Esc", "close"),
+            (keys_label_for_action("help", "?"), "this help"),
+            (keys_label_for_action("quit", "q") + " / Esc", "close"),
         ]
         show_markdown(self._panel, keys_markdown(rows),
                       title="Text Viewer — Keys", z=self._child_z)

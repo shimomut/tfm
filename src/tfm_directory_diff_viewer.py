@@ -49,7 +49,7 @@ from tfm_str_format import format_size
 from tfm_text_viewer import MONO, _ScrollBody, _header_bg, draw_status_bar, viewer_pad
 from tfm_diff_viewer import show_diff_viewer
 from tfm_text_dialog import keys_markdown, show_markdown
-from tfm_config import KeyBindings
+from tfm_config import KeyBindings, find_action_for_event, keys_label_for_action
 from tfm_file_operations import FileOperationService
 
 
@@ -1036,13 +1036,22 @@ class DirectoryDiffView(Widget):
             "view_file": self._open_file_diff,
         }
 
+    def _resolve_action(self, event) -> Any:
+        """Action bound to ``event`` via KEY_BINDINGS — the injected config's
+        bindings when present, else the shared singleton — so close/help honour the
+        user's rebinds even when the viewer is constructed without a config."""
+        if self._keys is not None:
+            return self._keys.find_action_for_event(event)
+        return find_action_for_event(event)
+
     def _keys_label(self, action: str, fallback: str) -> str:
         """Display string for an action's configured key(s) (so the help matches
-        the user's KEY_BINDINGS), or ``fallback`` when no config is present."""
-        if self._keys is None:
-            return fallback
-        keys, _ = self._keys.get_keys_for_action(action)
-        return " / ".join(keys) if keys else fallback
+        the user's KEY_BINDINGS), or ``fallback`` when the action is unbound. Uses
+        the injected config's bindings when present, else the shared singleton."""
+        if self._keys is not None:
+            keys, _ = self._keys.get_keys_for_action(action)
+            return " / ".join(keys) if keys else fallback
+        return keys_label_for_action(action, fallback)
 
     def _show_help(self) -> None:
         if self._panel is None:
@@ -1064,7 +1073,7 @@ class DirectoryDiffView(Widget):
             (delete, "delete focused (active side)"),
             (merge, "merge sides in $TEXT_DIFF"),
             ("r", "rescan"),
-            ("q / Esc", "close"),
+            (self._keys_label("quit", "q") + " / Esc", "close"),
         ]
         show_markdown(
             self._panel, keys_markdown(rows),
@@ -1502,11 +1511,12 @@ class DirectoryDiffView(Widget):
             return True
         key = event.key
         char = event.char
-        # File operations resolve through the shared, config-driven KeyBindings so
-        # their keys match the main file manager (C / M / K / DELETE / E / V). The
-        # focused node stands in for a selection — has_selection=True so the
-        # selection-gated copy/move/delete bindings fire; each handler then checks
-        # the active side itself and reports if the node is missing there.
+        # File operations resolve through the injected config's KeyBindings +
+        # FileOperationService (C / M / K / DELETE / E / V), present only when a
+        # config was passed in. The focused node stands in for a selection —
+        # has_selection=True so the selection-gated copy/move/delete bindings fire;
+        # each handler then checks the active side itself and reports if the node is
+        # missing there.
         if self._keys is not None:
             action = self._keys.find_action_for_event(event, has_selection=True)
             handler = self._file_op_handlers().get(action) if action else None
@@ -1514,8 +1524,16 @@ class DirectoryDiffView(Widget):
                 handler()
                 self._update_priorities()
                 return True
-        if key in ("escape", "q") or char == "q":
+        # Close and help also resolve through KEY_BINDINGS (the injected config when
+        # present, else the shared singleton) so they match the main file manager and
+        # honour rebinds. Esc is the universal modal dismiss and stays hardcoded; the
+        # viewer-only keys below (navigation, expand/collapse, next-diff, split,
+        # rescan) are local to the viewer.
+        action = self._resolve_action(event)
+        if key == "escape" or action == "quit":
             self._close()
+        elif action == "help":
+            self._show_help()
         elif key == "down":
             self._move_cursor(1)
         elif key == "up":
@@ -1558,8 +1576,6 @@ class DirectoryDiffView(Widget):
             self._nudge_split(-0.05)
         elif char == "]":
             self._nudge_split(0.05)
-        elif char == "?":
-            self._show_help()
         self._update_priorities()  # bias scanning toward the new viewport
         return True
 

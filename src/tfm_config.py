@@ -691,15 +691,22 @@ def find_action_for_event(event, has_selection: bool = False):
 def get_keys_for_action(action: str) -> tuple:
     """
     Get the key expressions and selection requirement for an action.
-    
+
     Args:
         action: Action name
-    
+
     Returns:
         Tuple of (key_expressions, selection_requirement)
     """
     key_bindings = config_manager.get_key_bindings()
     return key_bindings.get_keys_for_action(action)
+
+
+def keys_label_for_action(action: str, fallback: str = "") -> str:
+    """Display string for an action's configured key(s) (so help/footers match
+    the user's KEY_BINDINGS), or ``fallback`` when the action is unbound."""
+    keys, _ = get_keys_for_action(action)
+    return " / ".join(keys) if keys else fallback
 
 
 def _key_char(key) -> str:
