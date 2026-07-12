@@ -26,7 +26,7 @@ The main viewer class that handles:
 - `handle_key()`: Process keyboard input
 - `run()`: Main event loop
 
-#### 2. Integration with FileManager (`src/tfm_main.py`)
+#### 2. Integration with TfmApp (`tfm.py`)
 
 **Method: `diff_selected_files()`**
 - Collects selected files from both panes
@@ -288,10 +288,6 @@ def handle_key(self, event: KeyEvent) -> bool:
 - Identical files
 - Completely different files
 
-**Demo** (`demo/demo_diff_viewer.py`):
-- Interactive demonstration
-- Sample file generation
-- Real-world usage example
 
 ### Test Execution
 
@@ -319,8 +315,8 @@ The `'selection': 'required'` ensures the action only works when files are selec
 - `difflib`: Standard library for diff computation
 - `tfm_path`: Path abstraction for local/remote files
 - `tfm_colors`: Color scheme integration
-- `tfm_wide_char_utils`: Wide character support
-- `tfm_scrollbar`: Scrollbar rendering
+- PuiKit text utilities: wide character support (was `tfm_wide_char_utils`)
+- PuiKit scrollbars: scrollbar rendering (was `tfm_scrollbar`)
 - `puikit`: UI framework used for rendering (external — the old in-repo `ttk` toolkit)
 
 ### File Manager Integration
@@ -411,10 +407,9 @@ Follows TFM exception handling policy:
 ### Related Files
 
 - `src/tfm_diff_viewer.py`: Main implementation
-- `src/tfm_main.py`: Integration with file manager
+- `tfm.py`: Integration with file manager
 - `src/_config.py`: Configuration and key bindings
 - `test/test_diff_viewer.py`: Test suite
-- `demo/demo_diff_viewer.py`: Interactive demo
 - `doc/DIFF_VIEWER_FEATURE.md`: User documentation
 
 ### External Documentation

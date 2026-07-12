@@ -457,7 +457,7 @@ Both modes provide the same functionality, just with different interfaces optimi
 ## See Also
 
 - [Desktop Mode Guide](DESKTOP_MODE_GUIDE.md) - Overview of desktop mode features
-- [Menu Bar Demo](dev/MENU_BAR_DEMO.md) - Interactive demonstration of menu bar features
+- [Menu System](dev/MENU_SYSTEM.md) - Developer documentation for the menu system
 - [Key Bindings Selection Feature](KEY_BINDINGS_SELECTION_FEATURE.md) - Terminal mode key bindings
 
 ## Future Enhancements

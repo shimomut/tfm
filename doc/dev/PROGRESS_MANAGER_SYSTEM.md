@@ -129,7 +129,7 @@ progress_manager.finish_operation(success=success, message=message)
 
 ### Main Application Integration
 ```python
-# In FileManager class
+# In TfmApp class
 self.progress_manager = ProgressManager()
 
 # Check for active operations in main loop

@@ -254,21 +254,6 @@ PROGRESS_ANIMATION_SPEED = 0.2
 ✅ Total: 31/31 tests passed
 ```
 
-## Demo Programs
-
-### 1. **Basic Jump Dialog Demo** (`demo/demo_jump_dialog.py`)
-- Directory structure creation
-- Jump dialog functionality
-- Filtering capabilities
-- Navigation features
-- Thread safety
-- User interaction patterns
-
-### 2. **Hidden Files Demo** (`demo/demo_jump_dialog_hidden_files.py`)
-- Interactive demonstration of hidden files feature
-- Creates test directory structure with hidden and visible directories
-- Shows behavior differences between settings
-
 ## Performance Characteristics
 
 ### Scanning Performance

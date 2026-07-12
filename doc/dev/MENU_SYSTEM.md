@@ -29,7 +29,7 @@ This documentation is intended for:
 ┌─────────────────────────────────────────────────────────────┐
 │                    TFM Application Layer                     │
 │  ┌────────────────────────────────────────────────────────┐ │
-│  │  MenuManager (src/tfm_menu_manager.py)                 │ │
+│  │  MenuManager (tfm.py)                 │ │
 │  │  - Defines menu structure and hierarchy                │ │
 │  │  - Manages menu item IDs and constants                 │ │
 │  │  - Calculates menu item enable/disable states          │ │
@@ -37,7 +37,7 @@ This documentation is intended for:
 │  └────────────────────────────────────────────────────────┘ │
 │                           ↓                                  │
 │  ┌────────────────────────────────────────────────────────┐ │
-│  │  TFM Main (src/tfm_main.py)                            │ │
+│  │  TFM Main (tfm.py)                            │ │
 │  │  - Initializes MenuManager in desktop mode             │ │
 │  │  - Calls set_menu_bar() during initialization          │ │
 │  │  - Updates menu states in main loop                    │ │
@@ -106,7 +106,7 @@ This documentation is intended for:
 
 ### 1. MenuManager (Application Layer)
 
-**Location**: `src/tfm_menu_manager.py`
+**Location**: `tfm.py`
 
 **Purpose**: Manages menu structure, menu item IDs, and state calculation logic.
 
@@ -285,7 +285,7 @@ class CoreGraphicsBackend(Renderer):
 
 ### 5. TFM Main Integration (Application Layer)
 
-**Location**: `src/tfm_main.py`
+**Location**: `tfm.py`
 
 **Purpose**: Integrate menu system into TFM's main event loop.
 
@@ -348,7 +348,7 @@ class TFM:
 Add a new constant to MenuManager:
 
 ```python
-# In src/tfm_menu_manager.py
+# In tfm.py
 class MenuManager:
     # Existing constants...
     
@@ -1008,89 +1008,6 @@ def test_keyboard_shortcut_execution(self):
 ```
 
 
-### Demo Scripts
-
-Interactive testing and demonstration:
-
-```python
-# demo/demo_menu_bar.py
-
-"""
-Demonstrate menu bar functionality in desktop mode.
-
-This demo shows:
-- Menu bar creation and display
-- Menu item selection
-- Menu state updates
-- Keyboard shortcuts
-"""
-
-def main():
-    # Initialize backend
-    backend = CoreGraphicsBackend(
-        window_title="Menu Bar Demo",
-        rows=24,
-        cols=80
-    )
-    backend.initialize()
-    
-    # Create menu structure
-    menu_structure = {
-        'menus': [
-            {
-                'id': 'demo',
-                'label': 'Demo',
-                'items': [
-                    {
-                        'id': 'demo.action1',
-                        'label': 'Action 1',
-                        'shortcut': 'Cmd+1',
-                        'enabled': True
-                    },
-                    {
-                        'id': 'demo.action2',
-                        'label': 'Action 2',
-                        'shortcut': 'Cmd+2',
-                        'enabled': False
-                    }
-                ]
-            }
-        ]
-    }
-    
-    # Set menu bar
-    backend.set_menu_bar(menu_structure)
-    
-    # Main loop
-    while True:
-        # Draw instructions
-        backend.clear()
-        backend.draw_text(0, 0, "Menu Bar Demo")
-        backend.draw_text(2, 0, "Try the Demo menu or press Cmd+1")
-        backend.draw_text(3, 0, "Press 'e' to enable/disable Action 2")
-        backend.draw_text(4, 0, "Press 'q' to quit")
-        backend.refresh()
-        
-        # Get event
-        event = backend.get_event()
-        
-        if isinstance(event, MenuEvent):
-            # Handle menu event
-            backend.draw_text(6, 0, f"Menu item selected: {event.item_id}")
-            backend.refresh()
-            
-        elif isinstance(event, KeyEvent):
-            if event.char == 'q':
-                break
-            elif event.char == 'e':
-                # Toggle Action 2 state
-                enabled = not action2_enabled
-                backend.update_menu_item_state('demo.action2', enabled)
-                action2_enabled = enabled
-    
-    backend.shutdown()
-```
-
 ## Performance Considerations
 
 ### Menu Creation
@@ -1493,8 +1410,8 @@ def show_context_menu(self, file_path: Path, position: Tuple[int, int]):
 
 ### Source Files
 
-- **MenuManager**: `src/tfm_menu_manager.py`
-- **TFM Main**: `src/tfm_main.py`
+- **MenuManager**: `tfm.py`
+- **TFM Main**: `tfm.py`
 - **Renderer Interface**: `ttk/renderer.py`
 - **MenuEvent**: `ttk/input_event.py`
 - **CoreGraphics Backend**: `ttk/backends/coregraphics_backend.py`
@@ -1504,10 +1421,6 @@ def show_context_menu(self, file_path: Path, position: Tuple[int, int]):
 - **MenuManager Tests**: `test/test_menu_manager.py`
 - **Integration Tests**: `test/test_menu_integration.py`
 
-### Demo Files
-
-- **Menu Bar Demo**: `demo/demo_menu_bar.py`
-- **Keyboard Shortcuts Demo**: `demo/demo_menu_keyboard_shortcuts.py`
 
 ### Documentation
 

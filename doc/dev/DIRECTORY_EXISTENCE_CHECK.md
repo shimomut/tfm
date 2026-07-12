@@ -47,7 +47,7 @@ def cleanup_non_existing_directories(self) -> bool:
 
 ### Integration Point
 
-The cleanup is integrated into the `load_application_state()` method in `tfm_main.py`:
+The cleanup is integrated into the `load_application_state()` method in `tfm.py`:
 
 ```python
 def load_application_state(self):
@@ -166,6 +166,5 @@ This feature works in conjunction with:
 ## Code Locations
 
 - **Implementation**: `src/tfm_state_manager.py` - `cleanup_non_existing_directories()`
-- **Integration**: `src/tfm_main.py` - `load_application_state()`
+- **Integration**: `tfm.py` - `load_application_state()`
 - **Tests**: `test/test_*_cleanup.py`
-- **Demo**: `demo/demo_directory_cleanup.py`

@@ -417,7 +417,7 @@ quick_choice_bar.show(f"File '{filename}' exists. Overwrite?", choices, overwrit
 All components integrate seamlessly with TFM's main application:
 
 ```python
-# In FileManager class initialization
+# In TfmApp class initialization
 self.pane_manager = PaneManager(self.config)
 self.list_dialog = ListDialog(self.config)
 self.info_dialog = InfoDialog(self.config)

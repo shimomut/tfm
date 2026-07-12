@@ -121,7 +121,7 @@ Total *.py files found: 20+
 - `src/tfm_ssh_connection.py`: `_parse_ls_line()` method
 - `src/tfm_ssh.py`: `iterdir()` method
 - `src/tfm_ssh.py`: `rglob()` method
-- `src/tfm_search_dialog.py`: `_search_worker()` method
+- `src/tfm_progressive_search_dialog.py`: `_search_worker()` method
 
 ## Lessons Learned
 

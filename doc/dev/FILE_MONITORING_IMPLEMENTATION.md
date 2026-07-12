@@ -13,7 +13,7 @@ The file monitoring system enables TFM to automatically detect and reflect files
 - **FileMonitorManager** (`src/tfm_file_monitor_manager.py`) - Central coordinator for filesystem monitoring
 - **FileMonitorObserver** (`src/tfm_file_monitor_observer.py`) - Per-directory watcher wrapping watchdog library
 - **TFMFileSystemEventHandler** (`src/tfm_file_monitor_observer.py`) - Event handler for processing watchdog events
-- **FileManager Integration** (`src/tfm_main.py`) - Main application integration and reload handling
+- **FileManager Integration** (`tfm.py`) - Main application integration and reload handling
 
 ### Dependencies
 
@@ -156,7 +156,7 @@ def _is_immediate_child(self, event_path: str) -> bool:
 
 #### FileManager Integration
 
-**Location**: `src/tfm_main.py`
+**Location**: `tfm.py`
 
 **Purpose**: Integrates monitoring into main application event loop.
 
@@ -886,7 +886,7 @@ PYTHONPATH=.:src pytest test/test_*file_monitor*.py --cov=src --cov-report=html
 src/
 ├── tfm_file_monitor_manager.py      # Central monitoring coordinator
 ├── tfm_file_monitor_observer.py     # Per-directory watcher
-├── tfm_main.py                       # FileManager integration
+├── tfm.py                       # FileManager integration
 └── _config.py                        # Configuration defaults
 
 test/
@@ -1073,7 +1073,7 @@ All file monitoring operations are logged using TFM's unified logging system. En
 
 ```bash
 # Run TFM with debug logging
-python3 src/tfm_main.py --debug
+python3 tfm.py --debug
 ```
 
 **Key Log Messages**:
@@ -1413,7 +1413,7 @@ If upgrading from a version without file monitoring:
 
 - **FileMonitorManager**: `src/tfm_file_monitor_manager.py`
 - **FileMonitorObserver**: `src/tfm_file_monitor_observer.py`
-- **FileManager Integration**: `src/tfm_main.py`
+- **FileManager Integration**: `tfm.py`
 - **Configuration**: `src/_config.py`
 - **Configuration Manager**: `src/tfm_config.py`
 

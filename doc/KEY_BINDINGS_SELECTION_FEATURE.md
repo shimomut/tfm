@@ -58,7 +58,7 @@ KEY_BINDINGS = {
    - Added `is_key_bound_to_action_with_selection()` method
    - Module-level convenience functions for backward compatibility
 
-3. **Main TFM Integration** (`src/tfm_main.py`)
+3. **Main TFM Integration** (`tfm.py`)
    - Updated `is_key_for_action()` method to be selection-aware by default
    - All key handling automatically respects selection requirements
    - No need to manually choose between different methods

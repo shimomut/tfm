@@ -327,10 +327,6 @@ The text viewer respects TFM's configuration system:
 - Configuration system integration
 - Key binding validation
 
-#### Demo Programs
-- `demo/demo_text_viewer.py` - Basic text viewer demonstration
-- `demo/demo_text_viewer_remote.py` - Remote file support demonstration
-- Interactive examples for all features
 
 ### Test Results
 ```

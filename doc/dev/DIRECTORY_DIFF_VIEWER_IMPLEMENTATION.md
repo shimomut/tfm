@@ -747,7 +747,7 @@ def handle_system_event(self, event) -> bool:
 
 ### FileManager Integration
 
-**Location**: `src/tfm_main.py`
+**Location**: `tfm.py`
 
 Key binding registration:
 ```python
@@ -1108,16 +1108,6 @@ Tests for integration with other components:
 - DiffViewer integration
 - Renderer integration
 
-### Demo Scripts
-
-**Location**: `demo/demo_directory_diff_viewer.py`
-
-Demonstrates all features:
-- Basic directory comparison
-- Various difference types
-- Navigation and interaction
-- Error handling scenarios
-
 ## Future Enhancements
 
 ### Implemented Features
@@ -1155,9 +1145,9 @@ Any enhancements should:
 
 ### Related Components
 
-- **UILayer**: `src/tfm_ui_layer.py` - Base interface
+- **UILayer / Widget**: PuiKit - base interface (formerly `tfm_ui_layer`)
 - **DiffViewer**: `src/tfm_diff_viewer.py` - File diff viewer
-- **FileManager**: `src/tfm_main.py` - Main application
+- **FileManager**: `tfm.py` - Main application
 - **Path**: `src/tfm_path.py` - File system abstraction
 - **Colors**: `src/tfm_colors.py` - Color scheme
 
@@ -1187,11 +1177,11 @@ The progressive scanning feature adds:
 ### Dependencies
 
 **Internal**:
-- `tfm_ui_layer`: UILayer interface
+- PuiKit `Widget` / `push_layer`: UILayer interface (was `tfm_ui_layer`)
 - `tfm_path`: Path abstraction
 - `tfm_colors`: Color constants
-- `tfm_wide_char_utils`: Wide character support
-- `tfm_scrollbar`: Scrollbar rendering
+- PuiKit text utilities: wide character support (was `tfm_wide_char_utils`)
+- PuiKit scrollbars: scrollbar rendering (was `tfm_scrollbar`)
 - `tfm_progress_animator`: Progress animation
 
 **External**:

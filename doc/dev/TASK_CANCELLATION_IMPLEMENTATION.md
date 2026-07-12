@@ -97,7 +97,7 @@ def _handle_menu_event(self, event):
 
 File operations (copy, move, delete) are implemented as tasks:
 
-- `FileOperationTask` in `tfm_file_operation_task.py`
+- `FileOperationTask` in `tfm_task.py`
 - Runs in background thread
 - Checks cancellation flag during operation
 - Cleans up and exits gracefully when cancelled
@@ -106,7 +106,7 @@ File operations (copy, move, delete) are implemented as tasks:
 
 Archive operations (create, extract) are implemented as tasks:
 
-- `ArchiveOperationTask` in `tfm_archive_operation_task.py`
+- `ArchiveOperationTask` in `tfm_task.py`
 - Runs in background thread
 - Checks cancellation flag during operation
 - Cleans up and exits gracefully when cancelled
@@ -208,10 +208,6 @@ See `test/test_task_cancellation.py`:
 - `test_esc_during_task_logs_message`: Cancellation logs message
 - `test_blocked_action_logs_warning`: Blocked actions log warning
 
-### Demo
-
-See `demo/demo_task_cancellation.py` for interactive demonstration.
-
 ## Future Enhancements
 
 ### Potential Improvements
@@ -231,12 +227,11 @@ See `demo/demo_task_cancellation.py` for interactive demonstration.
 
 ## Related Files
 
-- `src/tfm_main.py`: Main input handling and task management
-- `src/tfm_base_task.py`: Base task interface
-- `src/tfm_file_operation_task.py`: File operation task implementation
-- `src/tfm_archive_operation_task.py`: Archive operation task implementation
+- `tfm.py`: Main input handling and task management
+- `src/tfm_task.py`: Base task interface
+- `src/tfm_task.py`: File operation task implementation
+- `src/tfm_task.py`: Archive operation task implementation
 - `test/test_task_cancellation.py`: Unit tests
-- `demo/demo_task_cancellation.py`: Interactive demo
 
 ## References
 

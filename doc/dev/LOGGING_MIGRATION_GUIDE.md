@@ -205,7 +205,7 @@ except FileNotFoundError as e:
 
 ## Real-World Examples
 
-### Example 1: tfm_main.py
+### Example 1: tfm.py
 
 **Before:**
 ```python
@@ -505,7 +505,7 @@ self.logger.info("Processing completed")
 - No new `add_message()` calls
 
 ### Phase 2: High-Traffic Components (Week 1)
-- Migrate `tfm_main.py`
+- Migrate `tfm.py`
 - Migrate `tfm_file_operations.py`
 - Migrate `tfm_directory_diff_viewer.py`
 

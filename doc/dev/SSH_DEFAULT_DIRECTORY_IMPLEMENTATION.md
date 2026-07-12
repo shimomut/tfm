@@ -53,7 +53,7 @@ if returncode == 0:
 
 ### Component 2: Navigation Integration
 
-**File**: `src/tfm_drives_dialog.py`
+**File**: `src/tfm_filter_list_dialog.py`
 
 When navigating to an SSH drive through the drives dialog, we now connect to the server and use the default directory:
 
@@ -125,14 +125,6 @@ Test coverage includes:
 - Drives dialog navigation using default directory
 - Error handling and fallback behavior
 
-**Demo file**: `demo/demo_ssh_default_directory.py`
-
-Demonstrates:
-- Default directory detection
-- Drives dialog navigation
-- Before/after comparison
-- Fallback behavior
-
 ## User Experience
 
 **Before**:
@@ -167,6 +159,6 @@ Potential improvements:
 ## References
 
 - **SSH Connection**: `src/tfm_ssh_connection.py`
-- **Drives Dialog**: `src/tfm_drives_dialog.py`
+- **Drives Dialog**: `src/tfm_filter_list_dialog.py`
 - **SSH Path**: `src/tfm_ssh.py`
 - **SFTP Feature**: `doc/SFTP_SUPPORT_FEATURE.md`

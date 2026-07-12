@@ -20,7 +20,7 @@ This document describes the implementation of flexible date-time formatting in T
    - Implements date formatting logic
    - Provides `_format_date()` method
 
-4. **Main Application** (`tfm_main.py`)
+4. **Main Application** (`tfm.py`)
    - Handles format cycling in View Options menu
    - Updates display when format changes
 
@@ -108,7 +108,7 @@ The `get_file_info()` method calls `_format_date()` to format the modification t
 
 ### Column Width Calculation
 
-**File:** `src/tfm_main.py`
+**File:** `tfm.py`
 
 ```python
 def draw_pane(self, pane_data, start_x, pane_width, is_active):
@@ -130,7 +130,7 @@ The `draw_pane()` method calls `get_date_column_width()` to determine the approp
 
 ### View Options Menu Integration
 
-**File:** `src/tfm_main.py`
+**File:** `tfm.py`
 
 ```python
 def show_view_options(self):
@@ -222,15 +222,6 @@ Tests cover:
 - Format cycling behavior
 - Edge cases (midnight, date boundaries)
 - Today vs. not-today logic
-
-### Demo Script
-
-**File:** `demo/demo_date_format.py`
-
-Demonstrates:
-- Visual comparison of all formats
-- Format cycling sequence
-- Real file examples with different timestamps
 
 ## Performance Considerations
 

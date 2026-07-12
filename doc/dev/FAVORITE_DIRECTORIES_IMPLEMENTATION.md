@@ -8,7 +8,7 @@ The Favorite Directories feature allows users to quickly navigate to frequently 
 
 ### File Structure
 - **Configuration**: `src/tfm_config.py` - Configuration loading and validation
-- **Main Logic**: `src/tfm_main.py` - Dialog display and navigation logic
+- **Main Logic**: `tfm.py` - Dialog display and navigation logic
 - **Templates**: `src/_config.py` - Default configuration template
 
 ### Key Components
@@ -128,7 +128,7 @@ Features tested:
 - Directory selection
 
 ### Manual Testing
-1. Start TFM: `python3 src/tfm_main.py`
+1. Start TFM: `python3 tfm.py`
 2. Press **J** to open favorites
 3. Test navigation and search
 4. Select a directory to verify navigation works

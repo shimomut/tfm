@@ -93,10 +93,10 @@ viewers). It honors two triggers:
 |------|--------|
 | `ttk/backends/curses_backend.py` | Translate Ctrl+letter (1-26) to CONTROL KeyEvents; add `force_repaint()` |
 | `ttk/renderer.py` | Add concrete no-op `force_repaint()` to the ABC |
-| `src/tfm_ui_layer.py` | Add `UILayerStack.mark_all_dirty()` |
-| `src/tfm_main.py` | Add `FileManager.force_redraw()`; route Ctrl-L / `redraw` globally |
+| `tfm.py` | Add `UILayerStack.mark_all_dirty()` |
+| `tfm.py` | Add `FileManager.force_redraw()`; route Ctrl-L / `redraw` globally |
 | `src/_config.py` | Add `redraw: ['F5']` default key binding (Ctrl-L is hardcoded separately) |
-| `src/tfm_info_dialog.py` | Document Ctrl-L in the help dialog |
+| `src/tfm_text_dialog.py` | Document Ctrl-L in the help dialog |
 
 ## Tests
 

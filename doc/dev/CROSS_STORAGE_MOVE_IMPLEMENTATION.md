@@ -195,15 +195,6 @@ python test/test_cross_storage_move.py
 python test/test_s3_move_operations.py
 ```
 
-### Demo Scripts
-```bash
-# Interactive demo
-python demo/demo_cross_storage_move.py
-
-# S3 integration demo (requires AWS credentials)
-python demo/demo_s3_move_integration.py
-```
-
 ## Future Enhancements
 
 ### Planned Features

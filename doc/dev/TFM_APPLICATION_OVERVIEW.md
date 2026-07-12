@@ -11,7 +11,7 @@ TFM (Terminal File Manager) is a sophisticated terminal-based file manager built
 ### Main Components
 
 #### Application Core
-- **tfm_main.py**: Main FileManager class and application logic
+- **tfm.py**: Main TfmApp class and application logic
 - **tfm_config.py**: Configuration system with user customization support
 - **tfm_const.py**: Application constants and key definitions
 - **tfm_colors.py**: Color scheme management and terminal color support
@@ -19,18 +19,18 @@ TFM (Terminal File Manager) is a sophisticated terminal-based file manager built
 #### Path and Storage Systems
 - **tfm_path.py**: Extended Path implementation supporting local and S3 paths
 - **tfm_s3.py**: AWS S3 integration with full pathlib compatibility
-- **tfm_cache_manager.py**: Intelligent caching system for remote operations
+- **tfm_ssh_cache.py**: Intelligent caching system for remote operations
 
 #### User Interface Components
 - **tfm_text_viewer.py**: Built-in text viewer with syntax highlighting
-- **tfm_base_list_dialog.py**: Base class for searchable list dialogs
-- **tfm_list_dialog.py**: Searchable list selection dialog
-- **tfm_search_dialog.py**: File and content search functionality
+- **tfm_filter_list_dialog.py**: Base class for searchable list dialogs
+- **tfm_filter_list_dialog.py**: Searchable list selection dialog
+- **tfm_progressive_search_dialog.py**: File and content search functionality
 - **tfm_batch_rename_dialog.py**: Regex-based batch renaming
-- **tfm_info_dialog.py**: Scrollable information display
+- **tfm_text_dialog.py**: Scrollable information display
 - **tfm_general_purpose_dialog.py**: Flexible dialog system
-- **tfm_quick_choice_bar.py**: Status bar quick selection
-- **tfm_single_line_text_edit.py**: Single-line text editor component
+- **PuiKit**: Status bar quick selection
+- **PuiKit**: Single-line text editor component
 
 #### Management Systems
 - **tfm_pane_manager.py**: Dual pane management and navigation

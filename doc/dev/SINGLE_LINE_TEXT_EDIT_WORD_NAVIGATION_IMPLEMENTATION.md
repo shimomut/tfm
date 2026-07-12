@@ -172,20 +172,10 @@ Command+Left → cursor at position 0
 Command+Right → cursor at end
 ```
 
-## Demo
-
-Interactive demo available at `demo/demo_single_line_text_edit_word_navigation.py` showcasing:
-- Word-level navigation with Alt+Left/Right
-- Word-level deletion with Alt+Backspace
-- Line-level navigation with Command+Left/Right
-- Line-level deletion with Command+Backspace
-- Visual feedback showing cursor position
-
 ## Files Modified
 
-- `src/tfm_single_line_text_edit.py`: Core implementation
+- PuiKit text-input widget: Core implementation (was `tfm_single_line_text_edit`)
 - `test/test_single_line_text_edit_word_navigation.py`: Test suite (new)
-- `demo/demo_single_line_text_edit_word_navigation.py`: Interactive demo (new)
 
 ## Compatibility
 

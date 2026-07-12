@@ -321,7 +321,7 @@ def draw(self, stdscr, safe_addstr_func):
 
 ### Main Application Integration
 ```python
-# In FileManager class
+# In TfmApp class
 self.general_dialog = GeneralPurposeDialog(self.config)
 self.search_dialog = SearchDialog(self.config)
 self.jump_dialog = JumpDialog(self.config)
@@ -416,10 +416,6 @@ The dialog system automatically handles width calculations but respects:
 - `test/test_general_purpose_dialog_width_fix.py`: Width calculation tests
 - `test/test_dialog_width_edge_cases.py`: Edge case handling
 
-### Demo Scripts
-- `demo/demo_dialog_rendering_optimization.py`: Performance demonstration
-- `demo/demo_progress_animation.py`: Animation behavior demonstration
-- `demo/demo_dialog_improvements.py`: Interactive demonstration
 
 ### Test Results
 

@@ -10,12 +10,12 @@ This document describes the implementation of the log clipboard copy feature, wh
 
 The feature is implemented across three main components:
 
-1. **MenuManager** (`src/tfm_menu_manager.py`)
+1. **MenuManager** (`tfm.py`)
    - Defines menu item IDs for clipboard operations
    - Adds menu items to the Edit menu
    - Manages menu item enabled/disabled states
 
-2. **FileManager** (`src/tfm_main.py`)
+2. **FileManager** (`tfm.py`)
    - Implements action handlers for menu items
    - Validates desktop mode and clipboard support
    - Calls LogManager methods to retrieve log text
@@ -164,12 +164,6 @@ Tests are located in `test/test_copy_log_clipboard.py`:
 - `test_log_text_preserves_formatting` - Format verification
 - `test_log_text_different_levels` - Multiple log levels
 
-### Demo Script
-
-A demo script is provided at `demo/demo_copy_log_clipboard.py` that:
-- Generates sample log messages
-- Demonstrates the clipboard copy feature
-- Allows manual testing in desktop mode
 
 ## Future Enhancements
 
@@ -184,9 +178,8 @@ Potential improvements for future versions:
 
 ## Related Code
 
-- `src/tfm_menu_manager.py` - Menu structure and item definitions
-- `src/tfm_main.py` - Action handlers and menu dispatch
+- `tfm.py` - Menu structure and item definitions
+- `tfm.py` - Action handlers and menu dispatch
 - `src/tfm_log_manager.py` - Log storage and retrieval
 - `src/tfm_logging_handlers.py` - Log message formatting
 - `test/test_copy_log_clipboard.py` - Unit tests
-- `demo/demo_copy_log_clipboard.py` - Demo script

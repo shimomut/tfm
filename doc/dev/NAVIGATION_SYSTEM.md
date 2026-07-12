@@ -22,7 +22,7 @@ The TFM Navigation System handles directory traversal, cursor positioning, and n
 
 When navigating from a child directory to its parent directory using the Backspace key, the system implements intelligent cursor positioning to improve user experience.
 
-#### Key Changes in `src/tfm_main.py`
+#### Key Changes in `tfm.py`
 
 ```python
 elif key == curses.KEY_BACKSPACE or key == KEY_BACKSPACE_2 or key == KEY_BACKSPACE_1:  # Backspace - go to parent directory
@@ -144,9 +144,6 @@ The navigation system includes comprehensive unit tests in `test/test_parent_dir
 - **Basic cursor positioning**: Verifies cursor is set to child directory
 - **Nonexistent child handling**: Tests fallback when child directory doesn't exist
 - **Root directory navigation**: Ensures proper handling at filesystem root
-
-### Demo Scripts
-- `demo/demo_parent_directory_cursor_positioning.py` - Interactive navigation demonstration
 
 ## Configuration Integration
 

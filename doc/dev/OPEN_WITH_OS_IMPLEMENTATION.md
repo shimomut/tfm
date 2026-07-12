@@ -10,12 +10,12 @@ This document describes the implementation of two related features:
 
 ### Components Modified
 
-1. **Menu Manager** (`src/tfm_menu_manager.py`)
+1. **Menu Manager** (`tfm.py`)
    - Added `FILE_OPEN_WITH_OS` menu item constant
    - Added `FILE_REVEAL_IN_FILE_MANAGER` menu item constant
    - Added both menu items to File menu with keyboard shortcuts
 
-2. **Main Application** (`src/tfm_main.py`)
+2. **Main Application** (`tfm.py`)
    - Added `platform` module import
    - Added `_action_open_with_os()` method
    - Added `_action_reveal_in_file_manager()` method
@@ -156,12 +156,6 @@ Test coverage includes:
 - Error handling for command failures
 - Unsupported platform handling
 - Empty pane handling
-
-### Demo Script
-
-Location: `demo/demo_open_with_os.py`
-
-The demo creates a temporary directory with various file types and launches TFM for interactive testing.
 
 ## Future Enhancements
 

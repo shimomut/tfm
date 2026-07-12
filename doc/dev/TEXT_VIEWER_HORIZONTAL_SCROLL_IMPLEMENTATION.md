@@ -193,9 +193,9 @@ Potential improvements:
 
 ## Related Components
 
-- `tfm_wide_char_utils.py`: Display width calculations
+- PuiKit text utilities: Display width calculations (was `tfm_wide_char_utils`)
 - `tfm_colors.py`: Color definitions for syntax highlighting
-- `tfm_scrollbar.py`: Vertical scrollbar rendering
+- PuiKit scrollbars: Vertical scrollbar rendering (was `tfm_scrollbar`)
 - Syntax highlighting: Pygments integration
 
 ## Code Locations

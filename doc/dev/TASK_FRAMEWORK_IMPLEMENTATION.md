@@ -490,12 +490,12 @@ class FileManager:
 The migration from callback-based to task-based architecture was done incrementally:
 
 ### Phase 1: Create Task Framework
-- Implemented `BaseTask` abstract class in `src/tfm_base_task.py`
+- Implemented `BaseTask` abstract class in `src/tfm_task.py`
 - Added task management to `FileManager`
 - Added unit tests for `BaseTask` interface
 
 ### Phase 2: Create FileOperationTask
-- Implemented `FileOperationTask` class in `src/tfm_file_operation_task.py`
+- Implemented `FileOperationTask` class in `src/tfm_task.py`
 - Implemented `OperationContext` dataclass
 - Added unit tests for `FileOperationTask`
 
@@ -653,16 +653,16 @@ class CompositeTask(BaseTask):
 ## Implementation Files
 
 ### Core Framework
-- `src/tfm_base_task.py`: BaseTask abstract class
-- `src/tfm_file_operation_task.py`: FileOperationTask implementation
+- `src/tfm_task.py`: BaseTask abstract class
+- `src/tfm_task.py`: FileOperationTask implementation
 
 ### Refactored Components
 - `src/tfm_file_operations.py`: FileListManager (renamed from FileOperations)
 - `src/tfm_file_operations_executor.py`: FileOperationsExecutor (new class for I/O)
-- `src/tfm_main.py`: FileManager with refactored component initialization
+- `tfm.py`: FileManager with refactored component initialization
 
 ### Integration Points
-- `src/tfm_main.py`: FileManager task management and component wiring
+- `tfm.py`: FileManager task management and component wiring
 
 ### Tests
 - `test/test_base_task.py`: BaseTask interface tests

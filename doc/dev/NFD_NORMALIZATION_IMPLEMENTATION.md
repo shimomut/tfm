@@ -98,7 +98,7 @@ def draw_text(self, row: int, col: int, text: str, ...):
     # ... pass to curses for rendering
 ```
 
-#### 3. TFM Wide Character Utils (`src/tfm_wide_char_utils.py`)
+#### 3. Wide Character Utils (now PuiKit text utilities; was `src/tfm_wide_char_utils.py`)
 
 **Function: `_cached_get_display_width()`**
 - Added NFC normalization before width calculation
@@ -166,7 +166,7 @@ macOS HFS+ and APFS filesystems automatically convert filenames to NFD:
 
 - `ttk/backends/coregraphics_backend.py` - CoreGraphics rendering implementation
 - `ttk/backends/curses_backend.py` - Curses backend (NFD normalization added to draw_text)
-- `src/tfm_wide_char_utils.py` - Width calculation utilities
+- PuiKit text utilities - width calculation (was `src/tfm_wide_char_utils.py`)
   - `_is_wide_character()` - Internal function for wide character detection
   - `_cached_is_wide_character()` - Cached version used by `_is_wide_character()`
   - Note: `_is_wide_character` is internal-only and NOT included in fallback function dictionaries

@@ -96,12 +96,6 @@ All tests verify that:
 2. SFTP commands are constructed with quoted paths
 3. Operations don't raise exceptions due to unquoted paths
 
-### Demo Script
-
-Created `demo/demo_ssh_filename_spaces.py` that demonstrates:
-- Path quoting for various filename patterns
-- Examples of affected operations
-- Implementation details
 
 ## Examples
 
@@ -137,7 +131,6 @@ After:  rename "/remote/old file.txt" "/remote/new file.txt"
 
 - `src/tfm_ssh_connection.py` - Main implementation
 - `test/test_ssh_filename_spaces.py` - Unit tests
-- `demo/demo_ssh_filename_spaces.py` - Demo script
 
 ## References
 

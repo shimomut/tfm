@@ -19,7 +19,7 @@ The integration consists of:
 
 ### Directory Comparison
 
-1. **Start TFM**: Run `python3 tfm.py` or `python3 src/tfm_main.py`
+1. **Start TFM**: Run `python3 tfm.py` or `python3 tfm.py`
 2. **Navigate**: Use TFM to navigate to the directories you want to compare
    - Left pane: Navigate to the first directory
    - Right pane: Navigate to the second directory
@@ -29,7 +29,7 @@ The integration consists of:
 
 ### File Comparison
 
-1. **Start TFM**: Run `python3 tfm.py` or `python3 src/tfm_main.py`
+1. **Start TFM**: Run `python3 tfm.py` or `python3 tfm.py`
 2. **Navigate**: Navigate to directories containing the files you want to compare
 3. **Select Files**: 
    - In the left pane: Navigate to and select a file (using Space or cursor position)

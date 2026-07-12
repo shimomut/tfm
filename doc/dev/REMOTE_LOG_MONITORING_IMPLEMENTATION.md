@@ -114,8 +114,8 @@ def broadcast_message(self, message):
 A demo script is provided to test the functionality:
 
 ```bash
-# Terminal 1: Start demo server
-python demo/demo_remote_log.py
+# Terminal 1: Start TFM with remote logging enabled
+python tfm.py --remote-log-port 8888
 
 # Terminal 2: Connect client
 python tools/tfm_log_client.py localhost 8888

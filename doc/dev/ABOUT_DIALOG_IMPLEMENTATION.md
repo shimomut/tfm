@@ -13,9 +13,8 @@ The About Dialog is implemented as a UILayer component that displays application
 
 ### File Structure
 
-- `src/tfm_about_dialog.py`: Main implementation
+- `tfm.py`: Main implementation
 - `test/test_about_dialog.py`: Unit and integration tests
-- `demo/demo_about_menu.py`: Standalone demo application
 
 ## MatrixColumn Class
 
@@ -116,7 +115,7 @@ def _draw_matrix_background(self, height, width):
 The About dialog is triggered from the menu system:
 
 ```python
-# In tfm_main.py
+# In tfm.py
 def _action_show_about(self):
     """Show About TFM dialog with Matrix-style animation."""
     self.about_dialog.show()
@@ -132,7 +131,7 @@ self.about_dialog = AboutDialog(self.config, renderer)
 
 ### Menu Configuration
 
-Defined in `tfm_menu_manager.py`:
+Defined in `tfm.py`:
 - `APP_ABOUT`: macOS application menu
 - `HELP_ABOUT`: Help menu (all platforms)
 
@@ -173,16 +172,6 @@ Defined in `tfm_menu_manager.py`:
 PYTHONPATH=.:src python -m pytest test/test_about_dialog.py -v
 ```
 
-## Demo Application
-
-The demo application (`demo/demo_about_menu.py`) provides a standalone way to test the About dialog:
-
-```bash
-PYTHONPATH=.:src python demo/demo_about_menu.py
-```
-
-**Note**: This is a TUI application and will block execution. Do not run in automated scripts.
-
 ## Future Enhancements
 
 Potential improvements:
@@ -195,7 +184,7 @@ Potential improvements:
 
 ## References
 
-- UILayer interface: `src/tfm_ui_layer.py`
-- Menu system: `src/tfm_menu_manager.py`
+- UILayer interface: PuiKit `Widget` / `push_layer` (formerly `tfm_ui_layer`)
+- Menu system: `tfm.py` (via `puikit.menu`)
 - Rendering: [PuiKit](https://github.com/crftwr/puikit) framework (external — `../puikit`)
 - Constants: `src/tfm_const.py`

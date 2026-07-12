@@ -84,7 +84,7 @@ def _search_worker(self, search_root, pattern_text, search_type, search_thread):
 ## Changes
 
 **Modified Files:**
-- `src/tfm_search_dialog.py`
+- `src/tfm_progressive_search_dialog.py`
   - Added `SearchThread` class with per-thread `cancel_event` and `searching` properties
   - Removed `self.cancel_search` and `self.current_cancel_event` from SearchDialog
   - Removed `self.searching` from SearchDialog
@@ -243,7 +243,7 @@ def _search_worker(self, search_root, pattern_text, search_type, cancel_event):
 ## Changes
 
 **Modified Files:**
-- `src/tfm_search_dialog.py`
+- `src/tfm_progressive_search_dialog.py`
   - Changed `self.cancel_search` (shared) to `self.current_cancel_event` (per-thread)
   - Modified `perform_search()` to create a new cancel event for each thread
   - Updated `_search_worker()` to accept `cancel_event` parameter

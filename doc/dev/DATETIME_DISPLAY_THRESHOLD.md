@@ -69,7 +69,7 @@ Display format:
 
 ### Code Location
 
-File: `src/tfm_main.py`
+File: `tfm.py`
 Method: `draw_file_line()`
 
 ### Key Code
@@ -184,7 +184,7 @@ Or cycle formats at runtime using:
 The minimum filename width (16 characters) is hardcoded in the threshold calculation. To adjust:
 
 ```python
-# In src/tfm_main.py, line ~1035
+# In tfm.py, line ~1035
 min_width_for_datetime = 2 + 1 + 16 + 1 + 4 + 1 + 8 + 1 + datetime_width
 #                                  ^^
 #                                  Adjust this value
@@ -217,8 +217,8 @@ The test verifies:
 
 - **Date Format Configuration**: `src/tfm_config.py`
 - **Date Formatting Logic**: `src/tfm_file_operations.py` (`_format_date()`)
-- **Column Width Calculation**: `src/tfm_main.py` (`get_date_column_width()`)
-- **File Line Drawing**: `src/tfm_main.py` (`draw_file_line()`)
+- **Column Width Calculation**: `tfm.py` (`get_date_column_width()`)
+- **File Line Drawing**: `tfm.py` (`draw_file_line()`)
 
 ## Future Enhancements
 

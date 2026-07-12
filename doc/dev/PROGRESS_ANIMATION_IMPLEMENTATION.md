@@ -143,11 +143,6 @@ The animation system includes comprehensive tests:
   - Thread safety verification
   - Performance impact assessment
 
-- **Demo Scripts**: `demo/demo_search_animation.py`
-  - Interactive demonstration of all patterns
-  - Configuration examples
-  - Performance comparisons
-
 ## API Reference
 
 ### ProgressAnimator Class

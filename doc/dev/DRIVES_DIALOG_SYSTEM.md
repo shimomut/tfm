@@ -325,10 +325,6 @@ The drives dialog respects existing TFM configuration:
 - Pane manager integration
 - Configuration system integration
 
-#### Demo Script (`demo/demo_drives_dialog.py`)
-- Interactive demonstration of all features
-- Real S3 integration testing
-- Error scenario simulation
 
 ### Test Scenarios
 

@@ -12,7 +12,7 @@ The rename conflict resolution feature is implemented across three main modules:
 
 1. **tfm_file_operations.py** - Handles copy and move operations
 2. **tfm_archive.py** - Handles archive extraction operations
-3. **tfm_main.py** - Provides UI dialogs (input dialog and choice dialog)
+3. **tfm.py** - Provides UI dialogs (input dialog and choice dialog)
 
 ### Design Pattern
 
@@ -335,8 +335,7 @@ The implementation follows TFM coding standards:
 The feature depends on:
 
 - `tfm_path.Path` - Cross-storage path abstraction
-- `tfm_main.FileManager` - UI dialog methods
-- `tfm_cache_manager.CacheManager` - Cache invalidation
+- `tfm.py` (`TfmApp`) - UI dialog methods
 - `tfm_progress_manager.ProgressManager` - Progress tracking
 
 ## Performance Considerations

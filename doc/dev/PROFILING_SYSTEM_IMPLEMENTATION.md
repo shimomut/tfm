@@ -18,7 +18,7 @@ This document describes the technical implementation of TFM's performance profil
                        │
                        ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                    FileManager (tfm_main.py)                 │
+│                    TfmApp (tfm.py)                      │
 │  ┌───────────────────────────────────────────────────────┐  │
 │  │              Main Loop (run() method)                 │  │
 │  │  ┌─────────────────────────────────────────────────┐ │  │
@@ -305,7 +305,7 @@ fm = FileManager(renderer, profiling_enabled=args.profile)
 
 ### FileManager Initialization
 
-**Location**: `src/tfm_main.py`
+**Location**: `tfm.py`
 
 ```python
 def __init__(self, renderer, profiling_enabled=False, ...):
@@ -321,7 +321,7 @@ def __init__(self, renderer, profiling_enabled=False, ...):
 
 ### Main Loop Integration
 
-**Location**: `src/tfm_main.py` - `FileManager.run()` method
+**Location**: `tfm.py` - `FileManager.run()` method
 
 ```python
 def run(self):
@@ -444,16 +444,6 @@ Tests cover:
 - Filename format validation
 - Directory structure verification
 - End-to-end profiling workflow
-
-### Demo Scripts
-
-**Location**: `demo/demo_fps_tracking.py`, `demo/demo_key_event_profiling.py`, etc.
-
-Demonstrate:
-- FPS tracking in action
-- Profile file generation
-- Analysis workflow
-- Error handling scenarios
 
 ## Data Formats
 

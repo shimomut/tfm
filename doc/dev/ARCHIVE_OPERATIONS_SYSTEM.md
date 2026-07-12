@@ -389,9 +389,6 @@ class ArchiveUI:
 # Run archive operation tests
 python test/test_archive_operations.py
 
-# Run demo script
-python demo/demo_archive_operations.py
-
 # Run specific format tests
 python test/test_archive_creation.py
 python test/test_archive_extraction.py

@@ -91,7 +91,7 @@ The drag-and-drop implementation follows a four-layer architecture:
 
 ### 1. Drag Gesture Detection
 
-**Module**: `src/tfm_drag_gesture.py`
+**Module**: `PuiKit`
 
 **Purpose**: Detects drag gestures from mouse events and distinguishes them from clicks.
 
@@ -145,7 +145,7 @@ class DragGestureState:
 
 ### 2. Drag Payload Building
 
-**Module**: `src/tfm_drag_payload.py`
+**Module**: `PuiKit`
 
 **Purpose**: Prepares file paths for drag operations, validates files, and converts to file:// URLs.
 
@@ -202,7 +202,7 @@ def _path_to_file_url(self, path: Path) -> str:
 
 ### 3. Drag Session Management
 
-**Module**: `src/tfm_drag_session.py`
+**Module**: `PuiKit`
 
 **Purpose**: Manages the lifecycle of a drag-and-drop session from initiation to completion.
 
@@ -532,7 +532,7 @@ def start_drag_session(
 
 ## FileManager Integration
 
-**Module**: `src/tfm_main.py`
+**Module**: `tfm.py`
 
 **Integration Points**:
 
@@ -773,11 +773,10 @@ Required for:
 - Edge cases with invalid drop targets
 
 **Test Procedure**:
-1. Run `demo/demo_drag_and_drop.py`
-2. Select files in TFM
-3. Click and drag files
-4. Drop on Finder, text editor, or other app
-5. Verify files appear in target application
+1. Select files in TFM
+2. Click and drag files
+3. Drop on Finder, text editor, or other app
+4. Verify files appear in target application
 
 ## Adding Platform Support
 

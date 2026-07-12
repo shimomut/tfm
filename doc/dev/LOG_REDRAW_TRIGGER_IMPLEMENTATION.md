@@ -142,12 +142,6 @@ for i, file in enumerate(files):
 - Verifies integration with stdout/stderr capture
 - Validates message counting and flag management
 
-### Demo Script
-- `demo/demo_log_redraw_trigger.py` demonstrates the feature in action
-- Shows various types of log messages and their effects
-- Explains the integration with the main loop
-- Provides usage examples and benefits
-
 ## Backward Compatibility
 
 ### Fully Compatible

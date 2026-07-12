@@ -258,10 +258,6 @@ python3 test/test_text_viewer_tab_handling.py
 
 # Run TAB width tests
 python3 test/test_text_viewer_tab_width.py
-
-# Run demo
-python3 demo/demo_text_viewer_tab_handling.py
-python3 demo/demo_text_viewer_tab_width.py
 ```
 
 ## Related Features

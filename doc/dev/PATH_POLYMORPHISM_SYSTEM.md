@@ -727,7 +727,7 @@ def verify_pathimpl(impl_class):
 
 - **Source Code**: `src/tfm_path.py` - PathImpl interface and Path facade
 - **Implementations**: `src/tfm_path.py` (Local), `src/tfm_archive.py` (Archive), `src/tfm_s3.py` (S3)
-- **UI Integration**: `src/tfm_text_viewer.py`, `src/tfm_info_dialog.py`, `src/tfm_search_dialog.py`
+- **UI Integration**: `src/tfm_text_viewer.py`, `src/tfm_text_dialog.py`, `src/tfm_progressive_search_dialog.py`
 - **Tests**: `test/test_virtual_methods_checkpoint.py`, `test/test_info_dialog_refactoring.py`
 - **Design Document**: `.kiro/specs/path-polymorphism-refactoring/design.md`
 - **Requirements**: `.kiro/specs/path-polymorphism-refactoring/requirements.md`

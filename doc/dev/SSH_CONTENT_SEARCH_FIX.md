@@ -9,7 +9,7 @@ When performing content search in an SFTP directory, the search dialog would fai
 
 ## Root Cause
 
-The `_is_text_file()` method in `src/tfm_search_dialog.py` (line 356) was using Python's built-in `open()` function:
+The `_is_text_file()` method in `src/tfm_progressive_search_dialog.py` (line 356) was using Python's built-in `open()` function:
 
 ```python
 with open(file_path, 'rb') as f:
@@ -19,7 +19,7 @@ This doesn't work for SSH paths because the built-in `open()` only understands l
 
 ## Solution
 
-Changed line 356 in `src/tfm_search_dialog.py` from:
+Changed line 356 in `src/tfm_progressive_search_dialog.py` from:
 ```python
 with open(file_path, 'rb') as f:
 ```
@@ -33,7 +33,7 @@ This allows the Path object to handle the file opening correctly, whether it's a
 
 ## Files Modified
 
-- `src/tfm_search_dialog.py` (line 356)
+- `src/tfm_progressive_search_dialog.py` (line 356)
 
 ## Testing
 

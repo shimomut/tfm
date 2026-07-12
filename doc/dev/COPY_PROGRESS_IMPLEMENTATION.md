@@ -138,7 +138,7 @@ def _progress_callback(self, progress_data):
 
 **Input Blocking:**
 ```python
-# In main event loop (tfm_main.py)
+# In main event loop (tfm.py)
 if hasattr(self, 'operation_in_progress') and self.operation_in_progress:
     # Only allow ESC key to cancel operation
     if key == 27:  # ESC key
@@ -505,10 +505,6 @@ def test_copy_with_progress():
     # Verify files copied correctly
 ```
 
-### Demo Scripts
-
-See `demo/demo_copy_progress_threading.py` for complete example.
-
 ## Future Enhancements
 
 ### Potential Improvements
@@ -560,5 +556,4 @@ Check:
 
 - `src/tfm_file_operations.py`: Main implementation
 - `src/tfm_progress_manager.py`: Progress tracking and animation
-- `demo/demo_copy_progress_threading.py`: Complete demo
 - `doc/COPY_PROGRESS_FEATURE.md`: User documentation

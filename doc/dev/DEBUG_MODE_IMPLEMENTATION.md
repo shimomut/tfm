@@ -10,7 +10,7 @@ TFM's debug mode (`--debug` flag) enables dual output for stdout/stderr: message
 
 The debug mode is implemented through three main components:
 
-1. **Command-line flag parsing** (`src/tfm_main.py`)
+1. **Command-line flag parsing** (`tfm.py`)
    - `--debug` flag sets `TFM_DEBUG=1` environment variable
    - Environment variable is checked when initializing LogManager
 
@@ -153,7 +153,7 @@ This test verifies:
 
 ## Related Files
 
-- `src/tfm_main.py`: Command-line argument parsing, debug flag handling
+- `tfm.py`: Command-line argument parsing, debug flag handling
 - `src/tfm_log_manager.py`: LogManager and LogCapture implementation
 - `temp/test_debug_mode.py`: Unit test for debug mode functionality
 - `doc/dev/DEBUG_MODE_IMPLEMENTATION.md`: This documentation file

@@ -94,7 +94,7 @@ For `nav_left` and `nav_right` actions:
 
 ## Files Modified
 
-- `src/tfm_main.py` - Updated three action handlers:
+- `tfm.py` - Updated three action handlers:
   - `_action_go_parent()` (line ~1515)
   - `nav_left` action handler (line ~4532)
   - `nav_right` action handler (line ~4555)
@@ -102,11 +102,6 @@ For `nav_left` and `nav_right` actions:
 ## Testing
 
 ### Manual Testing
-
-Use the demo script to verify the behavior:
-```bash
-python demo/demo_parent_directory_cursor_positioning.py
-```
 
 Test scenarios:
 1. Navigate into a subdirectory and press Backspace

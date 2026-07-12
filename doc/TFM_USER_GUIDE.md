@@ -847,7 +847,7 @@ For detailed information about specific features, see these dedicated guides:
 - [Command Line Directory Arguments Feature](COMMAND_LINE_DIRECTORY_ARGUMENTS_FEATURE.md) - Startup directory options
 
 ### Interface and Display
-- [Color Debugging Feature](COLOR_DEBUGGING_FEATURE.md) - Diagnosing color display issues
+- [Color Schemes](COLOR_SCHEMES_FEATURE.md) - Color scheme configuration and display
 - [Color Schemes Feature](COLOR_SCHEMES_FEATURE.md) - Dark and light themes
 - [Help Dialog Feature](HELP_DIALOG_FEATURE.md) - Built-in help system
 - [Key Bindings Selection Feature](KEY_BINDINGS_SELECTION_FEATURE.md) - Customizable keyboard shortcuts

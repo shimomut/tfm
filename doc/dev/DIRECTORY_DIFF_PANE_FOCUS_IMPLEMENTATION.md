@@ -138,13 +138,6 @@ Test coverage includes:
 
 See `test/test_directory_diff_pane_focus.py` for complete test suite.
 
-## Demo
-
-A demo script is available at `demo/demo_directory_diff_pane_focus.py` that showcases:
-- Tab key switching between panes
-- Focus indicator movement
-- Synchronized cursor navigation
-- Preparation for copy operations
 
 ## Design Rationale
 
@@ -188,5 +181,4 @@ The combination of bold header text and existing focused/inactive color pairs pr
 
 - `src/tfm_directory_diff_viewer.py` - Main implementation
 - `test/test_directory_diff_pane_focus.py` - Test suite
-- `demo/demo_directory_diff_pane_focus.py` - Demo script
 - `doc/DIRECTORY_DIFF_VIEWER_FEATURE.md` - User documentation (to be updated)

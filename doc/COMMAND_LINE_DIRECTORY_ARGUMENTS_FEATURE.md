@@ -123,10 +123,6 @@ Warning: Right directory '/invalid/path' does not exist, using home directory
 - `test/test_command_line_arguments.py` provides comprehensive test coverage
 - Tests argument parsing, validation, and integration scenarios
 
-### Demo Script
-- `demo/demo_command_line_directories.py` creates sample directories and demonstrates usage
-- Shows practical examples and expected behavior
-
 ## Backward Compatibility
 
 - Fully backward compatible - existing TFM usage continues to work unchanged

@@ -36,15 +36,6 @@ On your first launch of TFM, the window will appear at the default size (1200x80
 
 If your window becomes positioned in an undesirable location (for example, off-screen after a monitor configuration change), you can reset it to the default size and position.
 
-### Using the Demo Script
-Run the reset demo script:
-
-```bash
-python demo/demo_window_geometry_persistence.py
-```
-
-This script demonstrates the reset functionality and allows you to test it interactively.
-
 ### Manual Reset (Advanced)
 If you need to manually reset the window geometry, you can clear the saved preferences:
 

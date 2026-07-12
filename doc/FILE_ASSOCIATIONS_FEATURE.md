@@ -484,12 +484,6 @@ If a file doesn't match the expected pattern:
 
 ## Testing Your Configuration
 
-Run the demo to see your associations:
-
-```bash
-python3 demo/demo_file_associations.py
-```
-
 Run the test to verify everything works:
 
 ```bash

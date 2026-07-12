@@ -147,7 +147,6 @@ Potential improvements (not currently planned):
 
 - **Implementation**: `src/tfm_file_list_manager.py`
 - **Tests**: `test/test_natural_sorting.py`
-- **Demo**: `demo/demo_natural_sorting.py`
 - **User documentation**: `doc/NATURAL_SORTING_FEATURE.md`
 
 ### References

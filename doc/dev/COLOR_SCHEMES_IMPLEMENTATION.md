@@ -210,5 +210,5 @@ python3 show_color_schemes.py light
 - `src/tfm_colors.py` - Color scheme definitions and functions
 - `src/tfm_config.py` - Configuration system with color scheme support
 - `src/_config.py` - Default configuration template
-- `src/tfm_main.py` - Main application with color scheme integration
+- `tfm.py` - Main application with color scheme integration
 - `show_color_schemes.py` - Standalone color scheme information tool

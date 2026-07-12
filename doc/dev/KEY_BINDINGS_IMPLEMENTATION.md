@@ -11,7 +11,7 @@ This document describes the implementation of TFM's enhanced key bindings system
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                     TFM Application                          │
-│                  (tfm_main.py, etc.)                        │
+│                  (tfm.py, etc.)                        │
 └────────────────────────┬────────────────────────────────────┘
                          │ Uses
                          ↓

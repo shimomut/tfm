@@ -388,7 +388,7 @@ def extract_archive(self, archive_path, destination_path):
 
 ### Main Application Integration
 ```python
-# In FileManager class
+# In TfmApp class
 self.file_operations = FileOperations(self.config, self.log_manager, self.progress_manager)
 
 # Copy files between panes

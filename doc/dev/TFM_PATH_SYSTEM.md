@@ -85,15 +85,15 @@ from tfm_path import Path
 
 #### Files Updated
 All source files in `src/` were updated:
-- `src/tfm_main.py`
+- `tfm.py`
 - `src/tfm_file_operations.py`
 - `src/tfm_pane_manager.py`
 - `src/tfm_state_manager.py`
 - `src/tfm_config.py`
 - `src/tfm_text_viewer.py`
 - `src/tfm_jump_dialog.py`
-- `src/tfm_list_dialog.py`
-- `src/tfm_search_dialog.py`
+- `src/tfm_filter_list_dialog.py`
+- `src/tfm_progressive_search_dialog.py`
 - `src/tfm_batch_rename_dialog.py`
 - `src/tfm_external_programs.py`
 - `src/tfm_color_tester.py`

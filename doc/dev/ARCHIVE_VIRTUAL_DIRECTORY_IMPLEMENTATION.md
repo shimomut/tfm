@@ -13,7 +13,7 @@ The archive support follows TFM's established pattern for virtual filesystems, i
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                     TFM Main Application                     │
-│  (tfm_main.py, tfm_pane_manager.py, tfm_file_operations.py) │
+│  (tfm.py, tfm_pane_manager.py, tfm_file_operations.py) │
 └──────────────────────┬──────────────────────────────────────┘
                        │
                        ├─ Uses Path abstraction
@@ -1300,7 +1300,6 @@ dump_archive_structure("archive:///path/to/archive.zip#")
 
 - **Unit Tests**: `test/test_archive_*.py`
 - **Integration Tests**: `test/test_*_archive_*.py`
-- **Demo Scripts**: `demo/demo_archive_*.py`
 
 ## Changelog
 

@@ -414,9 +414,6 @@ local_path.is_remote() # Returns False
 - `test/test_subshell_remote_fallback.py` - Remote directory fallback
 - `test/test_subshell_remote_simple.py` - Core remote logic tests
 
-#### Demo Programs
-- `demo/demo_subshell.py` - Basic subshell demonstration
-- `demo/demo_subshell_remote_fallback.py` - Remote fallback demonstration
 
 ### Test Commands
 ```bash
@@ -425,9 +422,6 @@ python3 test/test_subshell.py
 
 # Test remote fallback
 python3 test/test_subshell_remote_fallback.py
-
-# See usage examples
-python3 demo/demo_subshell.py
 ```
 
 ## Use Cases

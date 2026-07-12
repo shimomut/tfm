@@ -145,7 +145,7 @@ log_manager.restore_stdio()
 
 ### Main Application Integration
 ```python
-# In FileManager class
+# In TfmApp class
 self.log_manager = LogManager(self.config)
 
 # Setup output capture
