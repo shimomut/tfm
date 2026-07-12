@@ -1411,20 +1411,17 @@ class TfmApp:
         elif action == "copy_paths":
             self.copy_paths_to_clipboard()
         elif action == "copy_files":
-            self.copy_files()
-            return False  # the confirm dialog drives its own redraw
+            # A guard bail returns True (redraw so the reason shows at once); once
+            # the confirm dialog takes over it returns False and drives its own redraw.
+            return self.copy_files()
         elif action == "move_files":
-            self.move_files()
-            return False
+            return self.move_files()
         elif action == "delete_files":
-            self.delete_files()
-            return False
+            return self.delete_files()
         elif action == "create_archive":
-            self.create_archive()
-            return False  # the dialog drives its own redraw
+            return self.create_archive()
         elif action == "extract_archive":
-            self.extract_archive()
-            return False
+            return self.extract_archive()
         elif action == "jump_to_path":
             self.jump_to_path()
             return False
@@ -2614,15 +2611,17 @@ class TfmApp:
         count = len(targets)
         self.log_info(f"Copied {count} {label}{'s' if count != 1 else ''} to clipboard")
 
-    def copy_files(self) -> None:
+    def copy_files(self) -> bool:
         """Copy the active pane's selection (or cursor entry) into the other
-        pane's directory (the 'C' key). Mirrors ttk TFM's copy-to-other-pane."""
-        self._transfer("copy")
+        pane's directory (the 'C' key). Mirrors ttk TFM's copy-to-other-pane.
+        Returns True when a guard bailed out synchronously (see ``_transfer``)."""
+        return self._transfer("copy")
 
-    def move_files(self) -> None:
+    def move_files(self) -> bool:
         """Move the active pane's selection (or cursor entry) into the other
-        pane's directory (the 'M' key, when a selection exists)."""
-        self._transfer("move")
+        pane's directory (the 'M' key, when a selection exists).
+        Returns True when a guard bailed out synchronously (see ``_transfer``)."""
+        return self._transfer("move")
 
     def _report_op_failures(self, verb: str, result: dict, z: int = 70) -> None:
         """Pop a message box naming the items that failed (and why), so a failure
@@ -2632,12 +2631,17 @@ class TfmApp:
             show_message_box(self.panel, body, title=f"{verb} — errors",
                              icon="warning", buttons=("OK",), markdown=True, z=z)
 
-    def _transfer(self, kind: str) -> None:
+    def _transfer(self, kind: str) -> bool:
         """Resolve the copy/move targets and destination from the panes, apply the
         pane-specific guards, then hand the run off to the shared
         :class:`~tfm_file_operations.FileOperationService` (which owns the confirm
         dialog, conflict prompt, and threaded progress). ``on_complete`` refreshes
-        the panes and logs the summary."""
+        the panes and logs the summary.
+
+        Returns True when a guard bailed out synchronously — the caller (``dispatch``)
+        must then redraw so the just-logged reason is shown at once rather than on
+        the next stray event. Returns False once the operation is handed off: the
+        confirm dialog then drives its own redraws."""
         verb = "Copy" if kind == "copy" else "Move"
         src_pane = self.active_pane()
         dst_pane = self.pm.get_inactive_pane()
@@ -2645,25 +2649,25 @@ class TfmApp:
             # The other pane is a search-results feed, not a directory — there is
             # nowhere to write. Reveal a real destination first (O / Shift-O).
             self.log_info(f"Cannot {kind}: the other pane is a search-results view")
-            return
+            return True
         if self._is_archive(dst_pane["path"]):
             # Browsed archives are read-only — copy/move out, never in.
             self.log_info(f"Cannot {kind}: the other pane is a read-only archive")
-            return
+            return True
         if kind == "move" and self._is_archive(src_pane["path"]):
             # Move = copy + delete source; the archive source can't be deleted.
             self.log_info("Cannot move out of an archive — use copy instead")
-            return
+            return True
         dest_dir = dst_pane["path"]
         targets = self._selected_or_focused(src_pane)
         if not targets:
             self.log_info(f"No file to {kind}")
-            return
+            return True
         # A virtual source spans many directories, so the single "same directory"
         # guard doesn't apply — the per-target dest-exists check below still holds.
         if not src_pane.get("virtual") and str(dest_dir) == str(src_pane["path"]):
             self.log_info(f"Cannot {kind}: source and destination are the same directory")
-            return
+            return True
 
         def on_complete(result: dict) -> None:
             self.flm.refresh_files(dst_pane)
@@ -2676,20 +2680,24 @@ class TfmApp:
 
         op = self._fileops.copy if kind == "copy" else self._fileops.move
         op(self.panel, targets, dest_dir, on_complete=on_complete, log=self.log_info)
+        return False
 
-    def delete_files(self) -> None:
+    def delete_files(self) -> bool:
         """Delete the active pane's selection (or cursor entry) via the shared
         :class:`~tfm_file_operations.FileOperationService` (confirm honouring
         ``CONFIRM_DELETE``, directories removed recursively); refresh the pane and
-        log the summary on completion."""
+        log the summary on completion.
+
+        Returns True when a guard bailed out synchronously (see ``_transfer`` for
+        why the caller then needs to redraw)."""
         pane = self.active_pane()
         targets = self._selected_or_focused(pane)
         if not targets:
             self.log_info("No file to delete")
-            return
+            return True
         if any(self._is_archive(t) for t in targets):
             self.log_info("Cannot delete inside a read-only archive")
-            return
+            return True
 
         def on_complete(result: dict) -> None:
             pane["selected_files"].clear()
@@ -2699,6 +2707,7 @@ class TfmApp:
             self.panel.render()
 
         self._fileops.delete(self.panel, targets, on_complete=on_complete, log=self.log_info)
+        return False
 
     # --- archives (create / extract) -----------------------------------------
 
@@ -2775,23 +2784,26 @@ class TfmApp:
                 tf.extractall(str(dest_dir))
             return len(members)
 
-    def create_archive(self) -> None:
+    def create_archive(self) -> bool:
         """Create an archive from the active pane's selection (or cursor entry)
         in the other pane's directory (the 'P' key). Prompts for a filename whose
         extension picks the format; an unrecognised extension defaults to
-        ``.tar.gz``. Mirrors ttk TFM's create-archive flow."""
+        ``.tar.gz``. Mirrors ttk TFM's create-archive flow.
+
+        Returns True when a guard bailed out synchronously (see ``_transfer`` for
+        why the caller then needs to redraw)."""
         pane = self.active_pane()
         sources = self._selected_or_focused(pane)
         if not sources:
             self.log_info("No files to archive")
-            return
+            return True
         if any(self._is_archive(s) for s in sources):
             self.log_info("Cannot archive files that live inside a read-only archive")
-            return
+            return True
         dest_dir = self.pm.get_inactive_pane()["path"]
         if self._is_archive(dest_dir):
             self.log_info("Cannot create an archive inside a read-only archive")
-            return
+            return True
         # Prefill a single item's name plus a dot, ready for the extension.
         initial = ""
         if len(sources) == 1:
@@ -2836,32 +2848,36 @@ class TfmApp:
                    text=initial, on_accept=accept, validate=validate, select_all=False,
                    region=self._active_pane_region())
         self.panel.render()
+        return False
 
-    def extract_archive(self) -> None:
+    def extract_archive(self) -> bool:
         """Extract the focused archive into a subdirectory (named after the
         archive) in the other pane's directory (the 'U' key). Confirms when
-        ``CONFIRM_EXTRACT_ARCHIVE`` is set or the destination already exists."""
+        ``CONFIRM_EXTRACT_ARCHIVE`` is set or the destination already exists.
+
+        Returns True when a guard bailed out synchronously (see ``_transfer`` for
+        why the caller then needs to redraw)."""
         entry = self._focused_entry()
         if entry is None:
             self.log_info("No file to extract")
-            return
+            return True
         try:
             if not entry.is_file():
                 self.log_info(f"{entry.name} is not a file")
-                return
+                return True
         except Exception:
             pass
         fmt = self._archive_format(entry.name)
         if fmt is None:
             self.log_info(f"'{entry.name}' is not a supported archive")
-            return
+            return True
         if self._is_archive(entry):
             self.log_info("Cannot extract an archive nested inside another archive")
-            return
+            return True
         dest_dir = self.pm.get_inactive_pane()["path"]
         if self._is_archive(dest_dir):
             self.log_info("Cannot extract into a read-only archive")
-            return
+            return True
         target = dest_dir / self._archive_basename(entry.name)
 
         def go() -> None:
@@ -2889,6 +2905,7 @@ class TfmApp:
             self.panel.render()
         else:
             go()
+        return False
 
     def _active_view(self) -> FilePane:
         return self.left_view if self.pm.active_pane == "left" else self.right_view
