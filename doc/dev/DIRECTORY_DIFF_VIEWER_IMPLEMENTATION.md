@@ -2,14 +2,16 @@
 
 ## Overview
 
-This document describes the implementation details of the Directory Diff Viewer feature in TFM. The viewer provides recursive directory comparison with a tree-structured, side-by-side display, following the established UILayer architecture pattern.
+This document describes the implementation details of the Directory Diff Viewer feature in TFM. The viewer provides recursive directory comparison with a tree-structured, side-by-side display. It is implemented as a PuiKit `Widget` (`DirectoryDiffView`, in `src/tfm_directory_diff_viewer.py`) pushed as a full-window modal layer via `show_directory_diff_viewer(panel, left, right)`.
+
+> **Doc scope note.** The redraw model and thread→UI bridge below reflect the current PuiKit port (`_dirty` flag + `request_animation_ticks`; see [Thread → UI Redraw](#thread--ui-redraw-animation-ticks)). Some lower-level snippets further down still show the pre-port ttk API (`UILayer` / `ui_layer_stack`, `self.renderer`, `handle_key_event` / `handle_system_event`, `KEY_*` constants); the concepts carry over but the current code uses PuiKit's `Widget` / `push_layer` / single `handle_event(event)` / `draw(ctx)`.
 
 ## Architecture
 
 ### Component Hierarchy
 
 ```
-DirectoryDiffViewer (UILayer)
+DirectoryDiffView (PuiKit Widget)
 ├── DirectoryScanner (Worker Thread) - Background scanning
 │   ├── Single-level directory traversal
 │   ├── File metadata collection
@@ -80,7 +82,7 @@ User Opens Viewer
        ↓
 [Update Tree] ← Progressive updates
        ↓
-[Mark Dirty] ← Trigger redraw
+[Set _dirty] ← main-thread tick repaints
        ↓
 [User Sees Updates] ← Incremental display
 ```
@@ -98,19 +100,47 @@ User Opens Viewer
 - Scans single directory level at a time
 - Updates file dictionaries with thread-safe locking
 - Adds child directories to queue
-- Marks tree as dirty for UI update
+- Sets `_dirty`; the main-thread animation tick repaints
 
 #### File Comparator Thread
 - Processes comparison_queue
 - Compares file content byte-by-byte
 - Updates tree node difference types
-- Marks tree as dirty for UI update
+- Sets `_dirty`; the main-thread animation tick repaints
 
 #### Priority Handler Thread
 - Monitors viewport changes
 - Identifies visible nodes
 - Moves high-priority items to front of scan_queue
 - Ensures visible items are scanned first
+
+### Thread → UI Redraw (animation ticks)
+
+The worker threads mutate the tree off the main thread, but **all rendering stays
+on the main thread** — PuiKit has no cross-thread draw. The port bridges the two
+with a `_dirty` flag drained by a per-frame animation tick. This is the one
+genuinely new-in-port decision: the legacy ttk viewer instead drove redraws
+directly from the worker threads through the layer stack's dirty loop, which does
+not exist under PuiKit.
+
+- **Worker side.** Scanner / comparator threads mutate the tree under
+  `self._lock` (an `RLock`) and set `self._dirty = True`. The flattened `visible`
+  node list is swapped atomically so `draw` can read it lock-free.
+- **Main-thread pump.** On push the viewer registers
+  `panel.request_animation_ticks(self._tick)`. `_tick()` runs on the main thread
+  each frame:
+  - if `self._cancel`, return `False` (unregisters the tick — no busy spin after
+    close);
+  - if `self._dirty`, clear it and call `self._panel.render()`;
+  - return `self._scanning or self._dirty` — keep ticking while a scan is live or
+    a repaint is still pending, then stop once idle.
+
+This keeps every `DrawContext` / `render` call on the main thread, fits PuiKit's
+model, and preserves the progressive-scan UX. (Considered fallback, ultimately
+unused: a bounded synchronous scan behind a progress screen — the pattern the
+search port uses — which would have lost live progressive updates. It was kept in
+reserve behind the first build slices and dropped once the tick-driven redraw
+worked.)
 
 ### Work Queue System
 
@@ -219,7 +249,7 @@ def start_scan(self):
     self.build_tree()
     
     # Display immediately
-    self.mark_dirty()
+    self._dirty = True
     
     # Start background workers
     self._start_directory_scanner_worker()
@@ -249,7 +279,7 @@ def _directory_scanner_worker(self):
             self.scan_queue.put(child_task)
         
         # Trigger UI update
-        self.mark_dirty()
+        self._dirty = True
 ```
 
 #### Phase 3: On-Demand Scanning
@@ -261,7 +291,7 @@ def expand_node(self, node_index: int):
     if not node.children_scanned:
         # Scan immediately in main thread
         node.scan_in_progress = True
-        self.mark_dirty()  # Show "scanning..." indicator
+        self._dirty = True  # Show "scanning..." indicator
         
         files = self._scan_single_level(node.left_path, node.right_path)
         self._update_tree_node(node, files)
@@ -271,7 +301,7 @@ def expand_node(self, node_index: int):
     
     node.is_expanded = True
     self.update_visible_nodes()
-    self.mark_dirty()
+    self._dirty = True
 ```
 
 ### Priority System
@@ -645,6 +675,24 @@ def compare_file_content(self, left_path: Path, right_path: Path) -> bool:
 2. **Content Rendering**: Draw visible tree nodes with highlighting
 3. **Status Bar Rendering**: Draw statistics and current state
 
+### Tree-line rendering — capability split (GUI vs terminal)
+
+The hierarchy connectors are drawn **differently per backend**, gated on
+`ctx.vector_shapes` (`_draw_side_vector` vs `_draw_side_grid` in
+`src/tfm_directory_diff_viewer.py`):
+
+- **GUI (vector):** connectors are thin `fill_rect` lines — 1 device pixel,
+  aligned to a base-unit grid — with node names in the proportional UI font,
+  elided to the column by **measured width**.
+- **Terminal (grid):** connectors stay as box-drawing glyphs on the character
+  grid, and names elide by cell count.
+
+The lesson behind the split: an earlier all-monospace pass fixed alignment but
+made the GUI look like a terminal — **box-drawing glyphs are the wrong primitive
+for a proportional font** (the same lesson as the MessageBox
+proportional-truncation bug). Elision must measure text width in the GUI, not
+count cells.
+
 ### Color Scheme
 
 Uses `tfm_colors` constants:
@@ -738,7 +786,7 @@ Handles window resize events:
 ```python
 def handle_system_event(self, event) -> bool:
     if event.type == "window_resize":
-        self.mark_dirty()
+        self._dirty = True
         return True
     return False
 ```
@@ -936,7 +984,7 @@ with self.tree_lock:
 with self.tree_lock:
     node.children_scanned = True
     node.children.extend(new_children)
-    self.mark_dirty()
+    self._dirty = True
 ```
 
 **Pattern 3: Priority Updates**
@@ -971,8 +1019,8 @@ with self.queue_lock:
 
 **Scenario 3: Dirty Flag Races**
 - **Problem**: Multiple threads marking dirty simultaneously
-- **Solution**: mark_dirty() is atomic (simple boolean set)
-- **Pattern**: No lock needed for dirty flag
+- **Solution**: `_dirty` is a plain bool set (atomic in CPython) — the tick only ever clears it
+- **Pattern**: No lock needed for the dirty flag itself
 
 ### Deadlock Prevention
 

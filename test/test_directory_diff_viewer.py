@@ -3,8 +3,8 @@
 Run with: PYTHONPATH=.:src pytest test/test_directory_diff_viewer.py -v
 
 Covers the backend-agnostic classification/tree logic and the widget's
-navigation + rendering on the MemoryBackend (TUI + GUI profiles), per the
-minimal-tests decision in doc/dev/DIRECTORY_DIFF_PORT_PLAN.md.
+navigation + rendering on the MemoryBackend (TUI + GUI profiles); see
+doc/dev/DIRECTORY_DIFF_VIEWER_IMPLEMENTATION.md.
 """
 
 import os

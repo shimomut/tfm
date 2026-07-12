@@ -1,7 +1,7 @@
 # TFM → PuiKit Port
 
 Status: **port essentially complete** — living document, tasks only.
-Branch: `puikit-port` · Last updated: 2026-07-05
+Branch: `puikit-port` · Last updated: 2026-07-11
 
 TFM's rendering/UI foundation has been moved off the in-repo **`ttk`** toolkit
 onto **[PuiKit](https://github.com/...)**, a capability-based framework that runs
@@ -59,77 +59,14 @@ it:
 - the two startup refreshes (panel/queue not up yet — needs a deferred kick).
 
 ### 2.2 Windows backend bring-up
-TFM now **runs on Windows** (verified in a VMware guest): the window, Direct2D/
-DirectWrite rendering, and basic navigation/features work. (New platform vs.
-`ttk`, which was curses + macOS only.) The Windows-specific parity gap
-(IME + both drag-and-drop directions) is now closed — all in the **PuiKit repo**
-(`puikit/backends/windows_backend.py`, `_win32_ime.py`, `_win32_dragdrop.py`),
-not TFM. Only bring-up testing (§C) remains open.
+TFM now **runs on Windows** (Direct2D/DirectWrite window, navigation, IME, and
+both drag-and-drop directions all working — the IME + drag-and-drop parity work
+lives in the **PuiKit repo**, not TFM). What remains is **bring-up testing**:
+beyond "it launches", smoke-test navigation → dialogs → viewers → file
+operations, and validate the cross-backend keyboard contract (§3) live, fixing
+whatever backend-specific gaps surface.
 
-**A. IME / text input — DONE.** Mode-gated (`ImmAssociateContext(hwnd, NULL)` in
-command mode, re-associated on text focus — `_win32_ime.disable_ime`/
-`enable_ime`), candidate window positioned at the live caret
-(`ImmSetCompositionWindow`/CFS_POINT), astral/emoji input fixed (`_on_char`
-buffers a WM_CHAR high surrogate and combines it with the following low one),
-and inline preedit wired (`WM_IME_SETCONTEXT` clears
-`ISC_SHOWUICOMPOSITIONWINDOW` so the OS doesn't draw its own composition box;
-`WM_IME_COMPOSITION`'s GCS_COMPSTR/GCS_CURSORPOS dispatch `IME_COMPOSITION` for
-the widget to render inline, matching macOS — a GCS_RESULTSTR commit only
-clears the preedit here since the committed characters still arrive via the
-existing WM_CHAR path, so nothing double-inserts). `PROFILE["ime"]` is `True`.
-Manually verified live in the real TFM app (rename dialog: type → Escape, no
-crash, IME state transitions cleanly); full CJK composition needs a live IME
-source to exercise end-to-end, not yet done.
-
-**B. Both drag-and-drop directions — DONE**
-(`puikit/backends/_win32_dragdrop.py`). `PROFILE["drag_and_drop"]` and
-`PROFILE["os_drag_drop"]` are both `True`:
-- **Drop-in** — a hand-built `IDropTarget` (`RegisterDragDrop`), not
-  `DragAcceptFiles`/`WM_DROPFILES`: that legacy shortcut was tried first (no
-  custom COM object needed) but verified live *not* to fire for an arbitrary
-  OLE drag source, regardless of `OleInitialize` ordering — real `IDropTarget`
-  registration is what actually works.
-- **Drag-out** — a hand-built `IDropSource` (2 methods) *and* a hand-built
-  `IDataObject` (`FileDataObject`, exposing exactly CF_HDROP over a real
-  `DROPFILES` global-memory block). An earlier attempt built the data object
-  for free via the shell's `SHCreateDataObject` (given each path's PIDL) to
-  avoid hand-authoring `IDataObject` — verified live *not* to work (its
-  `QueryGetData`/`GetData` both rejected CF_HDROP with the NULL-`pidlFolder` +
-  absolute-PIDL calling form), so `FileDataObject` replaced it.
-- Verified live end-to-end with two real `WindowsBackend` windows: dragging a
-  file out of one (`begin_file_drag`, exactly TFM's `FilePane.on_drag` →
-  `panel.begin_file_drag` call shape) and dropping it on the other delivered a
-  `FILE_DROP` event with the right path/coordinates, and the source's
-  `on_complete` correctly reported the chosen operation (`"copy"`).
-- `clipboard_rich`, `native_file_dialog` (IFileDialog), `system_tray`,
-  `media_keys` remain `False` — confirmed unused by TFM (no native file
-  picker, tray, or media-key handling anywhere in the app) and also `False` on
-  `MacOSBackend`, so not a real parity gap; not on this backend's punch list.
-
-(Images already work via WIC — not on this list.)
-
-**C. Bring-up testing.** Beyond "it launches": smoke-test navigation → dialogs →
-viewers → file operations, and validate the cross-backend keyboard contract (§3)
-live, fixing whatever backend-specific gaps surface.
-
-### 2.3 MenuItem shortcuts from the configured keymap — DONE
-Menu shortcut hints and the bottom status-bar key hints are now derived from the
-live keymap, so both track user rebindings instead of drifting from hardcoded
-strings. Each menu item passes its action id to `TfmApp._menu_shortcut(action)`
-(first bound key → `format_key_for_display`, or `None` when unbound);
-`StatusBar` builds its hint line the same way from an ordered `(action, label)`
-list. `KeyBindings.format_key_for_display` was upgraded to render named tokens as
-conventional labels (`ENTER`→`Enter`, `UP`→`↑`, `EQUAL`→`=`, `Command`→`Cmd`, …)
-rather than raw uppercase, which also improves the help dialog. Newly-bound items
-that previously showed no hint now do (Details `I`, Open-with `Cmd-Enter`, Reveal
-`Alt-Enter`, Drives `D`, Clear Selection `End`).
-
-Not converted (intentional): the Directory Diff Viewer's own `_keys_label`
-(`tfm_directory_diff_viewer.py`) still joins **raw** key tokens with hardcoded
-fallbacks — a separate, self-contained spot; fold it into the shared formatter if
-its footer keys ever grow beyond plain letters.
-
-### 2.4 Draw the tree disclosure indicator as a vector chevron in GUI
+### 2.3 Draw the tree disclosure indicator as a vector chevron in GUI
 The expand/collapse indicator on tree rows is a **glyph** today — `▸` (collapsed)
 / `▾` (expanded), drawn as text in both backends. In GUI it should instead be a
 **line-drawn chevron** (a `>` that rotates to `⌄` when open), rendered with vector
@@ -161,7 +98,7 @@ staircase if a 1–2px hairline `>` is enough. Decide with a small spike.
 Reserve the same marker-column width so the label origin (`label_x`) and the
 expander hit region are unchanged; only the mark's rendering swaps.
 
-### 2.5 Directory Diff Viewer — add content margins
+### 2.4 Directory Diff Viewer — add content margins
 Everything in the viewer is drawn **flush to the edges**, so text hugs the window
 border and the centre gutter with no breathing room. Add consistent insets. In
 `tfm_directory_diff_viewer.py` `draw` / the column geometry:
@@ -181,44 +118,7 @@ scrollbar x, the body child rect, and the pointer hit-tests / gutter-drag band
 must shift together, or the split drag and row clicks will land off by the margin.
 Keep it a single named constant (e.g. `_MARGIN`) so it's tunable in one place.
 
-### 2.6 Markdown for file-operation confirmation dialogs
-The copy / move / delete confirm prompts in `tfm_file_operations.py` are built as
-**plain text** with filenames and paths inlined, so the names don't stand out
-from the surrounding prose:
-- `delete` — `f"Delete {len(targets)} item(s)?\n{names}\nThis cannot be undone."`
-  (`names` = comma-joined `t.name`).
-- `_transfer` (copy / move + the conflict prompt) —
-  `f"{verb} {len(targets)} item(s) to {dest_dir}?"` + a conflict-count line.
-
-`show_message_box` already takes `markdown=True` (the archive create / extract
-dialogs use it, e.g. ``f"Extract `{entry.name}` to `{target}`?"``). Do the same
-here: pass `markdown=True` and rewrite the messages as Markdown so the **file
-names** and **destination path** render as code spans (``` `name` ```), counts /
-"cannot be undone" as bold/emphasis, and the multi-name preview as a bullet list
-instead of a comma run. Keep it consistent with the archive dialogs' style.
-
-Caveat: names can contain Markdown-special characters (`_ * [ ]` and backticks).
-Code spans neutralise most, but a name containing a backtick needs escaping —
-add a small helper (or reuse one) to wrap a filename safely as inline code.
-
-### 2.7 Archive virtual-directory browsing — DONE
-Enter on a `.zip` / `.tar.*` browses it in the pane as a directory (navigate
-in/out, view files, copy files/dirs out); the header shows `[archive.zip]/sub`;
-writes into/within an archive are refused (read-only).
-
-Implemented as **real `archive://…#` paths**, not the `pane["virtual"]` feed the
-note originally suggested: `ArchivePathImpl` (`tfm_archive.py`) already implements
-the full `Path` interface (`iterdir` / `is_dir` / `read_bytes` / `.parent`), so
-`compute_listing` lists it, `_open`/`_go_parent` navigate it, and the text viewer
-+ cross-storage copy read it — all unchanged. The only new code (all in `tfm.py`):
-an `_open` branch that wraps a recognised archive file as `archive://{abs}#`
-(skipping nested archives), the `_archive_header_label` formatter in
-`PaneHeader.draw`, an `_is_archive` predicate, and read-only guards on
-`_transfer` / create / rename / delete / archive / extract. Covered by
-`test/test_tfm_app_archive_browse.py`. Not done (intentional): writing back into
-archives, nested-archive entry, archive create/extract from *within* an archive.
-
-### 2.8 Color theme brush-up (file types, cursor, syntax)
+### 2.5 Color theme brush-up (file types, cursor, syntax)
 The port's palette is thin in three places; brush them up into one coherent,
 light/dark-aware scheme.
 
@@ -250,7 +150,7 @@ Cross-cutting:
   terminal specifically (suspected 256-color / palette quantization differs from
   Terminal.app); test there, not only in Terminal.app.
 
-### 2.9 Filepath TAB completion in input dialogs
+### 2.6 Filepath TAB completion in input dialogs
 Complete paths with TAB in the text-input prompts. `jump_to_path` in `tfm.py`
 even notes it: *"(TAB path completion is a later phase.)"* — the primary target,
 with the save-as / name prompts (`create_file`, `create_directory`,
@@ -285,85 +185,24 @@ To build:
   platform.
 - Remove the "later phase" note from `jump_to_path` once wired.
 
-### 2.10 macOS app bundle — port the build system from ttk to PuiKit
-The `macos_app/` build system (`build.sh` + `collect_dependencies.py` +
-`create_dmg.sh` + the Obj-C launcher in `macos_app/src/`) still packages the
-**old ttk toolkit** and has never been rebuilt against PuiKit. `make macos-app`
-will not produce a working bundle today. Stand it up so a 1.0 `.dmg` can ship.
+### 2.7 macOS app bundle — finish the PuiKit rebuild
+The `macos_app/` build system has been ported to PuiKit: `build.sh` bundles the
+`puikit` package (no more `${PROJECT_ROOT}/ttk` copy), the ttk
+`ttk_coregraphics_render*.so` copy step is gone, and `TFMAppDelegate.m` checks for
+`puikit` instead of `ttk`. What remains before a 1.0 `.dmg` ships:
 
-Good news: **PuiKit is pure Python** — its macOS backend
-(`puikit/backends/macos_backend.py`) is PyObjC (AppKit / Foundation / objc), with
-**no compiled module**. So the whole ttk native-render path drops out; nothing new
-has to be compiled, and `pyobjc` is already in `requirements.txt`.
-
-Concrete stale points to fix:
-- **Bundle PuiKit, not ttk.** `build.sh` copies `${PROJECT_ROOT}/ttk` →
-  `Resources/ttk` (`build.sh:185`+, the `backends/serialization/utils` loop) — but
-  `ttk/` no longer exists at the project root. Replace with a copy of the `puikit`
-  package. **Decide the source:** PuiKit is an **editable** install
-  (`.venv/…/__editable__.puikit-0.1.0.pth` → `/Users/crftwr/projects/puikit`), so
-  `collect_dependencies.py` (site-packages walk) won't pick it up as a normal dir.
-  Either copy `puikit/puikit/` from the sibling repo directly (like ttk was), or
-  add it to `requirements.txt` as a path/VCS dependency and let the collector
-  handle it. Prefer whatever keeps a single source of truth.
-- **Drop the ttk native module.** `build.sh:230`+ copies
-  `ttk_coregraphics_render.cpython-313-darwin.so` — a ttk-only compiled render lib.
-  PuiKit has no equivalent; delete this whole step. (It's also ABI-stale: hardcoded
-  `cpython-313` while the venv is now `cpython-314` — dead either way.)
-- **Fix the launcher's ttk assumptions.** `macos_app/src/TFMAppDelegate.m` hard-
-  errors if a `ttk/` dir is missing (`~:127`) and its comments/`sys.path` setup name
-  ttk (`~:114`,`134`). Swap the existence check to `puikit` (or drop it); the
-  `Resources` + `python_packages` `sys.path.insert`s and the `tfm.tfm_main` /
-  `cli_main` import path are otherwise unchanged (tfm source still copies `src/*` →
-  `Resources/tfm/`, `build.sh:171`+).
-- **Bump the version.** `VERSION` defaults to `0.99` (`build.sh:104`, and the
+- **Verify the rebuilt bundle actually runs.** The Obj-C launcher creates its own
+  `NSApplication`, then embeds Python and calls `cli_main()`, which builds PuiKit's
+  PyObjC macOS backend — which *also* wants the shared `NSApp` / an AppKit run
+  loop. Confirm the single-process launcher hands control to the PuiKit event loop
+  correctly (window shows, native `NSMenu` menu bar, keyboard contract holds), or
+  simplify the launcher now that rendering is Python-side. Then run the
+  `macos_app/README.md` / `doc/dev/MACOS_APP_TESTING.md` smoke tests against the
+  rebuilt bundle.
+- **Bump the version.** `VERSION` still defaults to `0.99` (`build.sh:104`, and the
   `Info.plist.template`); set the 1.0 string for release.
 
-Risk to verify while standing it up: the Obj-C launcher creates its **own**
-`NSApplication` and then embeds Python and calls `cli_main()`, which builds
-PuiKit's PyObjC macOS backend — which *also* wants the shared `NSApp` / an
-AppKit run loop. ttk's split (Obj-C owns the app, C++ `.so` only renders) may not
-map cleanly onto PuiKit driving AppKit from Python. Confirm the single-process
-launcher still hands control to the PuiKit event loop correctly (window shows,
-menu bar is the native `NSMenu`, keyboard contract holds), or simplify the
-launcher now that rendering is Python-side.
-
-Then run the existing `macos_app/README.md` / `doc/dev/MACOS_APP_TESTING.md`
-smoke tests against the rebuilt bundle, and update both docs + `build.sh`'s inline
-comments (they still describe copying ttk).
-
-### 2.10w Windows application bundle — new `windows_app/` build system
-**Status: scaffolded (branch `windows-app-bundle`).** The Windows counterpart of
-`macos_app/`: `windows_app/` builds a self-contained `build\TFM\` folder — a
-compiled C launcher (`TFM.exe`) that embeds the CPython **embeddable** package and
-runs `tfm.py --backend gui` on the Windows Direct2D backend, plus TFM's code,
-PuiKit, and all deps. Design: `doc/dev/WINDOWS_APP_BUILD_SYSTEM.md`.
-
-Mirrors macOS closely because the parallel holds: **nothing in TFM/PuiKit is
-compiled** on Windows either — the backend is pure Python on `ctypes` + `numpy`
-(only `numpy` ships DLLs). The one native artifact is `windows_app/src/launcher.c`
-(the analog of the Obj-C `main.m`/`TFMAppDelegate.m`): same `PyConfig` bootstrap,
-same `sys.path` shape (`app/` = macOS `Resources/`, `Lib\site-packages` =
-`python_packages`), same `sys.argv=("TFM","--backend","gui")` → `main()` call.
-
-Pieces: `build.ps1` (orchestrator), `make_icon.py` (`TFM.icns`→`.ico`),
-`resources/TFM.{manifest,rc}`. Dependency collection + `THIRD_PARTY_NOTICES.txt`
-reuse the shared `tools/collect_dependencies.py` (closure-based, `--include-deps-of
-puikit` → numpy) and `tools/generate_third_party_notices.py`. Makefile:
-`windows-app` / `windows-app-zip` / `windows-app-clean`.
-
-Open items before a 1.0 `.zip` ships:
-- **End-to-end build not yet run** — needs MSVC Build Tools + Windows SDK
-  installed (the Xcode-CLT analog); not on the dev box yet. Verify `cl.exe`/`rc.exe`
-  discovery, the embeddable download for the venv's exact version, and that the
-  launched bundle imports `numpy`/the Direct2D backend and shows a window.
-- **DPI** left unaware on purpose (matches CPython's own `python.exe` manifest and
-  the backend's 96-DPI assumption); revisit if per-monitor scaling lands in the
-  backend.
-- **Signing + installer** (`signtool`, Inno/MSIX) deferred, like the macOS
-  code-signing/DMG polish.
-
-### 2.11 Wire GUI fonts from config — docs + config-key sweep
+### 2.8 Wire GUI fonts from config — docs + config-key sweep
 **Status: essentially DONE** — GUI renders a configurable proportional UI face by
 default and a configurable mono face for aligned content, both from `~/.tfm/config.py`
 (`main` passes `base_font`/`ui_font` gui-gated in `backend_kwargs`; PuiKit's
