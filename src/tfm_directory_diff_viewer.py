@@ -46,7 +46,7 @@ from puikit.widgets.base import Widget
 
 from tfm_path import Path
 from tfm_str_format import format_size
-from tfm_text_viewer import MONO, _ScrollBody, draw_status_bar, viewer_pad
+from tfm_text_viewer import MONO, _ScrollBody, _header_bg, draw_status_bar, viewer_pad
 from tfm_diff_viewer import show_diff_viewer
 from tfm_text_dialog import keys_markdown, show_markdown
 from tfm_config import KeyBindings
@@ -1108,8 +1108,9 @@ class DirectoryDiffView(Widget):
         self._sel_active = getattr(theme, "selection_active_bg", accent) if theme else accent
         self._sel_inactive = getattr(theme, "selection_inactive_bg", muted) if theme else muted
         # Chrome surfaces fill the window edge to edge; text/columns inset over them.
+        header_bg = _header_bg(theme)   # the main window's 'header' role, distinct
         ctx.fill_rect(0, 0, wu, hu, Style(bg=content_bg))
-        ctx.fill_rect(0, 0, wu, head_h, Style(bg=chrome_bg))    # header bar
+        ctx.fill_rect(0, 0, wu, head_h, Style(bg=header_bg))    # header bar
         ctx.fill_rect(0, det_y, wu, 1.0, Style(bg=chrome_bg))   # details bar
         # (the footer row below the details is painted as the themed status bar)
 
@@ -1145,10 +1146,11 @@ class DirectoryDiffView(Widget):
         # own tone. This *is* the divider — several pixels wide, not a stroke.
         ctx.fill_rect(self._sep_x, 0, float(_GUTTER_W), det_y, Style(bg=self._gutter_bg))
 
-        # Header: the two directory paths, active side in accent, inset by the pad.
-        left_head = Style(fg=accent if self.active == "left" else self._text_fg, bg=chrome_bg,
+        # Header: the two directory paths, active side in accent, inset by the pad,
+        # on the distinct 'header' surface band.
+        left_head = Style(fg=accent if self.active == "left" else self._text_fg, bg=header_bg,
                           attr=TextAttribute.BOLD)
-        right_head = Style(fg=accent if self.active == "right" else self._text_fg, bg=chrome_bg,
+        right_head = Style(fg=accent if self.active == "right" else self._text_fg, bg=header_bg,
                            attr=TextAttribute.BOLD)
         ctx.draw_text(self._left_x, pad_y,
                       truncate_to_width(str(self.left_path), int(self._left_w)), left_head)

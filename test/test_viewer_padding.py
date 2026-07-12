@@ -17,12 +17,35 @@ sys.path.insert(0, os.path.join(_HERE, "..", "src"))
 sys.path.insert(0, os.path.join(_HERE, ".."))
 
 from tfm_text_viewer import (  # noqa: E402
-    TextViewer, viewer_pad, draw_status_bar, VIEWER_PAD_PX,
+    TextViewer, viewer_pad, draw_status_bar, _header_bg, _content_bg, VIEWER_PAD_PX,
 )
-from tfm_diff_viewer import DiffViewer  # noqa: E402
+from tfm_diff_viewer import DiffViewer, _DiffPane  # noqa: E402
 from tfm_directory_diff_viewer import DirectoryDiffView, _GUTTER_W  # noqa: E402
+from tfm_file_pane import CONTENT_PAD_CELLS  # noqa: E402
 
 PX, PY = VIEWER_PAD_PX / 8, VIEWER_PAD_PX / 16  # inset for an 8x16px base cell
+
+_CONTENT = (30, 30, 30)
+_HEADER = (73, 73, 76)
+_STATUS = (0, 122, 204)
+
+
+class _FakeTheme:
+    """Minimal theme exposing distinct surface roles, so the header band's color
+    can be told apart from the content background in a headless test."""
+
+    text = (200, 200, 200)
+    muted_text = (150, 150, 150)
+    accent = (0, 122, 204)
+    popup_bg = (37, 37, 38)
+    extras = {}
+    surfaces = {"content": _CONTENT, "header": _HEADER, "status": _STATUS}
+
+    def surface_bg(self, role):
+        return self.surfaces.get(role)
+
+    def __getattr__(self, name):  # misc getattr(theme, x, default) probes
+        return None
 
 
 class _GuiCtx:
@@ -39,6 +62,7 @@ class _GuiCtx:
         self.panel = None
         self.theme = None
         self.fills = []
+        self.styled_fills = []   # (x, y, w, h, bg)
         self.texts = []
         self.kids = []
         self.bars = []
@@ -47,7 +71,9 @@ class _GuiCtx:
         return float(len(t))
 
     def fill_rect(self, x, y, w, h, style=None):
-        self.fills.append((round(x, 3), round(y, 3), round(w, 3), round(h, 3)))
+        rect = (round(x, 3), round(y, 3), round(w, 3), round(h, 3))
+        self.fills.append(rect)
+        self.styled_fills.append(rect + (getattr(style, "bg", None),))
 
     def draw_text(self, x, y, t, style=None, **kw):
         self.texts.append((round(x, 3), round(y, 3), t))
@@ -111,6 +137,36 @@ def test_diff_viewer_footer_full_width_panes_inset():
     assert any(t[0] == PX and t[1] == fy for t in ctx.texts)
 
 
+def test_header_bg_is_the_distinct_header_surface():
+    th = _FakeTheme()
+    assert _header_bg(th) == _HEADER
+    assert _header_bg(th) != _content_bg(th)
+
+
+def _header_band_bg(ctx):
+    """The bg of the full-width band that reaches the top edge (y=0, w=window)."""
+    for x, y, w, h, bg in ctx.styled_fills:
+        if x == 0.0 and y == 0.0 and w == 200.0 and 0.0 < h <= 1.0 + PY + 1e-6:
+            return bg
+    return None
+
+
+def test_all_viewers_paint_a_distinct_header_band():
+    d = tempfile.mkdtemp()
+    p = Path(d) / "f.txt"; p.write_text("x\ny\n")
+    a = Path(d) / "a.txt"; a.write_text("a\nb\n")
+    bb = Path(d) / "b.txt"; bb.write_text("a\nc\n")
+    ld = Path(d) / "L"; ld.mkdir()
+    rd = Path(d) / "R"; rd.mkdir()
+    for viewer in (TextViewer(p), DiffViewer(a, bb),
+                   DirectoryDiffView(ld, rd, background=False)):
+        ctx = _GuiCtx(200.0, 100.0)
+        ctx.theme = _FakeTheme()
+        viewer.draw(ctx)
+        band = _header_band_bg(ctx)
+        assert band == _HEADER, f"{type(viewer).__name__}: header band {band} != {_HEADER}"
+
+
 def test_text_viewer_draws_rows_to_cover_fractional_bottom():
     # With a fractional body height (the l/r-padded viewer rarely lands on a whole
     # cell) plus a fractional scroll offset, the bottom partial row must still be
@@ -129,6 +185,32 @@ def test_text_viewer_draws_rows_to_cover_fractional_bottom():
     # bottom edge is max(top y) + 1.
     assert max(ys) + 1.0 >= body_h
     assert len(ys) == v._view_h + 2
+
+
+def test_diff_pane_insets_rows_from_edges_like_the_main_panes():
+    # The diff panes inset their gutter + content by CONTENT_PAD_CELLS on both
+    # edges (the same amount the main file panes use), so rows don't butt the
+    # pane edge — most visibly the shared splitter between the two panes.
+    d = tempfile.mkdtemp()
+    a = Path(d) / "a.txt"; a.write_text("\n".join("x" * 40 for _ in range(50)))
+    b = Path(d) / "b.txt"; b.write_text("\n".join("y" * 40 for _ in range(50)))
+    v = DiffViewer(a, b)
+    gutter = v._gutter_w()
+    ctx = _GuiCtx(60.0, 40.0)
+
+    left = _DiffPane(v, "l"); left.draw(ctx)
+    assert left._pad == CONTENT_PAD_CELLS
+    assert left._content_x == CONTENT_PAD_CELLS + gutter          # gutter inset from the left
+    assert left._content_x + left._content_w <= 60 - CONTENT_PAD_CELLS + 1e-9  # inset on the right
+
+    right = _DiffPane(v, "r"); right.draw(ctx)   # reserves one column for the scrollbar
+    assert right._content_x == CONTENT_PAD_CELLS + gutter
+    assert right._content_x + right._content_w <= 60 - 1 - CONTENT_PAD_CELLS + 1e-9
+
+    # On a character grid there is no sub-cell inset (matches the main panes).
+    grid = _GridCtx(60.0, 40.0)
+    left.draw(grid)
+    assert left._pad == 0.0 and left._content_x == gutter
 
 
 def test_dir_diff_viewer_bars_full_width_text_inset_and_hit_testing():

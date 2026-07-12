@@ -24,9 +24,10 @@ from puikit.panel import Rect
 from puikit.widgets import Splitter
 from puikit.widgets.base import Widget
 
+from tfm_file_pane import CONTENT_PAD_CELLS  # same l/r content inset as the main panes
 from tfm_text_dialog import keys_markdown, show_markdown
-from tfm_text_viewer import (MONO, _ScrollBody, _content_bg, _highlight, _is_light,
-                             _read_lines, _syntax_palette, draw_hscrollbar,
+from tfm_text_viewer import (MONO, _ScrollBody, _content_bg, _header_bg, _highlight,
+                             _is_light, _read_lines, _syntax_palette, draw_hscrollbar,
                              draw_status_bar, viewer_pad)
 
 #: Semantic diff hues. The whole-row tints and the stronger changed-character
@@ -142,6 +143,7 @@ class _DiffPane(Widget):
         self._gutter = 2
         self._content_x = 2
         self._content_w = 1
+        self._pad = 0.0                  # l/r content inset, set per draw
         self._bg = self._text_fg = self._muted = None
 
     def draw(self, ctx) -> None:
@@ -156,15 +158,24 @@ class _DiffPane(Widget):
         self._diffpal = _diff_bgs(bg)
         self._text_fg = theme.text if theme is not None else (212, 212, 212)
         self._muted = theme.muted_text if theme is not None else (150, 150, 150)
+        # Inset the gutter + content from both pane edges by the same amount the
+        # main file panes use (CONTENT_PAD_CELLS), so the rows breathe rather than
+        # butting the pane edge — most visibly the shared splitter between them.
+        # Zero on a character grid (no sub-cell), like the main panes.
+        mx = CONTENT_PAD_CELLS if ctx.vector_shapes else 0.0
+        self._pad = mx
         self._gutter = v._gutter_w()
-        self._content_x = self._gutter
+        self._content_x = mx + self._gutter
         self._w = w
         # The right pane leaves a column for the shared scrollbar at the edge.
         reserve = 1 if self.side == "r" else 0
-        self._content_w = max(1, w - self._gutter - reserve)
+        self._content_w = max(1, int(w - self._gutter - reserve - 2 * mx))
 
+        # The filename sits on the parent's 'header' surface band (drawn full-width
+        # in DiffViewer.draw), so use that bg rather than the content background.
         name = v.path1.name if self.side == "l" else v.path2.name
-        ctx.draw_text(0, 0, f" {name}"[:w], Style(fg=accent, bg=bg, attr=TextAttribute.BOLD))
+        ctx.draw_text(0, 0, f" {name}"[:w],
+                      Style(fg=accent, bg=_header_bg(theme), attr=TextAttribute.BOLD))
         # Content below the filename header, clipped for smooth scroll. Uses the
         # parent's fractional body height so the last row reaches the footer flush
         # with the pixel bottom (no whole-cell grid-snap gap).
@@ -222,10 +233,11 @@ class _DiffPane(Widget):
                     if ve > vs:
                         ctx.draw_text(content_x + (vs - col0_int) - xfrac, y, plain[vs:ve],
                                       Style(fg=text_fg, bg=char_bg, font=MONO))
-            # Gutter (after content) masks the left horizontal bleed, then numbers.
+            # Gutter (after content) masks the left horizontal bleed, then numbers
+            # (inset by the l/r pad so they don't butt the pane edge / splitter).
             ctx.fill_rect(0, y, content_x, 1.0, Style(bg=row_bg))
             if lineno is not None:
-                ctx.draw_text(0, y, str(lineno).rjust(self._gutter - 1),
+                ctx.draw_text(self._pad, y, str(lineno).rjust(self._gutter - 1),
                               Style(fg=muted, bg=row_bg, font=MONO))
 
 
@@ -271,12 +283,14 @@ class DiffViewer(Widget):
         self.top = max(0.0, min(self.top, float(max(0, len(self.rows) - self._view_h))))
         self.left = max(0.0, min(self.left, float(max(0, self._max_line - 1))))
 
-    def _pane_columns(self, wu: float, gutter: int) -> tuple[float, float, float, float]:
+    def _pane_columns(self, wu: float, gutter: int, mx: float = 0.0) -> tuple[float, float, float, float]:
         """``(left_x, left_content_w, right_x, right_content_w)`` for the two panes'
         content regions (after the gutter; the right side reserves the scrollbar
-        column). Uses the splitter's actual rects once it has drawn, falling back
-        to the fraction before the first draw. Widths are kept *fractional* so the
-        h-scrollbar thumb reflects the exact sub-cell viewport."""
+        column). ``mx`` is the per-edge content inset the panes apply, so the
+        h-scrollbars and the overflow test track where the rows actually sit. Uses
+        the splitter's actual rects once it has drawn, falling back to the fraction
+        before the first draw. Widths are kept *fractional* so the h-scrollbar thumb
+        reflects the exact sub-cell viewport."""
         fr, sr = self.splitter._first_rect, self.splitter._second_rect
         if fr.w > 0:
             lx, lw = fr.x, fr.w
@@ -285,8 +299,8 @@ class DiffViewer(Widget):
             frac = self.splitter.fraction
             lx, lw = 0.0, frac * wu
             rx, rw = lw, wu - lw
-        return (lx + gutter, max(1.0, lw - gutter),
-                rx + gutter, max(1.0, rw - gutter - 1))
+        return (lx + gutter + mx, max(1.0, lw - gutter - 2 * mx),
+                rx + gutter + mx, max(1.0, rw - gutter - 1 - 2 * mx))
 
     def _step_block(self, delta: int) -> None:
         if not self.blocks:
@@ -312,6 +326,9 @@ class DiffViewer(Widget):
         self._pad = (pad_x, pad_y)
         bg = _content_bg(theme)  # sit on TFM's own pane background, not popup_bg
         ctx.fill_rect(0, 0, wu, hu, Style(bg=bg))
+        # A distinct 'header' surface band across the top (reaching the top edge);
+        # each pane draws its filename onto it (see _DiffPane.draw).
+        ctx.fill_rect(0, 0, wu, 1.0 + pad_y, Style(bg=_header_bg(theme)))
 
         # Each pane gets its own horizontal scrollbar (the panes pan together by
         # self.left but have different widths). A row is reserved below the panes
@@ -321,7 +338,8 @@ class DiffViewer(Widget):
         # are then positioned from the fresh rects.
         gutter = self._gutter_w()
         iw = max(1.0, wu - 2 * pad_x)             # splitter width inside the l/r pad
-        lx, lcw, rx, rcw = self._pane_columns(iw, gutter)
+        mx = CONTENT_PAD_CELLS if ctx.vector_shapes else 0.0  # per-pane content inset
+        lx, lcw, rx, rcw = self._pane_columns(iw, gutter, mx)
         show_hbar = self._max_line > lcw or self._max_line > rcw
         fy = hu - 1.0 - pad_y                     # footer text row (surface below)
         hbar_y = fy - 1.0
@@ -344,7 +362,7 @@ class DiffViewer(Widget):
         # One horizontal scrollbar per pane, from the current splitter rects
         # (splitter-local, so shifted by the l/r pad into screen space).
         if show_hbar:
-            lx, lcw, rx, rcw = self._pane_columns(iw, gutter)
+            lx, lcw, rx, rcw = self._pane_columns(iw, gutter, mx)
             if self._max_line > lcw:
                 draw_hscrollbar(ctx, pad_x + lx, hbar_y, lcw, self.left, lcw, self._max_line)
             if self._max_line > rcw:

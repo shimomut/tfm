@@ -62,6 +62,16 @@ def _status_bg(theme) -> tuple[int, int, int] | None:
     return theme.surface_bg("status") or _content_bg(theme)
 
 
+def _header_bg(theme) -> tuple[int, int, int] | None:
+    """The themed header surface — the same ``header`` role the main window's pane
+    header bars use — so a viewer's title reads as a distinct band above the
+    content rather than text floating on the content background. Falls back to the
+    content surface for a theme without the role."""
+    if theme is None:
+        return None
+    return theme.surface_bg("header") or _content_bg(theme)
+
+
 def draw_status_bar(ctx, y: float, text: str, *, font=None, pad_x: float = 0.0,
                     bottom_pad: float = 0.0) -> None:
     """Paint a viewer's bottom status bar, exactly like the main window's
@@ -396,16 +406,20 @@ class TextViewer(Widget):
         muted = theme.muted_text if theme is not None else (150, 150, 150)
         accent = theme.accent if theme is not None else (0, 122, 204)
 
-        # Header — text inset from the top/left/right; its surface is the content
-        # background, which already fills the window edge to edge.
+        # Header — a distinct 'header' surface band across the top (reaching the
+        # top edge, like the main window's pane headers), with the text inset from
+        # the top/left/right.
+        head_h = 1.0 + pad_y
+        header_bg = _header_bg(theme)
+        ctx.fill_rect(0, 0, wu, head_h, Style(bg=header_bg))
         total = len(self.lines)
         pos = int(self.top) + 1
         iw = max(1.0, wu - 2 * pad_x)            # content width inside the l/r pad
         header = f" {self.path.name}  ({total} lines)"
         ctx.draw_text(pad_x, pad_y, elide(header, iw, where="end", measure=ctx.measure_text),
-                      Style(fg=accent, bg=bg, attr=TextAttribute.BOLD))
+                      Style(fg=accent, bg=header_bg, attr=TextAttribute.BOLD))
         info = f"{pos}/{total}  {'WRAP' if self.wrap else ''} "
-        ctx.draw_text(max(pad_x, wu - pad_x - len(info)), pad_y, info, Style(fg=muted, bg=bg))
+        ctx.draw_text(max(pad_x, wu - pad_x - len(info)), pad_y, info, Style(fg=muted, bg=header_bg))
 
         gutter_w = self._gutter_w()
         self._gutter = gutter_w
@@ -415,10 +429,9 @@ class TextViewer(Widget):
         # sub-cell); text still lays out on the whole-column ``_content_w``.
         content_wf = max(1.0, iw - gutter_w - 1)
         self._bg, self._text_fg, self._muted = bg, text_fg, muted
-        # The header takes one row plus its top pad; the footer one row plus its
-        # bottom pad (its status surface reaches the bottom edge). A horizontal
-        # scrollbar (no-wrap only) steals a row when a line overruns the width.
-        head_h = 1.0 + pad_y
+        # The footer takes one row plus its bottom pad (its status surface reaches
+        # the bottom edge). A horizontal scrollbar (no-wrap only) steals a row when
+        # a line overruns the width. (``head_h`` was set with the header above.)
         fy = hu - 1.0 - pad_y                     # footer text row (surface below)
         show_hbar = not self.wrap and self._max_line > self._content_w
         hbar_y = fy - 1.0                          # h-scrollbar, just above footer
