@@ -72,33 +72,7 @@ it:
 - post-file-operation reloads,
 - the two startup refreshes (panel/queue not up yet — needs a deferred kick).
 
-### 2.2 Tree disclosure chevron — visual tuning (done bar the eyeballing)
-**Done.** Chose the *primitive* route (over the fill_rect staircase): added
-`DrawContext.draw_chevron(x, y, w, h, *, expanded, style)` plus a `draw_chevron`
-backend seam — a two-segment stroked polyline mirroring the existing `draw_check`
-(macOS `NSBezierPath`, Windows `rt_draw_line`, memory records to `chevron_calls`,
-curses inherits the `CapabilityNotSupported` no-op). On vector backends the tree
-disclosure indicator is now a stroked `›` that rotates to `⌄` when open; the grid
-keeps the `▸`/`▾` glyph inline. Wired at both call sites — the Directory Diff
-Viewer's `_draw_side_vector` and the reusable `TreeView` — each reserving the same
-marker slot so the label origin and expander hit region are unchanged. Covered by
-`tests/test_vector_widgets.py` (TreeView) and `test/test_directory_diff_viewer.py`
-(diff viewer, via a vector-capable `MemoryBackend`).
-
-Geometry (revised after GUI feedback): `_render_chevron` computes the two arms at
-45° in **device pixels** (not fractions of the box), so the apex is a true **90°**
-regardless of the cell aspect ratio; the mark is sized to fill its column and
-pivots about its center when it rotates open. The reserved column width and the
-gap before the label are single tunable constants — `_CHEVRON_W` / `_CHEVRON_GAP`
-in `tfm_directory_diff_viewer.py`, `_MARK_W` / `_MARK_GAP` in `puikit/widgets/
-tree.py` (both default 1.1 / 0.4 base units).
-
-**Residual (needs a human at the macOS GUI):** the size fraction (`0.24`) and
-stroke width in `_render_chevron` were verified numerically (apex = 90.0°) but not
-visually — give it a once-over on a real display and nudge the constants above /
-the `0.24` if the mark reads too small, too fat, or off-center.
-
-### 2.3 Directory Diff Viewer — add content margins
+### 2.2 Directory Diff Viewer — add content margins
 Everything in the viewer is drawn **flush to the edges**, so text hugs the window
 border and the centre gutter with no breathing room. Add consistent insets. In
 `tfm_directory_diff_viewer.py` `draw` / the column geometry:
@@ -118,7 +92,7 @@ scrollbar x, the body child rect, and the pointer hit-tests / gutter-drag band
 must shift together, or the split drag and row clicks will land off by the margin.
 Keep it a single named constant (e.g. `_MARGIN`) so it's tunable in one place.
 
-### 2.4 Filepath TAB completion in input dialogs
+### 2.3 Filepath TAB completion in input dialogs
 Complete paths with TAB in the text-input prompts. `jump_to_path` in `tfm.py`
 even notes it: *"(TAB path completion is a later phase.)"* — the primary target,
 with the save-as / name prompts (`create_file`, `create_directory`,
