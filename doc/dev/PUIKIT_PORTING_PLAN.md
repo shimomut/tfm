@@ -42,8 +42,11 @@ Done and wired (Phases 1–4, plus the GUI-polish pass):
 - **Keyboard** — the cross-backend contract (`puikit/docs/keyboard_contract.md`)
   is implemented on curses / macOS / Windows and backed by live regression tests.
 - **GUI polish** — text clips by measured width (not cell count); lines/frames
-  draw as vectors in GUI mode; dialogs grow past the pane while staying
-  pane-anchored; directory listing is always async so navigation never blocks.
+  draw as vectors in GUI mode (including the tree disclosure indicator: a
+  vector-stroked `›`/`⌄` chevron via PuiKit's new `draw_chevron` primitive, in
+  the diff viewer and the reusable `TreeView`; the grid keeps the `▸`/`▾`
+  glyph); dialogs grow past the pane while staying pane-anchored; directory
+  listing is always async so navigation never blocks.
 - **edit_file / subshell** — terminal suspend/resume wired.
 - **Theme palette** — light/dark-aware file-type, cursor, and syntax-highlight
   colors, all driven by the active theme and switched from one toggle.
@@ -69,37 +72,31 @@ it:
 - post-file-operation reloads,
 - the two startup refreshes (panel/queue not up yet — needs a deferred kick).
 
-### 2.2 Draw the tree disclosure indicator as a vector chevron in GUI
-The expand/collapse indicator on tree rows is a **glyph** today — `▸` (collapsed)
-/ `▾` (expanded), drawn as text in both backends. In GUI it should instead be a
-**line-drawn chevron** (a `>` that rotates to `⌄` when open), rendered with vector
-primitives so it reads as UI chrome rather than a font character. The grid
-backend keeps the `▸`/`▾` glyph (a vector chevron can't be drawn on a character
-cell).
+### 2.2 Tree disclosure chevron — visual tuning (done bar the eyeballing)
+**Done.** Chose the *primitive* route (over the fill_rect staircase): added
+`DrawContext.draw_chevron(x, y, w, h, *, expanded, style)` plus a `draw_chevron`
+backend seam — a two-segment stroked polyline mirroring the existing `draw_check`
+(macOS `NSBezierPath`, Windows `rt_draw_line`, memory records to `chevron_calls`,
+curses inherits the `CapabilityNotSupported` no-op). On vector backends the tree
+disclosure indicator is now a stroked `›` that rotates to `⌄` when open; the grid
+keeps the `▸`/`▾` glyph inline. Wired at both call sites — the Directory Diff
+Viewer's `_draw_side_vector` and the reusable `TreeView` — each reserving the same
+marker slot so the label origin and expander hit region are unchanged. Covered by
+`tests/test_vector_widgets.py` (TreeView) and `test/test_directory_diff_viewer.py`
+(diff viewer, via a vector-capable `MemoryBackend`).
 
-Where the marker is emitted today:
-- **Directory Diff Viewer** — `_draw_side_vector` / `_draw_side_grid`
-  (`tfm_directory_diff_viewer.py`) build `marker = "▾ "|"▸ "` and `draw_text` it,
-  even on the vector path. This is TFM's live tree, so it's the primary target.
-- **PuiKit `TreeView`** (`puikit/widgets/tree.py`, `_EXPANDED`/`_COLLAPSED`) — the
-  reusable widget carries the same glyph; give it the same GUI chevron so the
-  behavior is shared, not re-bespoked per viewer.
+Geometry (revised after GUI feedback): `_render_chevron` computes the two arms at
+45° in **device pixels** (not fractions of the box), so the apex is a true **90°**
+regardless of the cell aspect ratio; the mark is sized to fill its column and
+pivots about its center when it rotates open. The reserved column width and the
+gap before the label are single tunable constants — `_CHEVRON_W` / `_CHEVRON_GAP`
+in `tfm_directory_diff_viewer.py`, `_MARK_W` / `_MARK_GAP` in `puikit/widgets/
+tree.py` (both default 1.1 / 0.4 base units).
 
-**Key sub-decision — how to draw the diagonal.** `DrawContext` currently exposes
-**only `fill_rect`** (axis-aligned); there is no line / polyline / polygon /
-triangle primitive, so the diff viewer's existing vector connectors are all
-horizontal / vertical bars. A chevron needs diagonals. Two routes:
-- approximate the chevron with a short **staircase of `fill_rect`s** (a few
-  device-pixel steps) — no new PuiKit surface, but crisp only at small sizes; or
-- add a real vector primitive to PuiKit (`draw_line` with arbitrary endpoints, or
-  a `fill_polygon` for a filled triangle) — the cleaner long-term primitive, also
-  reusable for a filled-triangle disclosure look, but a new backend seam (macOS +
-  memory + curses no-op) with its own regression test.
-Prefer the primitive if a filled triangle / smooth chevron is wanted; the
-staircase if a 1–2px hairline `>` is enough. Decide with a small spike.
-
-Reserve the same marker-column width so the label origin (`label_x`) and the
-expander hit region are unchanged; only the mark's rendering swaps.
+**Residual (needs a human at the macOS GUI):** the size fraction (`0.24`) and
+stroke width in `_render_chevron` were verified numerically (apex = 90.0°) but not
+visually — give it a once-over on a real display and nudge the constants above /
+the `0.24` if the mark reads too small, too fat, or off-center.
 
 ### 2.3 Directory Diff Viewer — add content margins
 Everything in the viewer is drawn **flush to the edges**, so text hugs the window

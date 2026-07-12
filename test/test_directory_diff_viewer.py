@@ -14,7 +14,9 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from puikit import Event, EventType, Panel, PROFILE_GUI_DESKTOP, PROFILE_TUI
+from puikit import (
+    CapabilityProfile, Event, EventType, Panel, PROFILE_GUI_DESKTOP, PROFILE_TUI,
+)
 from puikit.backends.memory_backend import MemoryBackend
 
 from tfm_path import Path
@@ -209,6 +211,29 @@ def test_enter_on_differing_file_opens_file_diff(backend, trees):
     panel.dispatch_event(_key("enter"))
     # A per-file DiffViewer layer is pushed on top.
     assert len(panel._layers) == 2
+
+
+class _VectorBackend(MemoryBackend):
+    """A grid backend that *claims* vector_shapes so the viewer's drawn-line
+    (GUI) path — including the disclosure chevron — is exercised headlessly.
+    (The real MemoryBackend masks the capability off.)"""
+
+    @property
+    def capabilities(self) -> CapabilityProfile:
+        return CapabilityProfile({**self._capabilities, "vector_shapes": True})
+
+
+def test_directory_rows_draw_vector_chevron_not_glyph(trees):
+    backend = _VectorBackend(width=100, height=30, capabilities=PROFILE_GUI_DESKTOP)
+    panel = Panel(backend)
+    show_directory_diff_viewer(panel, *trees, background=False)
+    panel.render()
+    # The "sub" directory draws a disclosure chevron on the vector path (once
+    # per side it exists on), and the ▸/▾ glyph no longer leaks onto the grid.
+    assert backend.chevron_calls, "a directory row should stroke a vector chevron"
+    text = "\n".join(backend.snapshot())
+    assert "▸" not in text and "▾" not in text
+    assert "sub" in text  # the label still renders next to the chevron
 
 
 # --- progressive scanning (slice 3) ------------------------------------------

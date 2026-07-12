@@ -305,6 +305,11 @@ def summarize_directory(node: TreeNode) -> DifferenceType:
 _DIFF_FG = (222, 120, 110)
 #: Horizontal base units reserved per tree depth level (the connector column).
 _INDENT = 2
+#: GUI/vector disclosure chevron: reserved column width, and the gap between the
+#: chevron and the label, both in base units. The chevron fills the column; the
+#: gap gives the name breathing room (the grid path keeps the ▸/▾ glyph instead).
+_CHEVRON_W = 1.1
+_CHEVRON_GAP = 0.4
 #: Minimum width (base units) either pane may be shrunk to by the split drag.
 _MIN_PANE = 8
 #: Width (base units) of the centre gutter / splitter band holding the verdict
@@ -1282,11 +1287,19 @@ class DirectoryDiffView(Widget):
                 ctx.fill_rect(cx, y, lw, 1.0, line_style)
         if path is None:
             return
-        marker = ("▾ " if node.is_expanded else "▸ ") if node.is_directory else ""
-        label = marker + node.name + ("/" if node.is_directory else "") + suffix
+        label = node.name + ("/" if node.is_directory else "") + suffix
+        name_x = label_x
         avail = col_w - depth * _INDENT
+        if node.is_directory:
+            # A right-angle disclosure chevron (UI chrome) filling a reserved
+            # column, then a gap before the name — vs. the ▸/▾ glyph the grid
+            # path draws inline.
+            ctx.draw_chevron(label_x, y, _CHEVRON_W, 1.0,
+                             expanded=node.is_expanded, style=Style(fg=fg))
+            name_x = label_x + _CHEVRON_W + _CHEVRON_GAP
+            avail -= _CHEVRON_W + _CHEVRON_GAP
         if avail > 0:
-            ctx.draw_text(label_x, y, elide(label, float(avail), measure=ctx.measure_text),
+            ctx.draw_text(name_x, y, elide(label, float(avail), measure=ctx.measure_text),
                           Style(fg=fg, bg=row_bg))
 
     # --- events --------------------------------------------------------------
