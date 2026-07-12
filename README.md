@@ -15,7 +15,6 @@ A powerful file manager that runs both in the terminal and as a native desktop a
 - **External program integration** with configurable launchers
 - **AWS S3 support** for cloud storage operations
 - **Customizable interface** with multiple color schemes and key bindings
-- **Remote log monitoring** for debugging and system monitoring
 
 ## Development with Kiro
 
@@ -69,7 +68,7 @@ next to TFM and lets the Makefile wire everything into a virtualenv.
    **Desktop Mode** (macOS only) additionally needs PyObjC:
    ```bash
    pip install pyobjc                # or: pip install -e .[macos]
-   python3 tfm.py --desktop
+   python3 tfm.py --backend gui
    ```
 
 ### Essential Controls
@@ -93,13 +92,11 @@ For comprehensive information about TFM's features and usage:
 - **[SFTP Support](doc/SFTP_SUPPORT_FEATURE.md)** - Remote server access via SSH with file operations and search
 - **[AWS S3 Support](doc/S3_SUPPORT_FEATURE.md)** - Cloud storage integration and S3 bucket management
 - **[Archive Virtual Directory Browsing](doc/ARCHIVE_VIRTUAL_DIRECTORY_FEATURE.md)** - Browse archives as directories
-- **[Remote Log Monitoring](doc/REMOTE_LOG_MONITORING_FEATURE.md)** - Real-time log monitoring setup and usage
 - **[Search Animation](doc/SEARCH_ANIMATION_FEATURE.md)** - Advanced search features and visual feedback
 
 ### Developer Documentation
 - **[Path Polymorphism System](doc/dev/PATH_POLYMORPHISM_SYSTEM.md)** - Storage-agnostic architecture and extensibility
 - **[Navigation System](doc/dev/NAVIGATION_SYSTEM.md)** - Core navigation implementation
-- **[Remote Log Implementation](doc/dev/REMOTE_LOG_MONITORING_IMPLEMENTATION.md)** - Technical details of log monitoring
 - **[External Programs](doc/dev/EXTERNAL_PROGRAMS_IMPLEMENTATION.md)** - Program integration system
 
 ## Key Features Overview
@@ -186,7 +183,6 @@ Type `exit` to return to TFM.
 - **Threaded Search:** Non-blocking filename and content search with progress tracking (works inside archives and on remote servers)
 - **Pane Management:** Resizable layout, directory sync, state persistence
 - **External Integration:** VSCode, Beyond Compare, and custom program support
-- **Remote Log Monitoring:** Stream logs to remote terminals for debugging
 - **AWS S3 Support:** Navigate and manage S3 buckets with seamless local/remote operations
 
 For detailed information on all features, see the [User Guide](doc/TFM_USER_GUIDE.md).
@@ -197,42 +193,34 @@ For detailed information on all features, see the [User Guide](doc/TFM_USER_GUID
 # Run in terminal mode (default)
 python3 tfm.py
 
-# Run in desktop mode (macOS only)
-python3 tfm.py --desktop
-python3 tfm.py --backend coregraphics  # Alternative syntax
+# Run in desktop mode (macOS only, requires PyObjC)
+python3 tfm.py --backend gui
 
 # Specify startup directories
 python3 tfm.py --left /path/to/projects --right /path/to/documents
 
-# Enable remote log monitoring
-python3 tfm.py --remote-log-port 8888
-
-# Enable performance profiling (specify targets: event, rendering, or both)
-python3 tfm.py --profile event
-python3 tfm.py --profile rendering,event
-
-# Enable debug mode (full stack traces)
-python3 tfm.py --debug
-
 # Combined usage - desktop mode with custom directories
-python3 tfm.py --desktop --left ./src --right ./test
+python3 tfm.py --backend gui --left ./src --right ./test
 
 # Help and version
 python3 tfm.py --help
 python3 tfm.py --version
 ```
 
+The full flag set is just `--backend {tui,curses,gui,macos}`, `--left DIR`,
+`--right DIR`, `--version`, and `--help`.
+
 ### Backend Selection
 
-TFM supports two rendering backends:
+TFM supports two rendering backends, chosen with `--backend`:
 
-- **Terminal Mode** (`--backend curses`): Traditional terminal interface, works on all platforms
-- **Desktop Mode** (`--backend coregraphics` or `--desktop`): Native macOS application with GPU acceleration
+- **Terminal Mode** (`--backend tui`, alias `curses`): traditional terminal interface, works on all platforms — the default
+- **Desktop Mode** (`--backend gui`, alias `macos`): native macOS application (requires PyObjC)
 
 Desktop mode provides:
 - Native macOS window with resizing and full-screen support
-- GPU-accelerated rendering at 60 FPS
-- Customizable fonts and window size
+- Customizable fonts (`MONO_FONT_NAME` / `UI_FONT_NAME` / `FONT_SIZE`)
+- Window size and position remembered automatically across runs
 - Better color accuracy with true RGB colors
 
 See the [User Guide](doc/TFM_USER_GUIDE.md#desktop-mode-macos) for detailed desktop mode configuration.
@@ -293,7 +281,7 @@ python3 tfm.py
 
 # Desktop mode (macOS only - requires pyobjc)
 pip install pyobjc
-python3 tfm.py --desktop
+python3 tfm.py --backend gui
 ```
 
 #### Option 2: Install as Package
@@ -312,7 +300,7 @@ pip install .[macos]
 
 # Run from anywhere (installs a `tfm` console command)
 tfm                # Terminal mode
-tfm --desktop      # Desktop mode (macOS only, if installed with [macos])
+tfm --backend gui      # Desktop mode (macOS only, if installed with [macos])
 ```
 
 #### Option 3: Development Installation
@@ -362,20 +350,6 @@ tfm/
 
 > TFM's UI framework, **PuiKit**, is **not** in this tree — it lives in its own
 > repository (`../puikit`) and is installed editable into the virtualenv.
-
-## Remote Log Monitoring
-
-Monitor TFM operations remotely for debugging:
-
-```bash
-# Start TFM with remote log monitoring
-python3 tfm.py --remote-log-port 8888
-
-# Connect from another terminal
-python3 src/tools/tfm_log_client.py localhost 8888
-```
-
-The log client provides color-coded output for different log sources and handles network connectivity gracefully.
 
 ## Troubleshooting
 

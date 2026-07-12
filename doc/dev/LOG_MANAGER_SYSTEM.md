@@ -326,7 +326,6 @@ if debug_mode:
 
 ### Advanced Features
 - **Log Rotation**: Automatic log file rotation
-- **Remote Logging**: Send logs to remote servers
 - **Structured Logging**: JSON or structured log format support
 - **Log Analysis**: Built-in log analysis tools
 - **Custom Formatters**: User-configurable message formatting

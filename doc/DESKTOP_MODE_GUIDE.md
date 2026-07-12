@@ -14,7 +14,7 @@ TFM can run as a native macOS desktop application with GPU acceleration, providi
 pip install pyobjc
 
 # Run in desktop mode
-python3 tfm.py --desktop
+python3 tfm.py --backend gui
 ```
 
 **Option 2: Install with extras**
@@ -23,7 +23,7 @@ python3 tfm.py --desktop
 pip install -e .[macos]
 
 # Run in desktop mode
-python3 tfm.py --desktop
+python3 tfm.py --backend gui
 ```
 
 **Option 3: From PyPI (when published)**
@@ -32,7 +32,7 @@ python3 tfm.py --desktop
 pip install tfm[macos]
 
 # Run in desktop mode
-tfm --desktop
+tfm --backend gui
 ```
 
 ### First Launch
@@ -70,31 +70,24 @@ When you launch TFM in desktop mode:
 
 ## Configuration
 
-### Setting Desktop Mode as Default
+### Choosing the backend
 
-Edit `~/.tfm/config.py`:
-
-```python
-# Use desktop mode by default
-PREFERRED_BACKEND = 'coregraphics'
-```
-
-Now `python3 tfm.py` will launch in desktop mode automatically.
+There is no configuration-file default for the backend — it is selected only by
+the `--backend` flag, and terminal mode is the default. To launch in desktop
+mode, pass `--backend gui` (alias `macos`) each time, or wrap it in a shell alias.
 
 ### Customizing Appearance
 
-```python
-# Font settings
-# Single font (simple format)
-DESKTOP_FONT_NAME = 'Menlo'         # Font name (see available fonts below)
-# Multiple fonts with cascade fallback (recommended for international text)
-# DESKTOP_FONT_NAME = ['Menlo', 'Monaco', 'Courier']  # First available font is used
-DESKTOP_FONT_SIZE = 14              # Font size in points (10-24 recommended)
+Font settings live in `~/.tfm/config.py` (they apply to desktop/GUI mode only):
 
-# Window settings
-DESKTOP_WINDOW_WIDTH = 1200         # Initial width in pixels
-DESKTOP_WINDOW_HEIGHT = 800         # Initial height in pixels
+```python
+MONO_FONT_NAME = 'Menlo'   # monospaced face for aligned columns (None = bundled default)
+UI_FONT_NAME  = None       # proportional face for names/labels (None = bundled/OS default)
+FONT_SIZE     = 12         # point size applied to both faces (8–72)
 ```
+
+The window's size and position are remembered **automatically** across runs (via
+the native macOS window autosave); there are no window-geometry config keys.
 
 ### Available Fonts
 
@@ -121,29 +114,16 @@ To check installed fonts, open `Font Book.app` and filter by "Fixed Width" (mono
 - **Large** (16-20pt): Better for presentations or accessibility
 - **Extra Large** (21-24pt): Maximum readability, less content visible
 
-### Window Size Guidelines
-
-**Common Resolutions**:
-- **Laptop** (13-15"): 1200x800 or 1400x900
-- **Desktop** (24-27"): 1600x1000 or 1800x1200
-- **Large Display** (32"+): 2000x1400 or larger
-
-The window size is just the initial size - you can resize it anytime.
-
 ## Usage
 
 ### Launching Desktop Mode
 
 ```bash
-# Method 1: Use --desktop flag
-python3 tfm.py --desktop
-
-# Method 2: Use --backend flag
-python3 tfm.py --backend coregraphics
-
-# Method 3: Set as default in config
-# Then just run:
+# Terminal mode (the default)
 python3 tfm.py
+
+# Desktop mode — chosen with --backend
+python3 tfm.py --backend gui
 ```
 
 ### Switching Between Modes
@@ -155,7 +135,7 @@ You can easily switch between terminal and desktop modes:
 python3 tfm.py --backend curses
 
 # Desktop mode
-python3 tfm.py --backend coregraphics
+python3 tfm.py --backend gui
 ```
 
 All your settings, favorites, and history are shared between modes.
@@ -245,8 +225,8 @@ See the [User Guide](TFM_USER_GUIDE.md) for complete keyboard reference and [Fon
 **Solutions**:
 1. Check font name spelling (case-sensitive):
    ```python
-   DESKTOP_FONT_NAME = 'Menlo'  # Correct
-   DESKTOP_FONT_NAME = 'menlo'  # Wrong - case matters
+   MONO_FONT_NAME = 'Menlo'  # Correct
+   MONO_FONT_NAME = 'menlo'  # Wrong - case matters
    ```
 
 2. Verify font is installed:
@@ -256,13 +236,13 @@ See the [User Guide](TFM_USER_GUIDE.md) for complete keyboard reference and [Fon
 
 3. Use a default font:
    ```python
-   DESKTOP_FONT_NAME = 'Menlo'  # Always available on macOS
+   MONO_FONT_NAME = 'Menlo'  # Always available on macOS
    ```
 
 4. Remove font setting to use default:
    ```python
    # Comment out or remove this line
-   # DESKTOP_FONT_NAME = 'CustomFont'
+   # MONO_FONT_NAME = 'CustomFont'
    ```
 
 
@@ -276,15 +256,11 @@ See the [User Guide](TFM_USER_GUIDE.md) for complete keyboard reference and [Fon
    - Look for TFM process
    - Check CPU and GPU usage
 
-2. Reduce window size:
-   ```python
-   DESKTOP_WINDOW_WIDTH = 1000   # Smaller window
-   DESKTOP_WINDOW_HEIGHT = 700
-   ```
+2. Make the window smaller by resizing it (the size is remembered for next time).
 
 3. Try a different font:
    ```python
-   DESKTOP_FONT_NAME = 'Monaco'  # Simpler font
+   MONO_FONT_NAME = 'Monaco'  # Simpler font
    ```
 
 4. Close other applications to free resources
@@ -312,12 +288,12 @@ See the [User Guide](TFM_USER_GUIDE.md) for complete keyboard reference and [Fon
 **Solutions**:
 1. Try a different font size:
    ```python
-   DESKTOP_FONT_SIZE = 14  # Try different sizes
+   FONT_SIZE = 14  # Try different sizes
    ```
 
 2. Use a different font:
    ```python
-   DESKTOP_FONT_NAME = 'Monaco'  # Try different fonts
+   MONO_FONT_NAME = 'Monaco'  # Try different fonts
    ```
 
 3. Check display scaling settings in macOS System Preferences
@@ -367,14 +343,13 @@ See the [User Guide](TFM_USER_GUIDE.md) for complete keyboard reference and [Fon
 - Use terminal mode for remote work
 - Keep both options available
 
-**Configuration**:
-```python
-# Set desktop as default
-PREFERRED_BACKEND = 'coregraphics'
-
-# Override with command line when needed:
-# python3 tfm.py --backend curses  # Force terminal mode
+**Choosing per run**:
+```bash
+python3 tfm.py                 # terminal mode (default)
+python3 tfm.py --backend gui   # desktop mode
 ```
+Tip: wrap the desktop command in a shell alias if you use it often (there is no
+config-file default for the backend).
 
 ## Advanced Topics
 
@@ -386,7 +361,7 @@ Create a launcher script for easy access:
 #!/bin/bash
 # ~/bin/tfm-desktop
 
-python3 /path/to/tfm/tfm.py --desktop "$@"
+python3 /path/to/tfm/tfm.py --backend gui "$@"
 ```
 
 Make it executable:
@@ -409,7 +384,7 @@ tfm-desktop --left ~/projects --right ~/documents
 **Spotlight Integration**:
 - Create an Automator application
 - Add "Run Shell Script" action
-- Use: `python3 /path/to/tfm/tfm.py --desktop`
+- Use: `python3 /path/to/tfm/tfm.py --backend gui`
 - Save as "TFM" in Applications folder
 
 ## Getting Help

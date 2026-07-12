@@ -20,10 +20,10 @@ To use TFM with the menu bar:
 
 ```bash
 # Launch TFM in desktop mode (auto-detects best backend)
-python tfm.py --desktop
+python tfm.py --backend gui
 
 # Or explicitly specify the CoreGraphics backend (macOS)
-python tfm.py --backend coregraphics
+python tfm.py --backend gui
 ```
 
 When TFM launches in desktop mode, the menu bar automatically appears at the top of the window.
@@ -398,7 +398,7 @@ You're instantly taken to your home directory.
 **Problem**: TFM launches but no menu bar appears
 
 **Solutions**:
-1. Verify you're running in desktop mode: `python tfm.py --desktop`
+1. Verify you're running in desktop mode: `python tfm.py --backend gui`
 2. Check that you're on macOS (Windows support coming soon)
 3. Ensure the CoreGraphics backend is available
 4. Check the terminal for error messages

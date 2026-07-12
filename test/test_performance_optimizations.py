@@ -32,7 +32,7 @@ def test_level_checking_before_formatting():
         MAX_LOG_MESSAGES = 100
     
     config = SimpleConfig()
-    log_manager = LogManager(config, remote_port=None)
+    log_manager = LogManager(config)
     
     # Get a logger and set its level to WARNING (should skip DEBUG and INFO)
     logger = log_manager.getLogger("TestLogger")
@@ -94,7 +94,7 @@ def test_visibility_checking_for_log_pane():
         MAX_LOG_MESSAGES = 100
     
     config = SimpleConfig()
-    log_manager = LogManager(config, remote_port=None)
+    log_manager = LogManager(config)
     
     # Get a logger
     logger = log_manager.getLogger("TestLogger")

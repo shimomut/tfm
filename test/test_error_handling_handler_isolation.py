@@ -15,7 +15,7 @@ import sys
 import io
 import logging
 
-from tfm_logging_handlers import LogPaneHandler, StreamOutputHandler, RemoteMonitoringHandler
+from tfm_logging_handlers import LogPaneHandler, StreamOutputHandler
 
 
 def test_logpane_handler_error_isolation():

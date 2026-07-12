@@ -10,7 +10,7 @@ TFM supports mouse interaction in both Desktop mode (CoreGraphics backend on mac
 
 - **Platform**: macOS with CoreGraphics backend
 - **Supported Events**: All mouse events including clicks, double-clicks, movement, and scroll wheel
-- **Launch Command**: `python tfm.py --desktop` or `python tfm.py --backend coregraphics`
+- **Launch Command**: `python tfm.py --backend gui` or `python tfm.py --backend gui`
 
 ### Terminal Mode (Limited Support)
 
@@ -308,7 +308,7 @@ When in text input modes (Quick Edit Bar, Quick Choice Bar, or I-search):
 **Problem**: Clicking on panes doesn't switch focus in Desktop mode
 
 **Solutions**:
-1. Verify you're running in Desktop mode: `python tfm.py --desktop`
+1. Verify you're running in Desktop mode: `python tfm.py --backend gui`
 2. Check that the window has focus (click on the window first)
 3. Ensure you're clicking within the pane boundaries (not on the border)
 4. Check the log pane for error messages

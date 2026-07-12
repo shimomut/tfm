@@ -37,7 +37,7 @@ python tfm.py --left ./src --right ./test
 
 #### Combine with other options
 ```bash
-python tfm.py --left ./src --right ./test --remote-log-port 8888
+python tfm.py --left ./src --right ./test
 ```
 
 ## Features

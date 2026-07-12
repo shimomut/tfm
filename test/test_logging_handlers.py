@@ -8,7 +8,7 @@ import logging
 import time
 from datetime import datetime
 
-from tfm_logging_handlers import LogPaneHandler, StreamOutputHandler, RemoteMonitoringHandler
+from tfm_logging_handlers import LogPaneHandler, StreamOutputHandler
 
 
 
@@ -176,27 +176,6 @@ def test_stream_output_handler_stream_capture():
     # Should be raw output without formatting
     assert output.strip() == "Raw output"
     print("✓ StreamOutputHandler stream capture test passed")
-
-
-def test_remote_monitoring_handler_basic():
-    """Test RemoteMonitoringHandler basic functionality"""
-    handler = RemoteMonitoringHandler(port=0)  # Port 0 = let OS choose
-    
-    # Don't start server for this basic test, just test emit doesn't crash
-    record = logging.LogRecord(
-        name="TestLogger",
-        level=logging.INFO,
-        pathname="",
-        lineno=0,
-        msg="Test message",
-        args=(),
-        exc_info=None
-    )
-    record.is_stream_capture = False
-    
-    # Should not crash even without server running
-    handler.emit(record)
-    print("✓ RemoteMonitoringHandler basic test passed")
 
 
 def test_is_stream_capture_flag():

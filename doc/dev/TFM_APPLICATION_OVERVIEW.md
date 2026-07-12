@@ -34,7 +34,7 @@ TFM (Terminal File Manager) is a sophisticated terminal-based file manager built
 
 #### Management Systems
 - **tfm_pane_manager.py**: Dual pane management and navigation
-- **tfm_log_manager.py**: Logging system with remote monitoring
+- **tfm_log_manager.py**: Logging system with in-app log pane
 - **tfm_file_operations.py**: File system operations handler
 - **tfm_progress_manager.py**: Progress tracking for long operations
 - **tfm_state_manager.py**: Application state persistence
@@ -79,7 +79,6 @@ TFM (Terminal File Manager) is a sophisticated terminal-based file manager built
 - **External Programs**: Configurable external command integration
 - **VSCode Integration**: Direct directory and file opening
 - **Beyond Compare Integration**: File and directory comparison
-- **Remote Log Monitoring**: Network-based log streaming
 
 ### Customization
 - **Configuration System**: Comprehensive Python-based configuration
@@ -100,12 +99,6 @@ tfm                               # If installed via pip
 ```bash
 python3 tfm.py --left /projects --right /documents
 python3 tfm.py --left . --right ..
-```
-
-### Remote Monitoring
-```bash
-python3 tfm.py --remote-log-port 8888
-python3 tools/tfm_log_client.py localhost 8888
 ```
 
 ### Color Testing

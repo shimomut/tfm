@@ -7,12 +7,13 @@ logic unchanged — ``tfm_path.Path`` for listing, ``PaneManager`` /
 PuiKit keyboard contract) — and renders through a custom ``FilePane`` widget
 hosted in a PuiKit ``Panel`` layout, on curses + macOS.
 
-Wired so far: browse / navigate (cursor, pane switch, arrow-key focus, descend /
-go up), selection, sort, hidden-file toggle, filename filter and incremental
-search, the built-in text and diff viewers, and the create / rename / batch-
-rename / favorites / jump-to-path dialogs. File operations (copy / move / delete)
-and archive / remote storage are later phases. The original ttk implementation is
-kept for reference under ``legacy/``.
+Navigation (cursor, pane switch, arrow-key focus, descend / go up), selection,
+sort, hidden-file toggle, filename filter and incremental search, the built-in
+text and diff viewers, and the create / rename / batch-rename / favorites /
+jump-to-path dialogs are all wired — as are file operations (copy / move /
+delete, threaded with progress and per-conflict resolution via ``tfm_task``),
+archive browsing, and remote storage (S3 / SFTP). The original ttk implementation
+is kept for reference under ``legacy/``.
 
     python tfm.py                       # TUI (curses)
     python tfm.py --backend gui         # macOS GUI

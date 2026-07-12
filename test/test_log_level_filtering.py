@@ -167,7 +167,7 @@ def test_level_filtering_behavior():
     log_manager = LogManager(config)
     
     # Configure handlers to capture messages
-    log_manager.configure_handlers(log_pane_enabled=True, stream_output_enabled=False, remote_enabled=False)
+    log_manager.configure_handlers(log_pane_enabled=True, stream_output_enabled=False)
     
     # Set default to WARNING
     log_manager.set_default_log_level(logging.WARNING)

@@ -114,12 +114,6 @@ for i, file in enumerate(files):
     # Each progress update triggers immediate redraw
 ```
 
-### Remote Monitoring
-```python
-# Remote log messages appear in real-time
-# when using --remote-log-port option
-```
-
 ## Configuration
 
 ### No Configuration Required
@@ -131,7 +125,6 @@ for i, file in enumerate(files):
 ### Customization Options
 - Uses existing `MAX_LOG_MESSAGES` configuration
 - Works with existing color schemes
-- Integrates with remote log monitoring
 - Respects existing log formatting
 
 ## Testing
@@ -153,8 +146,7 @@ for i, file in enumerate(files):
 ### Enhanced Behavior
 - Existing log messages now trigger automatic redraws
 - stdout/stderr capture works as before but with immediate display
-- Remote log monitoring benefits from real-time updates
-- All log sources (direct, captured, remote) trigger updates
+- All log sources (direct, captured) trigger updates
 
 ## Performance Considerations
 

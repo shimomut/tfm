@@ -144,53 +144,6 @@ Set log level in configuration:
 LOG_LEVEL = "INFO"  # or "WARNING", "DEBUG", "ERROR"
 ```
 
-## Remote Monitoring
-
-### Overview
-
-TFM supports remote log monitoring, allowing you to view logs from another terminal or machine.
-
-### Enabling Remote Monitoring
-
-Start TFM with the `--remote-log-port` option:
-
-```bash
-tfm --remote-log-port 9999
-```
-
-Or enable in configuration:
-
-```python
-# In config file
-REMOTE_MONITORING_ENABLED = True
-REMOTE_MONITORING_PORT = 9999
-```
-
-### Connecting to Remote Logs
-
-From another terminal:
-
-```bash
-# Using telnet
-telnet localhost 9999
-
-# Using netcat
-nc localhost 9999
-```
-
-### Remote Log Format
-
-Logs are sent as JSON:
-
-```json
-{
-    "timestamp": "14:23:45",
-    "source": "FileOp",
-    "level": "INFO",
-    "message": "File operation completed"
-}
-```
-
 ## File Logging
 
 ### Overview
@@ -282,19 +235,6 @@ tfm --log-file ~/tfm-backup.log
 # Review log later: less ~/tfm-backup.log
 ```
 
-### Combining with Remote Monitoring
-
-You can use both file logging and remote monitoring simultaneously:
-
-```bash
-tfm --log-file /tmp/tfm.log --remote-log-port 9999
-```
-
-This allows you to:
-- Monitor logs in real-time via remote connection
-- Keep a persistent record in the log file
-- Review logs later even after TFM exits
-
 ## Tips and Tricks
 
 ### Finding Recent Errors
@@ -352,16 +292,6 @@ This allows you to:
 - Set higher log level (WARNING or ERROR)
 - Clear old messages by restarting TFM
 
-### Remote Monitoring Not Working
-
-**Problem:** Cannot connect to remote monitoring.
-
-**Solution:**
-- Verify `--remote-log-port` option was used
-- Check port is not in use: `netstat -an | grep 9999`
-- Verify firewall allows connections
-- Try different port number
-
 ### File Logging Not Working
 
 **Problem:** Log file is not created or empty.
@@ -386,7 +316,6 @@ This allows you to:
 - **Error Diagnosis**: Detailed error messages help identify issues
 - **Operation Tracking**: See exactly what operations were performed
 - **Debug Information**: Detailed diagnostic data when needed
-- **Remote Monitoring**: View logs from another terminal
 
 ### For Developers
 
@@ -454,12 +383,6 @@ Messages are color-coded for easy identification:
 - Use WARNING to reduce verbosity
 - Use DEBUG for troubleshooting
 - Use ERROR for critical issues only
-
-### Remote Monitoring
-
-- Enable for debugging complex issues
-- Use for monitoring background operations
-- Disable when not needed (security)
 
 ### Message Review
 

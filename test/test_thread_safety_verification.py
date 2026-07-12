@@ -2,7 +2,7 @@
 Thread Safety Verification Test
 
 This test verifies that the thread safety implementation in LogPaneHandler
-and RemoteMonitoringHandler works correctly under concurrent access.
+works correctly under concurrent access.
 
 Run with: PYTHONPATH=.:src pytest test/test_thread_safety_verification.py -v
 """
@@ -11,7 +11,7 @@ import logging
 import threading
 import time
 
-from tfm_logging_handlers import LogPaneHandler, RemoteMonitoringHandler
+from tfm_logging_handlers import LogPaneHandler
 
 
 def test_logpane_handler_concurrent_emit():
@@ -129,78 +129,3 @@ def test_logpane_handler_concurrent_get_messages():
         thread.join()
     
     print("✓ LogPaneHandler concurrent read/write test passed")
-
-
-def test_remote_handler_concurrent_client_management():
-    """
-    Verify RemoteMonitoringHandler handles concurrent client operations safely.
-    
-    This test simulates concurrent client additions and message broadcasts
-    to verify thread-safe client list management.
-    """
-    handler = RemoteMonitoringHandler(port=9999)
-    
-    # Mock client sockets (we won't actually connect)
-    class MockSocket:
-        def __init__(self, client_id):
-            self.client_id = client_id
-            self.closed = False
-        
-        def send(self, data):
-            if self.closed:
-                raise ConnectionError("Socket closed")
-        
-        def close(self):
-            self.closed = True
-    
-    num_threads = 10
-    operations_per_thread = 50
-    
-    def add_and_remove_clients(thread_id):
-        """Add and remove mock clients."""
-        for i in range(operations_per_thread):
-            # Add a mock client
-            mock_socket = MockSocket(f"{thread_id}-{i}")
-            with handler.lock:
-                handler.clients.append(mock_socket)
-            
-            # Simulate some work
-            time.sleep(0.001)
-            
-            # Remove the client
-            with handler.lock:
-                if mock_socket in handler.clients:
-                    handler.clients.remove(mock_socket)
-    
-    def broadcast_messages(thread_id):
-        """Broadcast messages while clients are being added/removed."""
-        for i in range(operations_per_thread):
-            message = {
-                'timestamp': '12:00:00',
-                'source': f'Thread{thread_id}',
-                'level': 'INFO',
-                'message': f'Message {i}'
-            }
-            handler._broadcast_to_clients(message)
-            time.sleep(0.001)
-    
-    # Create threads
-    threads = []
-    
-    for i in range(num_threads // 2):
-        thread = threading.Thread(target=add_and_remove_clients, args=(i,))
-        threads.append(thread)
-    
-    for i in range(num_threads // 2):
-        thread = threading.Thread(target=broadcast_messages, args=(i,))
-        threads.append(thread)
-    
-    # Start all threads
-    for thread in threads:
-        thread.start()
-    
-    # Wait for all threads to complete
-    for thread in threads:
-        thread.join()
-    
-    print("✓ RemoteMonitoringHandler concurrent client management test passed")

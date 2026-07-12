@@ -67,7 +67,7 @@ cd tfm
 python3 tfm.py
 
 # Run in desktop mode (macOS only)
-python3 tfm.py --desktop
+python3 tfm.py --backend gui
 ```
 
 #### Method 2: Package Installation
@@ -78,7 +78,7 @@ python3 setup.py install
 
 # Run installed version
 tfm                # Terminal mode
-tfm --desktop      # Desktop mode (macOS only)
+tfm --backend gui      # Desktop mode (macOS only)
 ```
 
 #### Method 3: Development Installation
@@ -89,7 +89,7 @@ pip install -e .
 
 # Run from anywhere
 tfm                # Terminal mode
-tfm --desktop      # Desktop mode (macOS only)
+tfm --backend gui      # Desktop mode (macOS only)
 ```
 
 ### Optional Dependencies
@@ -204,11 +204,8 @@ TFM can run as a native macOS desktop application with GPU acceleration, providi
 # Install PyObjC (one-time setup)
 pip install pyobjc-framework-Cocoa
 
-# Run in desktop mode
-python3 tfm.py --desktop
-
-# Or use the full backend syntax
-python3 tfm.py --backend coregraphics
+# Run in desktop mode (native macOS window)
+python3 tfm.py --backend gui
 ```
 
 ### Features
@@ -224,20 +221,17 @@ Desktop mode provides several advantages over terminal mode:
 
 ### Configuration
 
-Desktop mode settings are configured in `~/.tfm/config.py`:
+Desktop-mode font settings live in `~/.tfm/config.py` (they are ignored in terminal mode):
 
 ```python
-# Backend selection
-PREFERRED_BACKEND = 'coregraphics'  # Use desktop mode by default
-
-# Desktop mode settings (macOS only)
-# Font name - can be a single font or list for cascade fallback
-DESKTOP_FONT_NAME = 'Menlo'         # Single font (simple)
-# DESKTOP_FONT_NAME = ['Menlo', 'Monaco', 'Courier']  # Multiple fonts with fallback
-DESKTOP_FONT_SIZE = 14              # Font size in points
-DESKTOP_WINDOW_WIDTH = 1200         # Initial window width in pixels
-DESKTOP_WINDOW_HEIGHT = 800         # Initial window height in pixels
+# GUI fonts and size — the grid is derived from the monospace face
+MONO_FONT_NAME = 'Menlo'   # monospaced face for aligned columns (None = bundled default)
+UI_FONT_NAME  = None       # proportional face for names/labels (None = bundled/OS default)
+FONT_SIZE     = 12         # point size applied to both faces (8–72)
 ```
+
+The window's size and position are remembered **automatically** across runs (via
+the native macOS window autosave) — there are no window-geometry config keys.
 
 #### Available Fonts
 
@@ -249,25 +243,16 @@ Common monospace fonts on macOS:
 - `Fira Code` - Popular programming font (if installed)
 - `JetBrains Mono` - Modern programming font (if installed)
 
-### Backend Selection Priority
+### Backend Selection
 
-TFM selects the rendering backend in this order:
+The backend is chosen only by the `--backend` flag; there is no configuration-file
+preference. The default is terminal mode:
 
-1. **Command-line flag**: `--backend` or `--desktop` overrides everything
-2. **Configuration file**: `PREFERRED_BACKEND` setting in `~/.tfm/config.py`
-3. **Default**: Falls back to terminal mode (`curses` backend)
+- `--backend tui` (alias `curses`) — terminal / curses, the default
+- `--backend gui` (alias `macos`) — native macOS window (requires PyObjC)
 
-### Automatic Fallback
-
-If desktop mode is requested but unavailable, TFM automatically falls back to terminal mode:
-
-```bash
-# Desktop mode requested but PyObjC not installed
-python3 tfm.py --desktop
-# Output: Error: PyObjC is required for CoreGraphics backend
-#         Install with: pip install pyobjc-framework-Cocoa
-#         Falling back to curses backend
-```
+If you request `--backend gui` without PyObjC installed, startup fails with an
+error — install it (`pip install pyobjc-framework-Cocoa`) or run in terminal mode.
 
 ### Keyboard Shortcuts
 
@@ -545,17 +530,6 @@ Press **x** to show external programs menu. Programs have access to TFM environm
 
 **See detailed documentation**: [External Programs Feature](EXTERNAL_PROGRAMS_FEATURE.md)
 
-### Remote Log Monitoring
-```bash
-# Start TFM with remote monitoring
-python3 tfm.py --remote-log-port 8888
-
-# Connect from another terminal
-python3 tools/tfm_log_client.py localhost 8888
-```
-
-**See detailed documentation**: [Remote Log Monitoring Feature](REMOTE_LOG_MONITORING_FEATURE.md)
-
 ### Pane Layout
 ```
 [        - Make left pane smaller
@@ -588,40 +562,6 @@ T        - Toggle fallback color mode for terminal compatibility
 TFM shows animated progress indicators during long-running operations like searching files.
 
 **See detailed documentation**: [Log Redraw Trigger Feature](LOG_REDRAW_TRIGGER_FEATURE.md)
-
-### Performance Profiling
-Enable performance profiling to investigate rendering and input handling performance:
-
-```bash
-# Enable profiling mode
-python3 tfm.py --profile
-```
-
-When profiling is enabled:
-- **FPS measurements** are printed every 5 seconds
-- **Profile files** are generated for key events and rendering
-- **Profile data** is saved to `profiling_output/` directory
-
-#### Analyzing Profile Files
-
-Use Python's pstats module:
-```bash
-python3 -m pstats profiling_output/key_profile_*.prof
-```
-
-Or use snakeviz for visual analysis:
-```bash
-pip install snakeviz
-snakeviz profiling_output/render_profile_*.prof
-```
-
-#### Use Cases
-- Investigating slow rendering or key response
-- Comparing terminal vs desktop mode performance
-- Testing performance optimizations
-- Benchmarking on different systems
-
-**See detailed documentation**: [Performance Profiling Feature](PERFORMANCE_PROFILING_FEATURE.md)
 
 ---
 
@@ -712,67 +652,33 @@ PROGRAMS = [
 
 ### Basic Usage
 ```bash
-python3 tfm.py                    # Default startup (terminal mode)
-python3 tfm.py --desktop          # Desktop mode (macOS only)
-python3 tfm.py --left ~/projects  # Specify left pane
-python3 tfm.py --right ~/docs     # Specify right pane
+python3 tfm.py                    # Terminal (curses) mode — the default
+python3 tfm.py --backend gui      # Native macOS window (requires PyObjC)
+python3 tfm.py --left ~/projects  # Set the left pane's startup directory
+python3 tfm.py --right ~/docs     # Set the right pane's startup directory
 ```
 
 ### Backend Selection
-```bash
-python3 tfm.py --backend curses        # Terminal mode (default)
-python3 tfm.py --backend coregraphics  # Desktop mode (macOS)
-python3 tfm.py --desktop               # Shorthand for desktop mode
-```
-
-### Advanced Options
-```bash
---remote-log-port 8888            # Enable remote monitoring
---profile TARGETS                 # Enable performance profiling (see targets below)
---debug                           # Enable debug mode with full stack traces
---version                         # Show version
---help                            # Show help
-```
-
-#### Performance Profiling
-Enable performance profiling for specific targets:
+`--backend` chooses the rendering backend:
 
 ```bash
-python3 tfm.py --profile event              # Profile event loop iterations
-python3 tfm.py --profile rendering          # Profile C++ renderer (CoreGraphics only)
-python3 tfm.py --profile rendering,event    # Profile multiple targets
+python3 tfm.py --backend tui      # Terminal / curses (alias: --backend curses) — default
+python3 tfm.py --backend gui      # Native macOS window (alias: --backend macos)
 ```
 
-**Available profiling targets:**
-- `event` - Profile event loop iterations using cProfile
-- `rendering` - Profile C++ renderer metrics (CoreGraphics backend only)
-
-Profiling data helps identify performance bottlenecks and optimize TFM's responsiveness.
-
-#### Debug Mode
-Enable detailed error reporting for troubleshooting:
-
+### All Options
 ```bash
-python3 tfm.py --debug
+--backend {tui,curses,gui,macos}  # Rendering backend (default: tui)
+--left DIR                        # Left pane startup directory
+--right DIR                       # Right pane startup directory
+--version                         # Show version and exit
+--help                            # Show help and exit
 ```
-
-When debug mode is enabled:
-- Full stack traces are printed for uncaught exceptions
-- Detailed error information helps diagnose issues
-- Useful for reporting bugs or investigating problems
-
-Without debug mode, TFM shows simplified error messages and suggests using `--debug` for details.
 
 ### Combined Options
 ```bash
-# Desktop mode with custom directories
-python3 tfm.py --desktop --left ~/projects --right ~/docs
-
-# Terminal mode with remote logging
-python3 tfm.py --backend curses --remote-log-port 8888
-
-# Desktop mode with profiling
-python3 tfm.py --desktop --profile event
+# macOS GUI with custom startup directories
+python3 tfm.py --backend gui --left ~/projects --right ~/docs
 ```
 
 **See detailed documentation**: [Command Line Directory Arguments Feature](COMMAND_LINE_DIRECTORY_ARGUMENTS_FEATURE.md)
@@ -818,8 +724,6 @@ Check file permissions and disk space
 - Press **?** for built-in help
 - Check feature documentation below
 - Use `--help` command line option
-- Enable remote logging for debugging
-- Use `--profile` for performance profiling
 
 **See detailed documentation**: [Help Dialog Feature](HELP_DIALOG_FEATURE.md)
 
@@ -858,13 +762,9 @@ For detailed information about specific features, see these dedicated guides:
 ### Configuration and Customization
 - [Configuration Feature](CONFIGURATION_FEATURE.md) - Complete configuration reference and customization guide
 
-### Performance and Debugging
-- [Performance Profiling Feature](PERFORMANCE_PROFILING_FEATURE.md) - Performance analysis, optimization, and testing
-
 ### Integration and Extensions
 - [Beyond Compare Integration](BEYONDCOMPARE_INTEGRATION.md) - File comparison tool integration
 - [External Programs Feature](EXTERNAL_PROGRAMS_FEATURE.md) - Custom program integration
-- [Remote Log Monitoring Feature](REMOTE_LOG_MONITORING_FEATURE.md) - Network log streaming
 - [Text Editor Feature](TEXT_EDITOR_FEATURE.md) - External editor integration
 - [VSCode Integration](VSCODE_INTEGRATION.md) - Visual Studio Code integration
 

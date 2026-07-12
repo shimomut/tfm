@@ -37,7 +37,6 @@ class TestFileLogging(unittest.TestCase):
         """Test that file logging is enabled when log_file is provided"""
         log_manager = LogManager(
             self.mock_config,
-            remote_port=None,
             is_desktop_mode=False,
             log_file=self.log_file_path
         )
@@ -54,7 +53,6 @@ class TestFileLogging(unittest.TestCase):
         """Test that file logging is disabled when log_file is None"""
         log_manager = LogManager(
             self.mock_config,
-            remote_port=None,
             is_desktop_mode=False,
             log_file=None
         )
@@ -70,7 +68,6 @@ class TestFileLogging(unittest.TestCase):
         """Test that log messages are written to file"""
         log_manager = LogManager(
             self.mock_config,
-            remote_port=None,
             is_desktop_mode=False,
             log_file=self.log_file_path
         )
@@ -104,7 +101,6 @@ class TestFileLogging(unittest.TestCase):
         """Test that stdout/stderr are also written to file"""
         log_manager = LogManager(
             self.mock_config,
-            remote_port=None,
             is_desktop_mode=False,
             log_file=self.log_file_path
         )
@@ -135,7 +131,6 @@ class TestFileLogging(unittest.TestCase):
         # Should not raise exception
         log_manager = LogManager(
             self.mock_config,
-            remote_port=None,
             is_desktop_mode=False,
             log_file=invalid_path
         )

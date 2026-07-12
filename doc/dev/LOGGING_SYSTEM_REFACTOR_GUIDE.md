@@ -25,7 +25,7 @@ The refactored system uses Python's standard logging framework with custom handl
 │  ┌──────────────────────────────────────────────────────┐   │
 │  │              Python logging.Logger                    │   │
 │  │  ┌────────────┐  ┌────────────┐  ┌────────────┐     │   │
-│  │  │ LogPane    │  │ Stream     │  │ Remote     │     │   │
+│  │  │ LogPane    │  │ Stream     │  │ File       │     │   │
 │  │  │ Handler    │  │ Handler    │  │ Handler    │     │   │
 │  │  └─────┬──────┘  └─────┬──────┘  └─────┬──────┘     │   │
 │  └────────┼────────────────┼────────────────┼────────────┘   │
@@ -43,8 +43,8 @@ The refactored system uses Python's standard logging framework with custom handl
 ┌─────────────────────────────────────────────────────────────┐
 │                    Output Destinations                       │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │  Log Pane    │  │  Original    │  │  Remote      │      │
-│  │  (Visual)    │  │  Streams     │  │  Clients     │      │
+│  │  Log Pane    │  │  Original    │  │  Log File    │      │
+│  │  (Visual)    │  │  Streams     │  │  (on disk)   │      │
 │  └──────────────┘  └──────────────┘  └──────────────┘      │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -54,7 +54,7 @@ The refactored system uses Python's standard logging framework with custom handl
 1. **LogManager**: Central configuration and coordination point
 2. **LogPaneHandler**: Routes messages to TFM's visual log display
 3. **StreamOutputHandler**: Routes messages to original stdout/stderr
-4. **RemoteMonitoringHandler**: Broadcasts messages to TCP clients
+4. **FileLoggingHandler**: Writes messages to a log file
 5. **LogCapture**: Converts stdout/stderr writes to LogRecords
 
 ## Using the New Logging System
@@ -86,7 +86,6 @@ TFM uses descriptive logger names for different components:
 - **"DirDiff"**: Directory diff viewer logging
 - **"Archive"**: Archive operations logging
 - **"Search"**: Search operations logging
-- **"Remote"**: Remote monitoring logging
 
 ### Log Levels
 
@@ -198,10 +197,6 @@ config = LoggingConfig(
     stream_output_desktop_default=True,
     stream_output_terminal_default=False,
     
-    # Remote monitoring settings
-    remote_monitoring_enabled=False,
-    remote_monitoring_port=9999,
-    
     # Log level settings
     default_log_level=logging.INFO,
     logger_levels={
@@ -216,11 +211,10 @@ config = LoggingConfig(
 Change configuration at runtime without restart:
 
 ```python
-# Enable remote monitoring
+# Reconfigure handlers at runtime
 log_manager.configure_handlers(
     log_pane_enabled=True,
-    stream_output_enabled=True,
-    remote_enabled=True
+    stream_output_enabled=True
 )
 
 # Disable log pane for debugging
@@ -257,19 +251,6 @@ Messages are automatically color-coded in the log pane:
 - **STDOUT**: Cyan color
 - **STDERR**: Magenta color
 
-### Remote Monitoring
-
-Enable TCP-based remote monitoring:
-
-```python
-# Enable remote monitoring on port 9999
-log_manager.configure_handlers(
-    remote_enabled=True
-)
-
-# Connect from external client
-# telnet localhost 9999
-```
 
 Messages are broadcast as JSON:
 
@@ -321,14 +302,6 @@ If one handler fails, others continue:
 logger.info("This message reaches all working handlers")
 ```
 
-### Client Failure Recovery
-
-Remote clients are automatically removed on failure:
-
-```python
-# Client disconnects are handled gracefully
-# Other clients continue receiving messages
-```
 
 ### Stream Write Failures
 
@@ -483,18 +456,6 @@ log_manager.set_default_level(logging.WARNING)
 config.max_log_messages = 500
 ```
 
-### Remote Monitoring Not Working
-
-Check configuration:
-
-```python
-# Verify remote monitoring is enabled
-log_manager.configure_handlers(remote_enabled=True)
-
-# Check port is not in use
-# netstat -an | grep 9999
-```
-
 ## Implementation Details
 
 ### Handler Pipeline
@@ -538,6 +499,6 @@ Potential improvements:
 
 ## Conclusion
 
-The refactored logging system provides a standard, flexible, and powerful logging infrastructure for TFM. By using Python's standard logging module, developers can leverage familiar patterns while maintaining TFM's unique features like log pane display, remote monitoring, and configurable output routing.
+The refactored logging system provides a standard, flexible, and powerful logging infrastructure for TFM. By using Python's standard logging module, developers can leverage familiar patterns while maintaining TFM's unique features like log pane display, file logging, and configurable output routing.
 
 For questions or issues, refer to the requirements and design documents in `.kiro/specs/logging-system-refactor/`.

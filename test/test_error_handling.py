@@ -16,7 +16,7 @@ import threading
 import time
 from io import StringIO
 
-from tfm_logging_handlers import LogPaneHandler, StreamOutputHandler, RemoteMonitoringHandler
+from tfm_logging_handlers import LogPaneHandler, StreamOutputHandler
 
 
 class FailingHandler(logging.Handler):
@@ -126,67 +126,6 @@ def test_stream_write_failure_suppression():
     
     # Verify the stream write was attempted
     assert failing_stream.write_called, "Stream write should have been attempted"
-
-
-def test_remote_client_failure_recovery():
-    """
-    Test that remote client failures are handled gracefully.
-    
-    Requirement 12.2: When remote client connections fail, the system
-    shall remove the client and continue.
-    """
-    print("\nTesting remote client failure recovery...")
-    
-    # Find an available port
-    test_port = 19999
-    
-    # Create RemoteMonitoringHandler
-    handler = RemoteMonitoringHandler(test_port)
-    handler.start_server()
-    
-    # Give server time to start
-    time.sleep(0.2)
-    
-    try:
-        # Connect a client
-        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        client_socket.connect(('localhost', test_port))
-        
-        # Give connection time to be accepted
-        time.sleep(0.2)
-        
-        # Verify client is in the list
-        initial_client_count = len(handler.clients)
-        assert initial_client_count == 1, f"Client should be connected, but got {initial_client_count} clients"
-        
-        # Close the client socket (simulate client failure)
-        client_socket.close()
-        
-        # Give time for the close to propagate
-        time.sleep(0.1)
-        
-        # Create a logger and emit multiple messages
-        # The first message might not detect the failure immediately,
-        # but subsequent messages should detect it and remove the client
-        logger = logging.getLogger("test_client_failure")
-        logger.setLevel(logging.DEBUG)
-        logger.handlers.clear()
-        logger.addHandler(handler)
-        
-        # Emit multiple messages to ensure failure is detected
-        for i in range(3):
-            logger.info(f"Test message {i} after client failure")
-            time.sleep(0.1)
-        
-        # Verify failed client was removed
-        final_client_count = len(handler.clients)
-        assert final_client_count == 0, f"Failed client should have been removed, but got {final_client_count} clients"
-        
-        print("✓ Remote client failure recovery works correctly")
-        
-    finally:
-        # Clean up
-        handler.stop_server()
 
 
 def test_multiple_handler_failures():

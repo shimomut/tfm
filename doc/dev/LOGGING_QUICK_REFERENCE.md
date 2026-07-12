@@ -226,31 +226,6 @@ for item in items:
 logger.info(f"Processing {len(items)} items")
 ```
 
-## Remote Monitoring
-
-### Enable
-
-```python
-log_manager.configure_handlers(remote_enabled=True)
-```
-
-### Connect
-
-```bash
-telnet localhost 9999
-```
-
-### Message Format
-
-```json
-{
-    "timestamp": "14:23:45",
-    "source": "FileOp",
-    "level": "INFO",
-    "message": "Operation completed"
-}
-```
-
 ## Advanced Features
 
 ### Thread Safety
@@ -358,7 +333,6 @@ config = LoggingConfig(
     log_pane_enabled=True,
     max_log_messages=1000,
     stream_output_enabled=None,  # Auto-detect
-    remote_monitoring_enabled=False,
     default_log_level=logging.INFO,
     logger_levels={
         "FileOp": logging.DEBUG,

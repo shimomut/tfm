@@ -10,7 +10,7 @@ import logging
 import threading
 import time
 
-from tfm_logging_handlers import LogPaneHandler, StreamOutputHandler, RemoteMonitoringHandler
+from tfm_logging_handlers import LogPaneHandler, StreamOutputHandler
 
 
 
@@ -122,15 +122,6 @@ def test_requirement_1_2_is_stream_capture_flag():
     assert "INFO:" not in output or output.strip() == "Raw stream"
     
     print("  ✓ StreamOutputHandler handles is_stream_capture flag")
-    
-    # Test RemoteMonitoringHandler
-    remote_handler = RemoteMonitoringHandler(port=0)
-    
-    # Should not crash with is_stream_capture flag
-    remote_handler.emit(stream_record)
-    remote_handler.emit(logger_record)
-    
-    print("  ✓ RemoteMonitoringHandler handles is_stream_capture flag")
 
 
 def test_requirement_2_1_log_pane_routing():
@@ -204,38 +195,6 @@ def test_requirement_3_5_original_streams():
         print("  ✓ StreamOutputHandler correctly uses provided stream")
     finally:
         sys.__stdout__ = original_stdout
-
-
-def test_requirement_4_1_tcp_connections():
-    """
-    Requirement 4.1: RemoteMonitoringHandler supports TCP connections
-    """
-    print("Testing Requirement 4.1: TCP connection support")
-    
-    handler = RemoteMonitoringHandler(port=0)  # Port 0 = OS chooses
-    
-    # Start server
-    handler.start_server()
-    
-    # Give server time to start
-    time.sleep(0.1)
-    
-    # Verify server is running
-    assert handler.running, "Server not running"
-    assert handler.server_socket is not None, "Server socket not created"
-    assert handler.server_thread is not None, "Server thread not created"
-    assert handler.server_thread.is_alive(), "Server thread not alive"
-    
-    # Stop server
-    handler.stop_server()
-    
-    # Give server time to stop
-    time.sleep(0.1)
-    
-    # Verify server stopped
-    assert not handler.running, "Server still running"
-    
-    print("  ✓ RemoteMonitoringHandler supports TCP connections")
 
 
 def test_thread_safety():

@@ -86,7 +86,7 @@ in `src/`. The `src/` modules, grouped by concern:
 - **`tfm_text_layout.py`** — text measurement / wrapping / layout helpers
 
 ### Logging
-- **`tfm_log_manager.py`** — unified logger (`getLogger`) with remote monitoring
+- **`tfm_log_manager.py`** — unified logger (`getLogger`) with in-app log pane
 - **`tfm_logging_handlers.py`** — logging handlers (in-app log pane, remote)
 
 ### Backend, state & misc

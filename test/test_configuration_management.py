@@ -27,10 +27,6 @@ def test_logging_config_defaults():
     assert config.stream_output_desktop_default == True
     assert config.stream_output_terminal_default == False
     
-    # Remote monitoring settings
-    assert config.remote_monitoring_enabled == False
-    assert config.remote_monitoring_port is None
-    
     # Log level settings
     assert config.default_log_level == logging.INFO
     assert config.logger_levels == {}
@@ -48,8 +44,6 @@ def test_logging_config_custom_values():
         log_pane_enabled=False,
         max_log_messages=500,
         stream_output_enabled=True,
-        remote_monitoring_enabled=True,
-        remote_monitoring_port=9999,
         default_log_level=logging.DEBUG,
         logger_levels={"Main": logging.WARNING}
     )
@@ -57,8 +51,6 @@ def test_logging_config_custom_values():
     assert config.log_pane_enabled == False
     assert config.max_log_messages == 500
     assert config.stream_output_enabled == True
-    assert config.remote_monitoring_enabled == True
-    assert config.remote_monitoring_port == 9999
     assert config.default_log_level == logging.DEBUG
     assert config.logger_levels == {"Main": logging.WARNING}
     
@@ -80,8 +72,7 @@ def test_configure_handlers_method_exists():
     # Check it can be called with arguments
     log_manager.configure_handlers(
         log_pane_enabled=True,
-        stream_output_enabled=False,
-        remote_enabled=False
+        stream_output_enabled=False
     )
     
     # Cleanup
@@ -118,12 +109,10 @@ def test_handler_attributes_exist():
     # Check handler attributes exist
     assert hasattr(log_manager, '_log_pane_handler')
     assert hasattr(log_manager, '_stream_output_handler')
-    assert hasattr(log_manager, '_remote_monitoring_handler')
 
     # Initially, handlers should be None (not configured yet)
     assert log_manager._log_pane_handler is None
     assert log_manager._stream_output_handler is None
-    assert log_manager._remote_monitoring_handler is None
     
     # Cleanup
     log_manager.restore_stdio()

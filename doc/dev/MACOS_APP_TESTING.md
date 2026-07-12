@@ -19,7 +19,7 @@ Essential tests to verify basic functionality:
 - [ ] File operations complete successfully (view, copy, move, delete)
 - [ ] Application quits cleanly (Q key, Cmd+Q, Dock menu)
 - [ ] Multiple windows work independently
-- [ ] Development mode still works (`python3 tfm.py --desktop`)
+- [ ] Development mode still works (`python3 tfm.py --backend gui`)
 
 ## Detailed Test Procedures
 
@@ -228,7 +228,7 @@ Essential tests to verify basic functionality:
 1. Open Terminal and navigate to project directory
 2. Run TFM in terminal mode: `python3 tfm.py`
 3. Quit (press Q)
-4. Run TFM in desktop mode: `python3 tfm.py --desktop`
+4. Run TFM in desktop mode: `python3 tfm.py --backend gui`
 5. Quit (press Q)
 
 **Expected Results:**
@@ -300,7 +300,7 @@ Essential tests to verify basic functionality:
 1. Check if window is hidden (use Mission Control or Cmd+Tab)
 2. Check Console.app for Python errors
 3. Verify CoreGraphics backend is working
-4. Try development mode: `python3 tfm.py --desktop`
+4. Try development mode: `python3 tfm.py --backend gui`
 
 ### Keyboard/Mouse Not Working
 

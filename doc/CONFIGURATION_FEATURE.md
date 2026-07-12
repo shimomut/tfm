@@ -353,20 +353,6 @@ Adjust log pane height at runtime using `{` and `}` keys.
 
 See `doc/LOGGING_FEATURE.md` for more details.
 
-#### Remote Monitoring
-
-Enable remote log monitoring:
-
-```python
-# Enable remote monitoring
-REMOTE_MONITORING_ENABLED = False
-
-# Remote monitoring port
-REMOTE_MONITORING_PORT = 9999
-```
-
-See `doc/REMOTE_LOG_MONITORING_FEATURE.md` for details.
-
 ### Text Editor
 
 Configure the default text editor:

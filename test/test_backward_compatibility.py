@@ -25,7 +25,7 @@ def test_add_message_routes_through_logging():
     
     # Create LogManager with log pane enabled, no remote monitoring
     config = MockConfig()
-    log_manager = LogManager(config, remote_port=None)
+    log_manager = LogManager(config)
     
     # Verify LogPaneHandler is created
     assert log_manager._log_pane_handler is not None, "LogPaneHandler should be created"
@@ -66,7 +66,7 @@ def test_add_message_error_source_uses_warning_level():
     
     # Create LogManager
     config = MockConfig()
-    log_manager = LogManager(config, remote_port=None)
+    log_manager = LogManager(config)
     
     # Add an error message
     log_manager.add_message("ERROR", "This is an error message")
@@ -96,7 +96,7 @@ def test_add_message_reaches_all_handlers():
     # Create LogManager with stream output enabled (desktop mode enables the
     # stream-output handler that echoes to the original stdout/stderr).
     config = MockConfig()
-    log_manager = LogManager(config, remote_port=None, is_desktop_mode=True)
+    log_manager = LogManager(config, is_desktop_mode=True)
 
     # Verify both handlers are created
     assert log_manager._log_pane_handler is not None, "LogPaneHandler should be created"
@@ -141,7 +141,7 @@ def test_add_startup_messages_uses_add_message():
     
     # Create LogManager
     config = MockConfig()
-    log_manager = LogManager(config, remote_port=None)
+    log_manager = LogManager(config)
     
     # Add startup messages
     log_manager.add_startup_messages("1.0.0", "https://github.com/test/repo", "TestApp")
@@ -178,7 +178,7 @@ def test_backward_compatibility_with_existing_code():
     
     # Create LogManager
     config = MockConfig()
-    log_manager = LogManager(config, remote_port=None)
+    log_manager = LogManager(config)
     
     # Simulate existing code patterns
     log_manager.add_message("FileOp", "File copied successfully")

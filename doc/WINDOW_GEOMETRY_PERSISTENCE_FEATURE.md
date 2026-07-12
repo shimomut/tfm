@@ -101,7 +101,7 @@ macOS should automatically detect this and reposition the window. If it doesn't:
 2. **Permissions issue** - TFM may not have permission to write to user defaults.
 
 **Solution**:
-1. Verify you're running TFM in desktop mode: `python tfm.py --backend coregraphics`
+1. Verify you're running TFM in desktop mode: `python tfm.py --backend gui`
 2. Check console output for any warning messages about persistence failures
 3. Try resetting the window geometry using the demo script
 

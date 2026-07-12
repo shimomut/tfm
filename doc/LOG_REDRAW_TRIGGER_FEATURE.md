@@ -28,7 +28,6 @@ If something goes wrong, error messages appear immediately:
 Configuration changes and system events show up right away:
 - "Configuration loaded"
 - "Color scheme changed"
-- "Remote log server started"
 
 ## Benefits
 
@@ -46,7 +45,6 @@ Configuration changes and system events show up right away:
 
 This feature works automatically - there's nothing you need to set up or configure. It works with:
 - All existing log messages
-- Remote log monitoring (if you use it)
 - All color schemes
 - All file operations
 
