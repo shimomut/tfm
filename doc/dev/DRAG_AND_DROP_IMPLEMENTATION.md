@@ -6,7 +6,7 @@
 > toolkit. That layer is now the external **[PuiKit](https://github.com/crftwr/puikit)**
 > framework (`../puikit`; see its `docs/drag_drop.md` and `puikit/backends/`), where
 > the APIs differ. TFM's application-layer drag-initiation design still applies.
-> See [PUIKIT_PORTING_PLAN.md](PUIKIT_PORTING_PLAN.md).
+> See [PROJECT_HISTORY.md](PROJECT_HISTORY.md).
 
 ## Overview
 

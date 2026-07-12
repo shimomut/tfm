@@ -16,7 +16,7 @@ current codebase:
 
 **For current information:**
 
-- The port itself and remaining work → [`../PUIKIT_PORTING_PLAN.md`](../PUIKIT_PORTING_PLAN.md)
+- The port itself → [`../PROJECT_HISTORY.md`](../PROJECT_HISTORY.md); remaining follow-up work is tracked as GitHub issues
 - Rendering / backend / event internals → the PuiKit repo's own documentation
 - TFM-layer feature behavior → the corresponding `*_FEATURE.md` / `*_IMPLEMENTATION.md` that remain in `doc/` and `doc/dev/`
 

@@ -6,7 +6,7 @@
 > classes, and the CoreGraphics backend describe the old rendering layer; the
 > equivalent code now lives in the PuiKit repo (`../puikit`, e.g. `puikit/menu.py`
 > and `puikit/backends/`), where the event/menu APIs differ. TFM's
-> application-layer menu design still applies. See [PUIKIT_PORTING_PLAN.md](PUIKIT_PORTING_PLAN.md).
+> application-layer menu design still applies. See [PROJECT_HISTORY.md](PROJECT_HISTORY.md).
 
 ## Overview
 

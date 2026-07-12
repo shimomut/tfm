@@ -115,8 +115,7 @@ non-interactively (they block).
 
 - **`doc/*_FEATURE.md`** — end-user feature docs (usage, behavior)
 - **`doc/dev/*_IMPLEMENTATION.md`, `*_SYSTEM.md`** — developer docs (design, internals)
-- **`doc/dev/PUIKIT_PORTING_PLAN.md`** — living record of the ttk→PuiKit port and remaining tasks
-- **`doc/dev/PROJECT_HISTORY.md`** — project timeline
+- **`doc/dev/PROJECT_HISTORY.md`** — project timeline, including the ttk→PuiKit port
 - **`doc/dev/_archived/`** — pre-PuiKit toolkit-internal docs (renderer / backend / event-system internals that now live in the PuiKit repo), kept for reference only
 
 ## Entry Points

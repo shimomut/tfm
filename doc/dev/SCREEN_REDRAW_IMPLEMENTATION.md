@@ -5,7 +5,7 @@
 > moved to the external **[PuiKit](https://github.com/crftwr/puikit)** framework
 > (`puikit/backends/curses_backend.py`, `puikit/backend.py`), where the API may
 > differ. TFM's redraw-trigger design still applies. See
-> [PUIKIT_PORTING_PLAN.md](PUIKIT_PORTING_PLAN.md).
+> [PROJECT_HISTORY.md](PROJECT_HISTORY.md).
 
 ## Problem
 

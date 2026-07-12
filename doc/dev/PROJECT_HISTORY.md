@@ -262,8 +262,8 @@ Windows backends.
   on macOS, DPI-aware rendering and packaging on Windows.
 
 PuiKit is now installed editable from a sibling `../puikit` checkout rather than
-vendored. The living record of the port and its remaining tasks is
-[PUIKIT_PORTING_PLAN.md](PUIKIT_PORTING_PLAN.md).
+vendored. The port is complete; remaining follow-up tasks are tracked as GitHub
+issues.
 
 **Key Achievement**: The UI framework became a reusable, independently-versioned
 project, and TFM became one of its applications rather than its host.

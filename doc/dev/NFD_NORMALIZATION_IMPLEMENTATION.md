@@ -5,7 +5,7 @@
 > layer is now the external **[PuiKit](https://github.com/crftwr/puikit)** framework
 > (`puikit/backends/`), which owns text-drawing normalization today. TFM's own
 > filesystem-side NFD handling (in `src/tfm_path.py`) still applies. See
-> [PUIKIT_PORTING_PLAN.md](PUIKIT_PORTING_PLAN.md).
+> [PROJECT_HISTORY.md](PROJECT_HISTORY.md).
 
 ## Overview
 
