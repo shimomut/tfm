@@ -625,7 +625,9 @@ class TfmApp:
             on_drag=lambda i, ev: self._start_drag("right", i, ev),
             on_drop=lambda i, paths: self._on_drop("right", i, paths),
         )
-        self.log = LogView(max_lines=2000, auto_scroll=True, wrap=True)
+        # Same chrome inset as the bars: the log's surface fills its slot, its
+        # text breathes in from the frame (BAR_PAD_PX on GUI, flush on the grid).
+        self.log = LogView(max_lines=2000, auto_scroll=True, wrap=True, padding_px=BAR_PAD_PX)
         self.status = StatusBar(self)
         # One Menu model drives the OS-native menu bar on macOS (an NSMenu) and an
         # in-window strip on curses — the Panel resolves which, so we never branch.
