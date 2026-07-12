@@ -64,6 +64,7 @@ from tfm_file_list_manager import FileListManager  # noqa: E402
 from tfm_file_monitor_manager import FileMonitorManager  # noqa: E402
 from tfm_file_pane import FilePane  # noqa: E402
 from tfm_filter_list_dialog import show_filter_list  # noqa: E402
+from tfm_completion import FilepathCompleter  # noqa: E402
 from tfm_input_dialog import show_input  # noqa: E402
 from tfm_progressive_search_dialog import show_progressive_search  # noqa: E402
 from tfm_isearch_bar import ISearchBar  # noqa: E402
@@ -2431,7 +2432,9 @@ class TfmApp:
             self.panel.render()
 
         show_input(self.panel, title="New Directory", prompt="Name:",
-                   on_accept=accept, validate=validate, region=self._active_pane_region())
+                   on_accept=accept, validate=validate,
+                   completer=FilepathCompleter(base_directory=str(pane["path"])),
+                   region=self._active_pane_region())
         self.panel.render()
 
     def create_file(self) -> None:
@@ -2462,7 +2465,9 @@ class TfmApp:
             self.panel.render()
 
         show_input(self.panel, title="New File", prompt="Name:",
-                   on_accept=accept, validate=validate, region=self._active_pane_region())
+                   on_accept=accept, validate=validate,
+                   completer=FilepathCompleter(base_directory=str(pane["path"])),
+                   region=self._active_pane_region())
         self.panel.render()
 
     def rename(self) -> None:
@@ -2509,7 +2514,9 @@ class TfmApp:
             self.panel.render()
 
         show_input(self.panel, title="Rename", prompt="Rename to:", text=original,
-                   on_accept=accept, validate=validate, region=self._active_pane_region())
+                   on_accept=accept, validate=validate,
+                   completer=FilepathCompleter(base_directory=str(entry.parent)),
+                   region=self._active_pane_region())
         self.panel.render()
 
     def batch_rename(self, files: list) -> None:
@@ -2895,6 +2902,7 @@ class TfmApp:
 
         show_input(self.panel, title="Create Archive", prompt="Archive filename:",
                    text=initial, on_accept=accept, validate=validate, select_all=False,
+                   completer=FilepathCompleter(base_directory=str(dest_dir)),
                    region=self._active_pane_region())
         self.panel.render()
         return False
@@ -3135,7 +3143,8 @@ class TfmApp:
     def jump_to_path(self) -> None:
         """Prompt for a directory path and navigate the active pane there.
         Accepts ``~``, relative (to the current path), and absolute paths;
-        mirrors ttk TFM's jump-to-path. (TAB path completion is a later phase.)"""
+        mirrors ttk TFM's jump-to-path. TAB completes directory names via
+        :class:`tfm_completion.FilepathCompleter`."""
         pane = self.active_pane()
         current = str(pane["path"])
 
@@ -3173,6 +3182,7 @@ class TfmApp:
         initial = current if current.endswith(os.sep) else current + os.sep
         show_input(self.panel, title="Jump to Path", prompt="Path:", text=initial,
                    on_accept=accept, validate=validate, select_all=False,
+                   completer=FilepathCompleter(base_directory=current, directories_only=True),
                    region=self._active_pane_region())
         self.panel.render()
 

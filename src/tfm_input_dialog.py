@@ -35,6 +35,13 @@ from puikit.widgets.base import Widget
 from puikit.widgets.text_edit import TextEdit
 
 from tfm_dialog_geometry import draw_title_bar, pane_anchored_box
+from tfm_completion import Completer, CompletionController
+from tfm_candidate_list import CandidateListOverlay, overlay_geometry
+
+#: Keys the candidate list consumes for navigation while it is showing; up/pageup
+#: step the highlight backward, down/pagedown forward.
+_NAV_KEYS = frozenset({"up", "down", "pageup", "pagedown"})
+_NAV_UP = frozenset({"up", "pageup"})
 
 
 class InputDialog(FocusContainer, Widget):
@@ -56,6 +63,7 @@ class InputDialog(FocusContainer, Widget):
         on_change: Callable[[str], None] | None = None,
         validate: Callable[[str], str | None] | None = None,
         select_all: bool = True,
+        completer: Completer | None = None,
     ):
         self.title = title
         self.prompt = prompt
@@ -83,6 +91,19 @@ class InputDialog(FocusContainer, Widget):
         self._field_rect = Rect(0.0, 0.0, 0.0, 0.0)
         self._size: tuple[float, float] = (0.0, 0.0)
 
+        # TAB completion (optional). The controller mutates ``self.edit`` and
+        # tracks the candidate state; the overlay is a separate, lower-z layer this
+        # dialog pushes/positions/removes (created lazily on first activation). The
+        # z is the dialog's own layer z, set by ``show_input``.
+        self._completion = CompletionController(self.edit, completer) if completer is not None else None
+        self._overlay: CandidateListOverlay | None = None
+        self._z = 70
+        # Captured each draw so the overlay can be anchored to the field: the
+        # dialog's absolute layer rect (to translate forwarded mouse coords) and
+        # the field's absolute rect (to place the popup under/above it).
+        self._dialog_rect: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)
+        self._field_screen_rect = Rect(0.0, 0.0, 0.0, 0.0)
+
     # --- focus ---------------------------------------------------------------
 
     def focus_children(self) -> list[Any]:
@@ -109,9 +130,77 @@ class InputDialog(FocusContainer, Widget):
             self.on_cancel()
 
     def _close(self) -> None:
+        self._remove_overlay()  # never leave a stray candidate layer behind
         panel = self._panel
         if panel is not None and panel.has_layers and panel._layers[-1].widget is self:
             panel.pop_layer()
+
+    # --- completion overlay --------------------------------------------------
+
+    def _overlay_slot(self) -> Any:
+        """The candidate overlay's layer slot, or None when it isn't pushed."""
+        panel = self._panel
+        if panel is None or self._overlay is None:
+            return None
+        for slot in panel._layers:
+            if slot.widget is self._overlay:
+                return slot
+        return None
+
+    def _remove_overlay(self) -> None:
+        if self._overlay is not None and self._panel is not None:
+            self._panel.remove(self._overlay)  # no-op if it isn't pushed
+
+    def _sync_overlay(self) -> None:
+        """Reflect the controller's state onto the overlay layer: create+push it
+        while candidates are showing, tear it down otherwise. The rect is a
+        placeholder — ``draw`` positions the overlay each frame from measured field
+        geometry (it draws after this dialog), so it never flashes at a wrong spot."""
+        c = self._completion
+        panel = self._panel
+        if c is None or panel is None:
+            return
+        if c.active and c.candidates:
+            if self._overlay is None:
+                self._overlay = CandidateListOverlay(on_activate=self._on_candidate_click)
+            if self._overlay_slot() is None:
+                # Above the dialog (higher z) so the popup hugs the field, but
+                # NON-INTERACTIVE so events/focus stay with the dialog beneath.
+                r = self._field_screen_rect
+                panel.push_layer(
+                    self._overlay, z=self._z + 1, interactive=False,
+                    hints={"x": r.x, "y": r.y + r.h, "w": 1.0, "h": 1.0, "shadow": True},
+                )
+            self._overlay.set_state(c.candidates, c.focused_index)
+        else:
+            self._remove_overlay()
+
+    def _on_candidate_click(self, index: int) -> None:
+        """A candidate row was clicked: apply it, close the list, and notify a
+        live prompt of the changed text (the enclosing event still triggers a
+        render)."""
+        c = self._completion
+        if c is None:
+            return
+        c.apply_index(index)
+        self._remove_overlay()
+        if self.on_change is not None:
+            self.on_change(self.edit.text)
+
+    def _forward_overlay_click(self, event: Event) -> bool:
+        """If a mouse event falls within the (lower-z, so non-topmost) overlay,
+        consume it here — forwarding a click to the overlay's row hit-test — so it
+        doesn't read as an outside-click that cancels the dialog. Coords arrive
+        dialog-local; convert to absolute, then to overlay-local."""
+        slot = self._overlay_slot()
+        if slot is None or event.x is None:
+            return False
+        dx, dy, _dw, _dh = self._dialog_rect
+        if not slot.rect.contains(event.x + dx, event.y + dy):
+            return False
+        if event.type is EventType.MOUSE_CLICK:
+            self._overlay.handle_event(event.translated(dx - slot.rect.x, dy - slot.rect.y))
+        return True
 
     # --- drawing -------------------------------------------------------------
 
@@ -147,6 +236,27 @@ class InputDialog(FocusContainer, Widget):
         ctx.draw_child(
             self.edit, field_x, y, field_w, 1.0, hints={"focused": True},
         )
+
+        # Anchor geometry for the completion overlay. Capture this layer's absolute
+        # rect (to translate forwarded mouse coords) and the field's absolute rect
+        # (a placeholder anchor for the push). The overlay is a higher-z layer, so
+        # it draws *after* this dialog: position its slot here, from the measured
+        # width of the text before the token, and it lands correctly under the field
+        # this same frame — on a proportional (GUI) font too, with no flash.
+        dx, dy, dw, dh = ctx.screen_rect
+        self._dialog_rect = (dx, dy, dw, dh)
+        self._field_screen_rect = Rect(dx + field_x, dy + y, field_w, 1.0)
+        c = self._completion
+        if c is not None and c.active and self._overlay is not None:
+            slot = self._overlay_slot()
+            if slot is not None:
+                token_x = dx + field_x + 1.0 + ctx.measure_text(self.edit.text[:c.completion_start_pos])
+                row_h = ctx.line_height(Style(fg=theme.text if theme else None))
+                sw, sh = self._panel.backend.size_units
+                slot.rect = Rect(*overlay_geometry(
+                    dx + field_x, dy + y, 1.0, token_x, c.candidates,
+                    ctx.measure_text, row_h, sw, sh,
+                ))
         y += 1
 
         if self._error:
@@ -165,16 +275,45 @@ class InputDialog(FocusContainer, Widget):
             return True
         if event.type is EventType.KEY:
             key = event.key
+            c = self._completion
+            if key == "tab" and c is not None:
+                # TAB completes the token: insert the common prefix and, when
+                # several matches remain, open (or refresh) the candidate list.
+                c.on_tab()
+                self._sync_overlay()
+                return True
             if key == "escape":
-                self._cancel()
-            elif key == "enter":
-                self._accept()
-            else:
-                # Editing clears a stale validation message as the user retypes.
-                self._error = ""
-                before = self.edit.text
-                self.edit.handle_event(event)
-                if self.on_change is not None and self.edit.text != before:
+                # Esc closes the candidate list first; a second Esc cancels.
+                if c is not None and c.active:
+                    c.dismiss()
+                    self._remove_overlay()
+                else:
+                    self._cancel()
+                return True
+            if key == "enter":
+                # A highlighted candidate is accepted into the field; with none
+                # highlighted, Enter is an ordinary submit.
+                if c is not None and c.accept():
+                    self._remove_overlay()
+                    if self.on_change is not None:
+                        self.on_change(self.edit.text)
+                else:
+                    self._accept()
+                return True
+            if c is not None and c.active and key in _NAV_KEYS:
+                c.move_focus(-1 if key in _NAV_UP else 1)
+                self._sync_overlay()
+                return True
+            # Ordinary editing. Clears a stale validation message as the user
+            # retypes, and refreshes the candidate list if it's open.
+            self._error = ""
+            before = self.edit.text
+            self.edit.handle_event(event)
+            if self.edit.text != before:
+                if c is not None:
+                    c.on_text_changed()
+                    self._sync_overlay()
+                if self.on_change is not None:
                     self.on_change(self.edit.text)
             return True
 
@@ -187,6 +326,8 @@ class InputDialog(FocusContainer, Widget):
                     focus_on_click(self, self.edit)
                 local = event.translated(-self._field_rect.x, -self._field_rect.y)
                 self.edit.handle_event(local)
+            elif self._forward_overlay_click(event):
+                pass  # a click on the candidate list, not an outside-click cancel
             elif event.type is EventType.MOUSE_CLICK and event.x is not None and not (
                 0 <= event.x < self._size[0] and 0 <= event.y < self._size[1]
             ):
@@ -206,6 +347,7 @@ def show_input(
     on_change: Callable[[str], None] | None = None,
     validate: Callable[[str], str | None] | None = None,
     select_all: bool = True,
+    completer: Completer | None = None,
     region: tuple[float, float] | None = None,
     anchor: str = "center",
     z: int = 70,
@@ -219,12 +361,19 @@ def show_input(
     ``(x, width)`` column span to anchor the dialog over the pane it acts on (see
     :func:`tfm_filter_list_dialog.show_filter_list`). ``anchor="top"`` pins the box
     near the top of the window instead of centering it, keeping the list below
-    visible."""
+    visible.
+
+    Pass ``completer`` (a :class:`tfm_completion.Completer`, e.g.
+    :class:`tfm_completion.FilepathCompleter`) to enable TAB completion: TAB then
+    inserts the longest common prefix and, when several matches remain, opens a
+    candidate list (a separate overlay layer below/above the field) that narrows
+    as you type and is navigable with the arrow keys."""
     dialog = InputDialog(
         title=title, prompt=prompt, text=text,
         on_accept=on_accept, on_cancel=on_cancel, on_change=on_change,
-        validate=validate, select_all=select_all,
+        validate=validate, select_all=select_all, completer=completer,
     )
+    dialog._z = z
     sw, sh = panel.backend.size_units
     w = max(36.0, min(sw * 0.6, 64.0))
     # pad + title bar + field + error row + pad. Error shares the row directly
