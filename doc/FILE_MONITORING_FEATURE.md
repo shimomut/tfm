@@ -81,13 +81,20 @@ Native mode provides instant change detection with minimal resource usage (typic
 
 ### Fallback Mode (Polling)
 
-When native monitoring isn't available, TFM automatically switches to polling mode. This happens with:
-- **S3 buckets** and cloud storage
+When native monitoring isn't available on a **local** path, TFM automatically switches to polling mode. This happens with:
 - **Network mounts** without change notification support
-- **Remote filesystems** over SSH or similar protocols
-- **Unsupported storage backends**
+- **Local filesystems** whose native change-notification API is unavailable
 
-In fallback mode, TFM checks for changes every 5 seconds (configurable). While less responsive than native mode, it ensures monitoring works everywhere.
+In fallback mode, TFM checks for changes every 5 seconds (configurable). While less responsive than native mode, it ensures monitoring works everywhere on local storage.
+
+### Remote and Cloud Backends (Monitoring Disabled)
+
+Automatic monitoring only works on paths that live in the local filesystem. For remote or virtual backends it is **disabled** — not even polling can watch them, because there is no local path to scan. This applies to:
+- **S3 buckets** and cloud storage
+- **Remote filesystems** over SSH/SFTP
+- **Archives** browsed in place
+
+For these locations the file list does not refresh automatically; refresh manually (re-enter the directory) to see changes. TFM skips monitoring for them silently instead of reporting errors.
 
 ### Fallback Mode Indicator
 
@@ -131,7 +138,11 @@ During automatic updates, TFM preserves your context:
 **Check for fallback mode indicator:**
 - If you see the fallback mode indicator, monitoring is working but using polling
 - Changes may take up to 5 seconds to appear (or your configured polling interval)
-- This is normal for S3, network mounts, and remote filesystems
+- This is normal for network mounts and local filesystems without native change notifications
+
+**Browsing S3, SSH, or an archive?**
+- Automatic monitoring is disabled for remote and virtual backends — there is no local path to watch
+- The file list won't refresh on its own; re-enter the directory to pick up changes
 
 **Check the log file:**
 - TFM logs monitoring activity with the "FileMonitor" component name

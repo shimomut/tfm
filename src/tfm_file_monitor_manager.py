@@ -187,12 +187,28 @@ class FileMonitorManager:
             
             # Update path
             state['path'] = path
-            
+
             # Check if this is an unsupported backend (S3, SSH/SFTP, network mounts)
             # Requirements 6.4, 6.5
             monitoring_mode = self._detect_monitoring_mode(path)
+
+            # Remote/virtual backends (S3, SSH/SFTP, archives) cannot be watched
+            # by watchdog at all — not even in polling mode, which still stats the
+            # raw path and raises [Errno 2] on e.g. "s3://bucket/" (issue #181).
+            # Skip monitoring cleanly instead of cascading through failing retries
+            # and polling fallbacks that all log errors and end up disabled anyway.
+            if monitoring_mode == "disabled":
+                self.logger.debug(
+                    f"Filesystem monitoring not supported for {pane_name} pane backend: {path} "
+                    f"- skipping (watchdog only monitors local paths)"
+                )
+                state['observer'] = None
+                state['error_count'] = 0
+                state['retry_count'] = 0
+                return
+
             force_polling = (monitoring_mode == "polling")
-            
+
             if force_polling:
                 self.logger.debug(f"Unsupported backend detected for {pane_name} pane: {path} - forcing polling mode")
             
@@ -319,37 +335,54 @@ class FileMonitorManager:
     def _detect_monitoring_mode(self, path: Path) -> str:
         """
         Detect the appropriate monitoring mode for a path.
-        
-        Checks if the path is on an unsupported storage backend (S3, network mounts, etc.)
-        and returns the appropriate monitoring mode.
-        
+
+        watchdog (both its native and PollingObserver backends) can only watch
+        paths that live in the local filesystem — it ultimately calls
+        os.scandir()/os.stat() on the raw path string. Remote and virtual
+        backends (S3, SSH/SFTP, archives) are not mounted locally, so even
+        polling mode fails: scheduling a watch on "s3://bucket/" raises
+        [Errno 2] No such file or directory (issue #181). For those backends
+        monitoring must be disabled entirely rather than attempted.
+
         Args:
             path: Path to check
-            
+
         Returns:
             "native", "polling", or "disabled"
         """
+        # Preferred check: the TFM Path abstraction knows its own storage
+        # scheme. watchdog only understands local ('file') paths, so disable
+        # monitoring for every other backend (s3, ssh, scp, ftp, archive, …).
+        get_scheme = getattr(path, "get_scheme", None)
+        if callable(get_scheme):
+            try:
+                scheme = get_scheme()
+            except Exception as e:
+                self.logger.debug(f"Could not determine scheme for {path}: {e}")
+                scheme = None
+            if scheme is not None and scheme != "file":
+                self.logger.debug(f"Remote/virtual backend detected ({scheme}): {path} - monitoring disabled")
+                return "disabled"
+
         path_str = str(path)
-        
-        # Check for S3 paths (requirement 6.4)
-        # Note: Path() normalizes "s3://" to "s3:", so check for both
-        if path_str.startswith('s3:') or path_str.startswith('/s3/'):
-            self.logger.debug(f"Detected S3 path: {path} - will use polling mode")
-            return "polling"
-        
-        # Check for SSH/remote paths
-        # Note: Path() normalizes "ssh://" to "ssh:", so check for both
-        if path_str.startswith('ssh:') or path_str.startswith('sftp:'):
-            self.logger.debug(f"Detected SSH/remote path: {path} - will use polling mode")
-            return "polling"
-        
-        # Check for network mounts (common patterns)
-        # This is a heuristic - network mounts can be mounted anywhere
-        # but commonly appear in /mnt, /net, or have network-like names
+
+        # Fallback heuristics for plain str/pathlib paths that don't expose
+        # get_scheme(). These remote/virtual URIs cannot be watched by watchdog
+        # either. Note: pathlib normalizes "s3://" to "s3:", so match the bare
+        # scheme prefix as well as the collapsed "/s3/" form.
+        if path_str.startswith(('s3:', '/s3/', 'ssh:', 'sftp:', 'scp:', 'ftp:', 'archive:')):
+            self.logger.debug(f"Remote/virtual path detected: {path} - monitoring disabled")
+            return "disabled"
+
+        # Check for network mounts (common patterns). Unlike the backends above,
+        # network mounts present as real local filesystem paths, so watchdog's
+        # polling observer can watch them. This is a heuristic - network mounts
+        # can be mounted anywhere but commonly appear in /mnt, /net, or use
+        # UNC-style paths.
         if any(pattern in path_str for pattern in ['/mnt/', '/net/', '//']) and not path.exists():
             self.logger.debug(f"Detected potential network mount: {path} - will use polling mode")
             return "polling"
-        
+
         # For local filesystem, let FileMonitorObserver try native first
         # It will automatically fall back to polling if native fails
         return "native"

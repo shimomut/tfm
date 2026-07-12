@@ -660,39 +660,59 @@ class PollingObserver(BaseObserver):
 - Detects all change types
 
 **Use Cases**:
-- S3 paths (no native monitoring)
 - Network mounts without notification support
-- SSH/SFTP paths
-- Archive paths (zip, tar, etc.)
-- After native monitoring failures
+- Local filesystems whose native API is unavailable
+- After native monitoring failures on a local path
+
+> **Note:** Polling only works on the **local** filesystem. watchdog's
+> `PollingObserver` still calls `os.scandir()`/`os.stat()` on the raw path, so
+> it cannot watch remote/virtual backends (S3, SSH/SFTP, archives) — those are
+> **disabled**, not polled. Attempting to poll `s3://bucket/` raised
+> `[Errno 2] No such file or directory` (issue #181).
 
 ### Backend Detection
 
-FileMonitorManager automatically detects when to use fallback mode:
+FileMonitorManager decides per-path whether native monitoring, polling, or no
+monitoring applies. The primary signal is the storage scheme reported by the
+TFM `Path` abstraction (`get_scheme()`); string heuristics are a fallback for
+plain `str`/`pathlib` paths that don't expose it.
 
 ```python
 def _detect_monitoring_mode(self, path: Path) -> str:
     """
     Detect appropriate monitoring mode for a path.
-    
+
     Returns:
         "native" - Use OS-native monitoring
-        "polling" - Use fallback polling mode
-        "disabled" - Monitoring not possible
+        "polling" - Use fallback polling mode (local paths only)
+        "disabled" - Monitoring not possible (remote/virtual backends)
     """
+    # Preferred: watchdog only understands local ('file') paths; disable
+    # monitoring for every other backend (s3, ssh, scp, ftp, archive, …).
+    get_scheme = getattr(path, "get_scheme", None)
+    if callable(get_scheme):
+        scheme = get_scheme()
+        if scheme is not None and scheme != "file":
+            return "disabled"
+
     path_str = str(path)
-    
-    # Check for unsupported backends
-    if path_str.startswith('s3://'):
+
+    # Fallback heuristics for plain str/pathlib paths without get_scheme().
+    if path_str.startswith(('s3:', '/s3/', 'ssh:', 'sftp:', 'scp:', 'ftp:', 'archive:')):
+        return "disabled"
+
+    # Network mounts are real local paths, so polling can watch them.
+    if any(p in path_str for p in ['/mnt/', '/net/', '//']) and not path.exists():
         return "polling"
-    if path_str.startswith('ssh://') or path_str.startswith('sftp://'):
-        return "polling"
-    if any(path_str.endswith(ext) for ext in ['.zip', '.tar', '.tar.gz', '.tgz']):
-        return "disabled"  # Archive paths cannot be monitored
-    
+
     # Default to native for local paths
     return "native"
 ```
+
+When `_detect_monitoring_mode()` returns `"disabled"`, `_start_pane_monitoring()`
+skips observer creation entirely — it does **not** create an observer, increment
+`error_count`, or schedule retries — so browsing an S3/SSH/archive pane no longer
+cascades through failing polling fallbacks.
 
 
 ## Configuration
@@ -1221,11 +1241,14 @@ To add support for new storage backends:
 ```python
 def _detect_monitoring_mode(self, path: Path) -> str:
     path_str = str(path)
-    
-    # Add detection for new backend
+
+    # Add detection for new backend. Remote/virtual backends that aren't
+    # mounted in the local filesystem must return "disabled" — watchdog
+    # (even PollingObserver) can only watch real local paths. Return
+    # "polling" only for backends that DO present as local paths.
     if path_str.startswith('newbackend://'):
-        return "polling"  # or "native" if supported
-    
+        return "disabled"  # or "native"/"polling" if it maps to a local path
+
     # ... existing detection logic ...
 ```
 

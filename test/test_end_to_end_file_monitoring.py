@@ -606,25 +606,25 @@ class TestErrorScenarios(unittest.TestCase):
         # Either we have a new observer or we're in retry state
         self.assertTrue(state['observer'] is not None or state['retry_count'] > 0)
     
-    def test_s3_path_uses_fallback_mode(self):
-        """Test that S3 paths automatically use fallback mode."""
+    def test_s3_path_disables_monitoring(self):
+        """S3 paths can't be watched by watchdog, so monitoring is disabled (issue #181)."""
         s3_path = Path("s3://bucket/path")
-        
+
         # Detect monitoring mode
         mode = self.manager._detect_monitoring_mode(s3_path)
-        
-        # Should use polling mode for S3
-        self.assertEqual(mode, "polling")
-    
-    def test_ssh_path_uses_fallback_mode(self):
-        """Test that SSH paths automatically use fallback mode."""
+
+        # Monitoring must be disabled for S3, not attempted via polling
+        self.assertEqual(mode, "disabled")
+
+    def test_ssh_path_disables_monitoring(self):
+        """SSH paths can't be watched by watchdog, so monitoring is disabled (issue #181)."""
         ssh_path = Path("ssh://server/path")
-        
+
         # Detect monitoring mode
         mode = self.manager._detect_monitoring_mode(ssh_path)
-        
-        # Should use polling mode for SSH
-        self.assertEqual(mode, "polling")
+
+        # Monitoring must be disabled for SSH, not attempted via polling
+        self.assertEqual(mode, "disabled")
 
 
 class TestEventCoalescing(unittest.TestCase):

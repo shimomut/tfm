@@ -180,29 +180,59 @@ class TestFileMonitorManagerLifecycle(unittest.TestCase):
         self.assertIn(mode, ["native", "polling"])
     
     def test_detect_s3_path(self):
-        """Test detection of S3 paths for fallback mode"""
+        """S3 paths cannot be watched by watchdog, so monitoring is disabled (issue #181)"""
         s3_path = Path("s3://bucket/path")
         mode = self.manager._detect_monitoring_mode(s3_path)
-        self.assertEqual(mode, "polling")
-        
+        self.assertEqual(mode, "disabled")
+
         s3_path2 = Path("/s3/bucket/path")
         mode2 = self.manager._detect_monitoring_mode(s3_path2)
-        self.assertEqual(mode2, "polling")
-    
+        self.assertEqual(mode2, "disabled")
+
     def test_detect_ssh_path(self):
-        """Test detection of SSH/remote paths for fallback mode"""
+        """SSH/SFTP paths cannot be watched by watchdog, so monitoring is disabled (issue #181)"""
         ssh_path = Path("ssh://server/path")
         mode = self.manager._detect_monitoring_mode(ssh_path)
-        self.assertEqual(mode, "polling")
-        
+        self.assertEqual(mode, "disabled")
+
         sftp_path = Path("sftp://server/path")
         mode2 = self.manager._detect_monitoring_mode(sftp_path)
-        self.assertEqual(mode2, "polling")
+        self.assertEqual(mode2, "disabled")
     
     def test_detect_local_path(self):
         """Test detection of local filesystem paths"""
         mode = self.manager._detect_monitoring_mode(self.left_path)
         self.assertEqual(mode, "native")
+
+    def test_detect_remote_path_via_scheme(self):
+        """A TFM Path whose scheme is not 'file' disables monitoring (issue #181).
+
+        This is the real-world case: an S3 pane holds a tfm_path.Path whose
+        str() is 's3://bucket/', and detection must key off get_scheme() rather
+        than fragile string prefixes."""
+        remote_path = Mock()
+        remote_path.get_scheme.return_value = "s3"
+        remote_path.__str__ = Mock(return_value="s3://bucket/")
+        mode = self.manager._detect_monitoring_mode(remote_path)
+        self.assertEqual(mode, "disabled")
+
+    def test_start_pane_monitoring_skips_remote_backend(self):
+        """Starting monitoring on a remote (S3) pane must skip cleanly, not error.
+
+        Regression test for issue #181: watchdog's polling observer raised
+        [Errno 2] on 's3://bucket/'. Detection now disables monitoring for the
+        pane without creating an observer or accumulating error/retry counts."""
+        remote_path = Mock()
+        remote_path.get_scheme.return_value = "s3"
+        remote_path.__str__ = Mock(return_value="s3://bucket/")
+
+        self.manager._start_pane_monitoring('left', remote_path)
+
+        state = self.manager.monitoring_state['left']
+        self.assertIsNone(state['observer'])
+        self.assertEqual(state['error_count'], 0)
+        self.assertEqual(state['retry_count'], 0)
+        self.assertFalse(state['failed_permanently'])
     
     def test_suppress_reloads(self):
         """Test reload suppression"""
