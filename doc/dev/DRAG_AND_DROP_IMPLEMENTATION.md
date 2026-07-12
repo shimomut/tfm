@@ -1064,8 +1064,6 @@ Before releasing platform support:
 - `doc/DRAG_AND_DROP_FEATURE.md` - End-user documentation
 - `doc/MOUSE_EVENT_SUPPORT_FEATURE.md` - Mouse event infrastructure
 - `doc/dev/MOUSE_EVENT_SYSTEM.md` - Mouse event system implementation
-- `.kiro/specs/drag-and-drop/requirements.md` - Feature requirements
-- `.kiro/specs/drag-and-drop/design.md` - Feature design document
 
 ## Changelog
 

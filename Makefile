@@ -5,8 +5,8 @@
 # Python interpreter selection
 # All Python is run through the project virtual environment (.venv). There is no
 # fallback to a system python3 - run 'make venv' first to create the environment.
-# An absolute path is used so targets that change directories (e.g. "cd ttk && ...")
-# still resolve the same interpreter.
+# An absolute path is used so targets that change directories still resolve the
+# same interpreter.
 # venv layout differs by platform: POSIX uses .venv/bin/, Windows uses .venv/Scripts/.
 # Detected via `uname -s` rather than $(OS) - MSYS2/Git-Bash make does not
 # reliably inherit the Windows OS environment variable.
@@ -169,21 +169,17 @@ clean:
 	@find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
 	@rm -rf build/ dist/ 2>/dev/null || true
 
-install: check-venv
-	@echo "Installing TTK..."
-	@cd ttk && $(PIP) install .
+install: check-venv install-puikit
 	@echo "Installing TFM..."
 	@$(PIP) install .
 
 uninstall: check-venv
 	@echo "Uninstalling TFM..."
 	@$(PIP) uninstall -y tfm
-	@echo "Uninstalling TTK..."
-	@$(PIP) uninstall -y ttk
+	@echo "Uninstalling PuiKit..."
+	@$(PIP) uninstall -y puikit
 
-dev-install: check-venv
-	@echo "Installing TTK in development mode..."
-	@cd ttk && $(PIP) install -e .
+dev-install: check-venv install-puikit
 	@echo "Installing TFM in development mode..."
 	@$(PIP) install -e .
 

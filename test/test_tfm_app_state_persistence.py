@@ -2,7 +2,7 @@
 Cross-session state persistence for the PuiKit TfmApp.
 
 Replaces the legacy ``test_state_restoration_*`` coverage, which targeted the
-old curses ``FileManager`` (now under ``legacy/src/tfm_main.py``). Here we drive
+old curses ``FileManager`` (the old ``tfm_main.py``, since removed). Here we drive
 the new ``TfmApp`` state hooks directly against a real ``TFMStateManager`` backed
 by a temp database, so save/restore is exercised end to end without standing up
 the whole PuiKit UI.

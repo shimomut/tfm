@@ -8,7 +8,7 @@ directory. Shared by both bundle builds — ``macos_app/build.sh`` (into
 ``Lib\\site-packages``); it makes no OS assumptions.
 
 Rather than copying the entire virtual environment (which drags in test/build
-tooling such as pytest, delocate and the retired ``ttk`` toolkit), this resolves
+tooling such as pytest and delocate), this resolves
 the dependency closure of ``requirements.txt`` using the installed package
 metadata and copies only those distributions. Environment markers are honoured,
 so platform-specific requirements (``pyobjc; sys_platform == "darwin"``,

@@ -250,7 +250,7 @@ capability-based framework that runs the same widget code on curses, macOS, and
 Windows backends.
 
 - **`ttk` fully removed from `src/`.** The old toolkit and the UI modules bound to
-  it were frozen under `legacy/`; no `import ttk` remains in the live app.
+  it were removed (preserved in git history); no `import ttk` remains in the live app.
 - **The app collapsed onto PuiKit widgets.** The shell became a top-level `tfm.py`
   driving dual `FilePane` widgets in a `Splitter(Splitter(left, right), log)`
   layout; dialogs, menus (native `NSMenu` on macOS, in-window strip on curses),

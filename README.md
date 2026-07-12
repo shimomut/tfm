@@ -343,9 +343,8 @@ tfm/
 │   └── tools/     # External programs for end users
 ├── tools/         # Development tools and utilities
 ├── test/          # Test files (1000+ passing tests)
-├── doc/           # User documentation
-│   └── dev/       # Developer documentation (+ dev/_archived/ for retired toolkit docs)
-└── legacy/        # Pre-PuiKit-port code (retired: old ttk src/test/demo)
+└── doc/           # User documentation
+    └── dev/       # Developer documentation
 ```
 
 > TFM's UI framework, **PuiKit**, is **not** in this tree — it lives in its own

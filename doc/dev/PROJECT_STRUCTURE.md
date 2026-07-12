@@ -6,8 +6,8 @@ TFM (Terminal File Manager) is organized so that the file-manager application,
 its tests, and its documentation stay cleanly separated. Since the **PuiKit
 port**, the rendering/UI toolkit is no longer vendored in this repo — TFM depends
 on the external [PuiKit](https://github.com/crftwr/puikit) framework, and the old
-in-repo `ttk` toolkit (plus the UI modules bound to it) is frozen under
-`legacy/`.
+in-repo `ttk` toolkit (plus the UI modules bound to it) was removed after the
+port (preserved in git history).
 
 ## Directory Structure
 
@@ -18,13 +18,10 @@ tfm/
 ├── test/                   # Unit / integration tests (test_*.py), run with pytest
 ├── doc/                    # End-user docs (*_FEATURE.md, guides)
 │   └── dev/                # Developer docs (*_IMPLEMENTATION.md, *_SYSTEM.md, plans)
-│       └── _archived/      # Retired pre-PuiKit toolkit-internal docs (reference only)
 ├── tools/                  # Internal dev/build utilities (*.py, *.sh)
 ├── macos_app/              # macOS .app packaging (see MACOS_APP_BUILD_SYSTEM.md)
 ├── windows_app/            # Windows packaging (see WINDOWS_APP_BUILD_SYSTEM.md)
-├── legacy/                 # Frozen pre-PuiKit code (old ttk toolkit + ttk-bound UI). Not executed.
 ├── temp/                   # Throwaway work-in-progress files
-├── _archived/              # Retired Kiro specs
 ├── .kiro/                  # Historical Kiro design specs (reference, not authoritative)
 ├── setup.py                # Package setup for pip installation
 ├── Makefile                # Build automation (run, test, venv, install-puikit, macos-app, ...)
@@ -107,16 +104,14 @@ PYTHONPATH=.:src pytest test/test_tfm_path.py -v    # one file
 ```
 
 `make test` runs the suite; `make test-quick` runs a fast subset. Interactive
-demos are **not** here — the old TFM demos are retired under `legacy/demo/`, and
-PuiKit ships its own demos in `../puikit/demo/`. Neither should be launched
-non-interactively (they block).
+demos are **not** here — PuiKit ships its own demos in `../puikit/demo/`, which
+should not be launched non-interactively (they block).
 
 ## Documentation (`doc/`)
 
 - **`doc/*_FEATURE.md`** — end-user feature docs (usage, behavior)
 - **`doc/dev/*_IMPLEMENTATION.md`, `*_SYSTEM.md`** — developer docs (design, internals)
 - **`doc/dev/PROJECT_HISTORY.md`** — project timeline, including the ttk→PuiKit port
-- **`doc/dev/_archived/`** — pre-PuiKit toolkit-internal docs (renderer / backend / event-system internals that now live in the PuiKit repo), kept for reference only
 
 ## Entry Points
 
@@ -146,10 +141,3 @@ non-interactively (they block).
 
 - User config at `~/.tfm/config.py`, created from `src/_config.py`
 - Defaults / constants / colors in `src/tfm_config.py`, `src/tfm_const.py`, `src/tfm_colors.py`
-
-## The `legacy/` boundary
-
-A module moved to `legacy/` iff it transitively imported the old `ttk` toolkit;
-everything `ttk`-free stayed in `src/`. `legacy/` is frozen and **not executed**
-— its imports point at `src/` paths it no longer sits on. Consult it for old
-behavior, not to run it. See `legacy/README.md`.

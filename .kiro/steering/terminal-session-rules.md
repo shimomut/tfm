@@ -34,7 +34,7 @@ pytest test/test_file.py -v
 **Why this is needed:**
 - The TFM application is `tfm.py` at the repo root; its modules are in `src/`
 - The UI framework, **PuiKit**, is external (installed editable from `../puikit`), so it is already importable — no path entry needed
-- There is no longer a `ttk/` directory (removed in the PuiKit port; the old code is frozen under `legacy/`)
+- There is no longer a `ttk/` directory (removed in the PuiKit port)
 - Setting PYTHONPATH ensures imports of `tfm` and `tfm_*` work correctly
 
 ## Git Command Standards
@@ -63,7 +63,7 @@ Commands that don't need it: `status`, `add`, `commit`, `push`, `pull`
 
 ### Demo and Test Script Guidelines
 
-**The application (`tfm.py`) and demos (`legacy/demo/*.py`, `../puikit/demo/*.py`):**
+**The application (`tfm.py`) and demos (`../puikit/demo/*.py`):**
 - ❌ **DO NOT execute** - These launch interactive TUI/GUI applications that require user input
 - ✅ **Only inspect code** to verify implementation
 - If user explicitly requests running the app or a demo, warn them it will block and suggest they run it manually
@@ -76,7 +76,7 @@ Commands that don't need it: `status`, `add`, `commit`, `push`, `pull`
 ### Identifying Blocking Programs
 
 Programs that will block execution:
-- `tfm.py` (the file manager itself) and any file in `legacy/demo/` or `../puikit/demo/`
+- `tfm.py` (the file manager itself) and any file in `../puikit/demo/`
 - Scripts that import `curses`, PuiKit backends, or `tfm_*` UI components
 - Scripts with event loops or `while True` without timeout
 - Scripts that call `.run()`, `.mainloop()`, or similar blocking methods

@@ -2,9 +2,9 @@
 
 TFM is a TUI file manager. The application lives at the repo root (`tfm.py`) plus the `tfm_*` modules in `src/`, with tests in `test/` and docs in `doc/`. Its rendering/UI layer runs on **[PuiKit](https://github.com/crftwr/puikit)** — an external, capability-based framework that runs the same widget code on curses, macOS, and Windows backends. PuiKit is **not vendored** here; it is installed editable from `../puikit` (see `make install-puikit`).
 
-The pre-PuiKit code — the old in-repo **`ttk`** toolkit and the UI modules bound to it — is frozen under `legacy/` for reference only. Don't edit it, import from it, or treat it as current.
+The pre-PuiKit code — the old in-repo **`ttk`** toolkit and the UI modules bound to it — has been removed; consult git history if you ever need it. Don't reintroduce it or import from it.
 
-Historical Kiro design docs live in `.kiro/specs/<feature>/` (and retired ones in `_archived/specs/`) — useful as reference for existing features, but not authoritative for current state. Source of truth is the code.
+Historical Kiro design docs live in `.kiro/specs/<feature>/` — useful as reference for existing features, but not authoritative for current state. Source of truth is the code.
 
 ---
 
@@ -35,7 +35,7 @@ Use `--no-pager` for any git command that may page output: `diff`, `log`, `show`
 ### Don't run TUIs
 
 - **Never execute `tfm.py`** — it launches the interactive file manager (curses / native PuiKit backend) and blocks indefinitely. Read the source instead.
-- Anything importing `curses`, PuiKit backends, or `tfm_*` UI components is blocking. PuiKit demos (`../puikit/demo/*.py`) and the retired demos under `legacy/demo/*.py` block too.
+- Anything importing `curses`, PuiKit backends, or `tfm_*` UI components is blocking. PuiKit demos (`../puikit/demo/*.py`) block too.
 - `test/test_*.py` are safe — run them with `pytest`, not `python` directly.
 - If the user explicitly wants to see the app or a demo, tell them to run it manually rather than starting it yourself.
 - Last-resort timeout wrapper: `python3 tools/timeout.py 5 python <script>`.
@@ -53,12 +53,10 @@ Use `--no-pager` for any git command that may page output: `diff`, `log`, `show`
 | End-user external programs | `src/tools/` | `*.sh`, `*.py` |
 | TFM end-user docs | `doc/` | `FEATURE_NAME_FEATURE.md` |
 | TFM developer docs | `doc/dev/` | `SYSTEM_NAME_SYSTEM.md`, `FEATURE_NAME_IMPLEMENTATION.md` |
-| Retired pre-PuiKit code | `legacy/` | frozen, not executed |
 | Temporary files | `temp/` | `temp_*`, `TEMP_*` |
 
 - `tools/` is for internal/dev utilities. `src/tools/` is for end-user-facing external programs (different audience).
 - PuiKit is a separate project (`../puikit`, its own repo). Don't add UI-toolkit / backend / renderer code to TFM — that belongs in PuiKit.
-- `legacy/` is frozen reference (the old `ttk`-era code). Don't edit it or import from it in new code.
 - Use `temp/` for any throwaway file produced during development.
 
 ### Documentation policy

@@ -2,8 +2,8 @@
 Filesystem-monitoring wiring for the PuiKit TfmApp.
 
 Replaces the legacy ``test_reload_*`` coverage, which targeted the old curses
-``FileManager._handle_reload_request`` / reload queue (now under
-``legacy/src/tfm_main.py``). Here we drive the ported wiring on ``TfmApp``:
+``FileManager._handle_reload_request`` / reload queue (the old curses
+``tfm_main.py``, since removed). Here we drive the ported wiring on ``TfmApp``:
 
   * observer threads post pane names to ``TfmApp.reload_queue``
   * ``_process_reload_queue`` drains them on the main thread

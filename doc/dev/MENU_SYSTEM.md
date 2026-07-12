@@ -1426,7 +1426,6 @@ def show_context_menu(self, file_path: Path, position: Tuple[int, int]):
 
 - **End-User Documentation**: `doc/MENU_BAR_FEATURE.md` (includes keyboard shortcuts reference)
 - **Developer Documentation**: `doc/dev/MENU_SYSTEM.md` (this file)
-- **Keyboard Shortcuts Implementation**: `doc/dev/_archived/KEYBOARD_SHORTCUTS_IMPLEMENTATION.md` (archived — pre-PuiKit)
 
 ## References
 

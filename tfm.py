@@ -13,7 +13,7 @@ text and diff viewers, and the create / rename / batch-rename / favorites /
 jump-to-path dialogs are all wired — as are file operations (copy / move /
 delete, threaded with progress and per-conflict resolution via ``tfm_task``),
 archive browsing, and remote storage (S3 / SFTP). The original ttk implementation
-is kept for reference under ``legacy/``.
+was removed after the port (see git history).
 
     python tfm.py                       # TUI (curses)
     python tfm.py --backend gui         # macOS GUI

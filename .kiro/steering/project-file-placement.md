@@ -11,10 +11,8 @@ inclusion: always
 - `test/` - TFM test files (`test_*.py`)
 - `doc/` - TFM end-user documentation (`FEATURE_NAME_FEATURE.md`)
 - `doc/dev/` - TFM developer documentation (`SYSTEM_NAME_SYSTEM.md`, `FEATURE_NAME_IMPLEMENTATION.md`)
-- `doc/dev/_archived/` - Retired pre-PuiKit toolkit-internal docs (reference only)
 - `tools/` - Development tools and scripts for Kiro/developers (`*.sh`, `*.py`)
 - `src/tools/` - External programs for end users (`*.sh`, `*.py`)
-- `legacy/` - Frozen pre-PuiKit code (old `ttk` toolkit + ttk-bound UI); not executed
 - `temp/` - Temporary files during development
 
 > **PuiKit** (the UI framework) is **not** in this repo — it lives in `../puikit`
@@ -39,7 +37,6 @@ inclusion: always
 | TFM tests | `test/` | `test_*.py` |
 | Development tools | `tools/` | `*.sh`, `*.py` |
 | End-user external programs | `src/tools/` | `*.sh`, `*.py` |
-| Retired pre-PuiKit code | `legacy/` | frozen, not executed |
 | Temporary files | `temp/` | `temp_*`, `TEMP_*` |
 
 ## Key Rules
