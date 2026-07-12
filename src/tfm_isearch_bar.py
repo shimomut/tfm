@@ -171,3 +171,76 @@ class ISearchBar(FocusContainer, Widget):
                     self.on_cancel()
             return True
         return True  # modal: swallow everything else
+
+
+class ViewerISearch:
+    """Drives an :class:`ISearchBar` for a full-window modal viewer (text / diff).
+
+    The viewer owns match computation and highlighting; this owns the bar's
+    lifecycle — building it, pushing it as a thin overlay pinned to the viewer's
+    footer row, and tearing it down on Enter / Esc — so both viewers get the main
+    file manager's incremental-search UX without each re-implementing the
+    plumbing (the same reason the main window's search lives in ``ISearchBar``).
+
+    The viewer supplies five callbacks:
+        recompute(pattern): fired live on every keystroke — recompute the match
+            set, repaint highlights, and jump to the nearest match.
+        navigate(delta):    Up (``-1``) / Down (``+1``) — walk to the prev / next
+            match.
+        status():           returns ``(position, total)`` for the bar's counter.
+        accept():           Enter — keep the current match; clear the search chrome.
+        cancel():           Esc / outside click — restore the pre-search view.
+    """
+
+    def __init__(self, *, recompute, navigate, status, accept, cancel):
+        self._recompute = recompute
+        self._navigate = navigate
+        self._status = status
+        self._accept = accept
+        self._cancel = cancel
+        self.active = False
+        self._bar: ISearchBar | None = None
+        self._panel = None
+
+    def open(self, panel, footer_rect, z: int) -> None:
+        """Open the search bar over ``footer_rect`` (``(x, y, w, h)`` in the
+        panel's size units, e.g. the viewer's footer row). No-op when already open
+        or the footer hasn't been captured yet (nothing to anchor to)."""
+        if self.active or panel is None or footer_rect is None:
+            return
+        self.active = True
+        self._panel = panel
+        self._bar = ISearchBar(
+            on_change=self._recompute,
+            on_navigate=self._navigate,
+            on_submit=self._accept_and_close,
+            on_cancel=self._cancel_and_close,
+            get_status=self._status,
+        )
+        x, y, w, h = footer_rect
+        # Pinned over the footer with the "status" surface so it reads as the
+        # viewer's bottom bar; z sits above the viewer's own layer so it becomes
+        # the focus root (its TextEdit engages the IME and blinks a caret).
+        panel.push_layer(self._bar, z=z,
+                         hints={"surface": "status", "x": x, "y": y, "w": w, "h": h})
+        panel.render()
+
+    @property
+    def pattern(self) -> str:
+        return self._bar.pattern if self._bar is not None else ""
+
+    def _teardown(self) -> None:
+        self.active = False
+        panel = self._panel
+        if (panel is not None and panel.has_layers
+                and panel._layers[-1].widget is self._bar):
+            panel.pop_layer()
+        self._bar = None
+
+    def _accept_and_close(self) -> None:
+        self._teardown()
+        self._accept()
+
+    def _cancel_and_close(self) -> None:
+        self._teardown()
+        self._cancel()

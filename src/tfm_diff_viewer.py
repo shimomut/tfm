@@ -9,8 +9,12 @@ It reuses the text viewer's file reading and syntax highlighting
 (:mod:`tfm_text_viewer`), so each side keeps its syntax colors with the diff
 tint laid over them. Push it with :func:`show_diff_viewer`.
 
-Keys: ↑/↓/PageUp/PageDown/Home/End scroll; ←/→ scroll horizontally;
-``n``/``N`` jump to the next/previous change; ``q`` or Esc closes.
+Config-driven keys resolve through the shared ``KEY_BINDINGS`` (honouring the
+user's rebinds): the ``search`` binding opens the same ``ISearchBar`` overlay the
+main file manager uses (matches highlighted on both sides, ``Up``/``Down`` walk
+them); ``help`` and ``quit`` do the obvious. ↑/↓/PageUp/PageDown/Home/End scroll,
+←/→ scroll horizontally, and ``n``/``N`` jump to the next/previous *change block*
+(viewer-local, independent of search); Esc closes.
 """
 
 from __future__ import annotations
@@ -24,12 +28,13 @@ from puikit.panel import Rect
 from puikit.widgets import Splitter
 from puikit.widgets.base import Widget
 
-from tfm_config import find_action_for_event, keys_label_for_action
+from tfm_config import is_action_for_event, keys_label_for_action
 from tfm_file_pane import CONTENT_PAD_CELLS  # same l/r content inset as the main panes
+from tfm_isearch_bar import ViewerISearch
 from tfm_text_dialog import keys_markdown, show_markdown
 from tfm_text_viewer import (MONO, _ScrollBody, _content_bg, _header_bg, _highlight,
-                             _is_light, _read_lines, _syntax_palette, draw_hscrollbar,
-                             draw_status_bar, viewer_pad)
+                             _is_light, _match_bg, _read_lines, _syntax_palette,
+                             draw_hscrollbar, draw_status_bar, viewer_pad)
 
 #: Semantic diff hues. The whole-row tints and the stronger changed-character
 #: tints are the theme's *content background* blended toward these, so a diff
@@ -237,12 +242,40 @@ class _DiffPane(Widget):
                     if ve > vs:
                         ctx.draw_text(content_x + (vs - col0_int) - xfrac, y, plain[vs:ve],
                                       Style(fg=text_fg, bg=char_bg, font=MONO))
+                # Incremental-search highlights overlay the diff tint for this side.
+                if v.search_pattern:
+                    self._draw_search(ctx, y, ri, plain, col0_int, xfrac,
+                                      window_end, content_x, text_fg)
             # Gutter (after content) masks the left horizontal bleed, then numbers
             # (inset by the l/r pad so they don't butt the pane edge / splitter).
             ctx.fill_rect(0, y, content_x, 1.0, Style(bg=row_bg))
             if lineno is not None:
                 ctx.draw_text(self._pad, y, str(lineno).rjust(self._gutter - 1),
                               Style(fg=muted, bg=row_bg, font=MONO))
+
+    def _draw_search(self, ctx, y, ri, plain, col0_int, xfrac,
+                     window_end, content_x, text_fg) -> None:
+        """Overlay incremental-search highlights on this side's visible line —
+        every occurrence of the pattern, with the current match row emphasised
+        (firmer tint, like the text viewer)."""
+        v = self.v
+        pat = v.search_pattern.lower()
+        if not pat:
+            return
+        low = plain.lower()
+        is_current = bool(v.search_matches and v.search_pos >= 0
+                          and v.search_matches[v.search_pos] == ri)
+        start = 0
+        while True:
+            hit = low.find(pat, start)
+            if hit < 0:
+                break
+            s, e = hit, hit + len(pat)
+            start = e
+            vs, ve = max(s, col0_int), min(e, window_end)
+            if ve > vs:
+                ctx.draw_text(content_x + (vs - col0_int) - xfrac, y, plain[vs:ve],
+                              Style(fg=text_fg, bg=_match_bg(self._bg, is_current), font=MONO))
 
 
 class DiffViewer(Widget):
@@ -279,6 +312,23 @@ class DiffViewer(Widget):
         self.splitter = Splitter(self.left_pane, self.right_pane,
                                  orientation="horizontal", fraction=0.5,
                                  min_first=10, min_second=10)
+        # Incremental search state (the ``search`` binding). A match is a display
+        # row whose left or right line contains the pattern; both panes highlight
+        # occurrences and the current match row is emphasised. ``_search_origin_top``
+        # is the pre-search scroll (restored on cancel); ``_footer_rect`` is
+        # captured each draw so the ISearchBar can pin over the footer.
+        self.search_pattern = ""
+        self.search_matches: list[int] = []   # display-row indices with a hit
+        self.search_pos = -1
+        self._search_origin_top = 0.0
+        self._footer_rect: tuple[float, float, float, float] | None = None
+        self._isearch = ViewerISearch(
+            recompute=self._search_recompute,
+            navigate=self._search_step,
+            status=self._search_status,
+            accept=self._search_accept,
+            cancel=self._search_cancel,
+        )
 
     def _gutter_w(self) -> int:
         return len(str(max(1, len(self.lines1), len(self.lines2)))) + 1
@@ -316,6 +366,76 @@ class DiffViewer(Widget):
             nxt = next((b for b in reversed(self.blocks) if b < cur), self.blocks[-1])
         self.top = float(nxt)
         self._clamp()
+
+    # --- search --------------------------------------------------------------
+
+    def _enter_search(self) -> None:
+        """Open the incremental-search overlay pinned to the footer (the ``search``
+        binding), reusing the main file manager's ``ISearchBar`` via
+        :class:`ViewerISearch`. Independent of ``n``/``N`` diff-block navigation."""
+        if self._isearch.active or self._footer_rect is None:
+            return
+        self._search_origin_top = self.top
+        self._clear_search()
+        self._isearch.open(self._panel, self._footer_rect, self._child_z)
+
+    def _clear_search(self) -> None:
+        """Drop the highlight chrome (pattern + match set)."""
+        self.search_pattern = ""
+        self.search_matches = []
+        self.search_pos = -1
+
+    def _search_recompute(self, pattern: str) -> None:
+        """Live per-keystroke: rows whose left or right line contains ``pattern``
+        (case-insensitive) become the match set; jump to the nearest match at/after
+        the current scroll, or restore the pre-search view when nothing matches."""
+        self.search_pattern = pattern
+        pat = pattern.lower()
+        self.search_matches = [
+            i for i, r in enumerate(self.rows)
+            if pat in r["l1"].lower() or pat in r["l2"].lower()
+        ] if pat else []
+        if self.search_matches:
+            cur = int(self.top)
+            self.search_pos = next(
+                (k for k, m in enumerate(self.search_matches) if m >= cur), 0)
+            self.top = float(self.search_matches[self.search_pos])
+        else:
+            self.search_pos = -1
+            self.top = self._search_origin_top
+        self._clamp()
+        self._render()
+
+    def _search_step(self, delta: int) -> None:
+        """Up (``delta<0``) / Down (``delta>0``): walk to the previous / next match
+        row, wrapping at the ends. A no-op with no matches."""
+        if not self.search_matches:
+            return
+        self.search_pos = (self.search_pos + delta) % len(self.search_matches)
+        self.top = float(self.search_matches[self.search_pos])
+        self._clamp()
+        self._render()
+
+    def _search_status(self) -> tuple[int, int]:
+        """``(position, total)`` for the bar's counter."""
+        n = len(self.search_matches)
+        return (self.search_pos + 1 if (n and self.search_pos >= 0) else 0, n)
+
+    def _search_accept(self) -> None:
+        """Enter: keep the current match's scroll; clear the highlights."""
+        self._clear_search()
+        self._render()
+
+    def _search_cancel(self) -> None:
+        """Esc / outside click: restore the pre-search scroll and clear."""
+        self.top = self._search_origin_top
+        self._clear_search()
+        self._clamp()
+        self._render()
+
+    def _render(self) -> None:
+        if self._panel is not None:
+            self._panel.render()
 
     # --- drawing -------------------------------------------------------------
 
@@ -373,9 +493,13 @@ class DiffViewer(Widget):
                 draw_hscrollbar(ctx, pad_x + rx, hbar_y, rcw, self.left, rcw, self._max_line)
 
         # Bottom status bar — full-width 'status' surface reaching the bottom edge,
-        # text inset, matching the main window (and the other two viewers).
+        # text inset, matching the main window (and the other two viewers). Its rect
+        # is captured so the ISearchBar can pin over it during a search.
+        self._footer_rect = (0.0, fy, wu, hu - fy)
+        search_k = keys_label_for_action("search", "F")
+        quit_k = keys_label_for_action("quit", "q")
         hint = (f" {len(self.rows)} rows · {len(self.blocks)} changes · "
-                "n/N jump · ←→ pan · drag divider · q close ")
+                f"n/N jump · {search_k} search · ←→ pan · {quit_k}/Esc close ")
         draw_status_bar(ctx, fy, hint, pad_x=pad_x, bottom_pad=pad_y)
 
     # --- events --------------------------------------------------------------
@@ -405,15 +529,17 @@ class DiffViewer(Widget):
         if event.type is not EventType.KEY:
             return True
         key = event.key
-        # Close and help resolve through the shared, config-driven KEY_BINDINGS so
-        # they honour the user's rebinds, matching the main file manager. Esc is the
-        # universal modal dismiss and stays hardcoded; the viewer-only keys below
-        # (scroll, next-diff) remain local to the viewer.
-        action = find_action_for_event(event)
-        if key == "escape" or action == "quit":
+        # Config-driven keys (quit / help / search) resolve through KEY_BINDINGS by
+        # name, so they honour the user's rebinds. Esc is the universal modal
+        # dismiss; the scroll and n/N diff-block keys below are viewer-local. While
+        # a search is open the ISearchBar is the top layer and receives keys, so
+        # this isn't reached.
+        if key == "escape" or is_action_for_event(event, "quit"):
             self._close()
-        elif action == "help":
+        elif is_action_for_event(event, "help"):
             self._show_help()
+        elif is_action_for_event(event, "search"):
+            self._enter_search()
         elif key == "down":
             self.top += 1
         elif key == "up":
@@ -446,6 +572,8 @@ class DiffViewer(Widget):
             ("Home / End", "top / bottom"),
             ("← / →", "scroll horizontally"),
             ("n / N", "next / prev diff block"),
+            (keys_label_for_action("search", "F"), "incremental search"),
+            ("↑ / ↓ (in search)", "next / prev match"),
             ("Drag gutter", "move centre split"),
             (keys_label_for_action("help", "?"), "this help"),
             (keys_label_for_action("quit", "q") + " / Esc", "close"),

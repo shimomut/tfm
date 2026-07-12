@@ -293,6 +293,14 @@ class Config:
         'scroll_log_page_up': ['Shift-LEFT'],  # Scroll log pane up one page (to older messages)
         'scroll_log_page_down': ['Shift-RIGHT'], # Scroll log pane down one page (to newer messages)
         
+        # === Text / Diff Viewer ===
+        # Viewer-only actions. 'search' (F, above) opens incremental search inside
+        # the viewers too. 'toggle_wrap' intentionally shares 'W' with
+        # 'compare_selection': they never apply in the same context (file list vs.
+        # open viewer), and each context matches its own action by name via
+        # KeyBindings.is_action_for_event, so the shared key is unambiguous.
+        'toggle_wrap': ['W'],                  # Text viewer: toggle line wrapping
+
         # === Display & Appearance ===
         'toggle_hidden': ['.'],                # Toggle visibility of hidden files (dotfiles)
         'toggle_color_scheme': ['T'],          # Switch between dark and light color schemes

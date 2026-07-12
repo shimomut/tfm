@@ -231,7 +231,7 @@ When TFM is in a text input mode, mouse events are automatically ignored to prev
    - Prevents accidental clicks during decision-making
 
 3. **I-search Mode**: When searching in the text viewer
-   - Activated by pressing '/' in the text viewer
+   - Activated by the `search` key (default `F`) in the text viewer
    - Mouse clicks are ignored until you exit search mode
    - Prevents accidental scrolling while typing search terms
 
@@ -256,7 +256,7 @@ When TFM is in a text input mode, mouse events are automatically ignored to prev
 **Scenario 2: Searching in Text Viewer**
 ```
 1. Open a file in the text viewer
-2. Press '/' to start i-search → Search prompt appears
+2. Press the `search` key (default `F`) to start i-search → Search bar appears
 3. Type your search term
 4. Accidentally click with mouse → Nothing happens (click ignored)
 5. Press Escape to exit search → I-search mode ends

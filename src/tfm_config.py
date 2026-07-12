@@ -279,7 +279,36 @@ class KeyBindings:
                         return action
 
         return None
-    
+
+    def is_action_for_event(self, event, action: str, has_selection: bool = False) -> bool:
+        """Whether ``event`` triggers a *specific* ``action``.
+
+        Unlike :meth:`find_action_for_event` — which returns the single,
+        globally-first action bound to a key — this tests one named action, so a
+        context (e.g. a viewer) can safely handle a key that another action also
+        uses elsewhere. The text viewer's ``toggle_wrap`` and the main file
+        manager's ``compare_selection`` both bind ``W``; the viewer asks
+        ``is_action_for_event(event, "toggle_wrap")`` and gets the right answer
+        regardless of dict order.
+
+        Args:
+            event: PuiKit ``Event`` (or, transitionally, a ttk ``KeyEvent``)
+            action: The action name to test.
+            has_selection: Whether files are currently selected.
+
+        Returns:
+            True when ``event`` matches one of ``action``'s configured keys and
+            the action's selection requirement is satisfied.
+        """
+        if not event:
+            return False
+        keys, selection_req = self.get_keys_for_action(action)
+        if not keys or not self._check_selection_requirement(selection_req, has_selection):
+            return False
+        key, char, mods = self._event_identity(event)
+        return any(self._matches(self._parse_key_expression(k), key, char, mods)
+                   for k in keys)
+
     def get_keys_for_action(self, action: str) -> tuple:
         """
         Get the key expressions and selection requirement for an action.
@@ -686,6 +715,15 @@ def find_action_for_event(event, has_selection: bool = False):
     """
     key_bindings = config_manager.get_key_bindings()
     return key_bindings.find_action_for_event(event, has_selection)
+
+
+def is_action_for_event(event, action: str, has_selection: bool = False) -> bool:
+    """Whether ``event`` triggers a specific ``action`` (see
+    :meth:`KeyBindings.is_action_for_event`). Lets a context handle a key that a
+    different action also binds elsewhere — e.g. a viewer's ``toggle_wrap`` vs the
+    main file manager's ``compare_selection``, both on ``W``."""
+    key_bindings = config_manager.get_key_bindings()
+    return key_bindings.is_action_for_event(event, action, has_selection)
 
 
 def get_keys_for_action(action: str) -> tuple:

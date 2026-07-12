@@ -180,15 +180,19 @@ The viewer handles various error conditions:
 
 Default key bindings for text viewer:
 
+Config-driven keys resolve through the shared `KEY_BINDINGS` (so they honour the
+user's rebinds); scroll keys are viewer-local.
+
 - `Up/Down`: Scroll one line
 - `PgUp/PgDn`: Scroll one page
 - `Home/End`: Jump to top/bottom
 - `Left/Right`: Horizontal scroll
-- `/`: Start forward search
-- `?`: Start backward search
-- `n`: Next search match
-- `N`: Previous search match
-- `q/Esc`: Exit viewer
+- `search` (default `F`): Open incremental search (the same `ISearchBar` overlay
+  the main file manager uses); `Up`/`Down` walk matches, `Enter` accepts, `Esc`
+  cancels
+- `toggle_wrap` (default `W`): Toggle line wrapping
+- `help` (default `?`): Key reference
+- `quit` (default `Q`) / `Esc`: Exit viewer
 
 ## Testing Considerations
 

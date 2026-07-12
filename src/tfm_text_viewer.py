@@ -3,17 +3,19 @@
 The PuiKit counterpart to ttk TFM's ``TextViewer``: a full-window read-only
 viewer with line numbers, vertical + horizontal scroll, line wrapping, and
 optional pygments syntax highlighting (a soft dependency — without it the text
-shows plain). Search (``/``) highlights matches and ``n`` / ``N`` step between
-them.
+shows plain). Incremental search (the ``search`` binding) opens the same
+``ISearchBar`` overlay the main file manager uses: every match is highlighted and
+``Up``/``Down`` walk between them.
 
 Content is drawn in a fixed-advance face so the line-number gutter, horizontal
 scroll, and search highlights line up by column on the GUI as well as the TUI.
 File reading goes through ``tfm_path.Path`` so it works for every storage
 backend. Push it with :func:`show_text_viewer`.
 
-Keys: ↑/↓/PageUp/PageDown/Home/End scroll vertically; ←/→ scroll horizontally
-(when not wrapping); ``w`` toggles wrap; ``/`` searches, ``n``/``N`` next/prev;
-``q`` or Esc closes.
+Keys resolve through the shared ``KEY_BINDINGS`` (so they honour the user's
+rebinds): ``search`` opens incremental search, ``toggle_wrap`` toggles line wrap,
+``help`` and ``quit`` do the obvious. ↑/↓/PageUp/PageDown/Home/End scroll
+vertically and ←/→ scroll horizontally (viewer-local); Esc closes.
 """
 
 from __future__ import annotations
@@ -28,7 +30,9 @@ from puikit.panel import Rect
 from puikit.text import elide
 from puikit.widgets.base import Widget
 
-from tfm_config import find_action_for_event, keys_label_for_action
+from tfm_config import (get_keys_for_action, is_action_for_event,
+                        keys_label_for_action)
+from tfm_isearch_bar import ViewerISearch
 from tfm_text_dialog import keys_markdown, show_markdown
 
 try:
@@ -327,11 +331,23 @@ class TextViewer(Widget):
         # chunk) so wrapped rows virtualize without re-splitting every frame.
         self._wrap_w = -1
         self._row_map: list[tuple[int, int]] = []
-        # Search state.
-        self.searching = False       # the search bar is open / being typed
+        # Incremental search state. The ISearchBar overlay drives input; this holds
+        # the live pattern (drives highlighting), the ordered match line indices,
+        # and the current match. ``_search_origin_top`` is the pre-search scroll,
+        # restored on cancel. ``_footer_rect`` is captured each draw so the bar can
+        # be pinned exactly over the footer.
         self.pattern = ""
         self.matches: list[int] = []  # source line indices containing pattern
         self.match_pos = -1
+        self._search_origin_top = 0.0
+        self._footer_rect: tuple[float, float, float, float] | None = None
+        self._isearch = ViewerISearch(
+            recompute=self._search_recompute,
+            navigate=self._search_step,
+            status=self._search_status,
+            accept=self._search_accept,
+            cancel=self._search_cancel,
+        )
         # Layout captured each draw, read by the clipped scroll body.
         self._body = _ScrollBody(self._draw_rows)
         self._gutter = 2
@@ -365,19 +381,71 @@ class TextViewer(Widget):
 
     # --- search --------------------------------------------------------------
 
-    def _recompute_matches(self) -> None:
-        pat = self.pattern.lower()
+    def _enter_search(self) -> None:
+        """Open the incremental-search overlay pinned to the footer (the ``search``
+        binding). Reuses the main file manager's ``ISearchBar`` via
+        :class:`ViewerISearch`."""
+        if self._isearch.active or self._footer_rect is None:
+            return
+        self._search_origin_top = self.top
+        self._clear_search()
+        self._isearch.open(self._panel, self._footer_rect, self._child_z)
+
+    def _clear_search(self) -> None:
+        """Drop the highlight chrome (pattern + match set)."""
+        self.pattern = ""
+        self.matches = []
+        self.match_pos = -1
+
+    def _search_recompute(self, pattern: str) -> None:
+        """Live per-keystroke: recompute the matching lines (case-insensitive
+        *contains*), highlight them, and jump to the nearest match at/after the
+        current scroll position — or back to the pre-search view when nothing
+        matches (mirrors the main file manager's isearch)."""
+        self.pattern = pattern
+        pat = pattern.lower()
         self.matches = [i for i, line in enumerate(self.lines) if pat in line.lower()] \
             if pat else []
-        self.match_pos = 0 if self.matches else -1
         if self.matches:
-            self._scroll_to_line(self.matches[0])
+            cur = int(self.top)
+            self.match_pos = next((k for k, m in enumerate(self.matches) if m >= cur), 0)
+            self._scroll_to_line(self.matches[self.match_pos])
+        else:
+            self.match_pos = -1
+            self.top = self._search_origin_top
+            self._clamp()
+        self._render()
 
-    def _step_match(self, delta: int) -> None:
+    def _search_step(self, delta: int) -> None:
+        """Up (``delta<0``) / Down (``delta>0``): walk to the previous / next
+        match, wrapping at the ends. A no-op with no matches."""
         if not self.matches:
             return
         self.match_pos = (self.match_pos + delta) % len(self.matches)
         self._scroll_to_line(self.matches[self.match_pos])
+        self._render()
+
+    def _search_status(self) -> tuple[int, int]:
+        """``(position, total)`` for the bar's counter: the 1-based index of the
+        current match (0 when off any match) and the match count."""
+        n = len(self.matches)
+        return (self.match_pos + 1 if (n and self.match_pos >= 0) else 0, n)
+
+    def _search_accept(self) -> None:
+        """Enter: keep the current match's scroll position; clear the highlights."""
+        self._clear_search()
+        self._render()
+
+    def _search_cancel(self) -> None:
+        """Esc / outside click: restore the pre-search scroll and clear."""
+        self.top = self._search_origin_top
+        self._clear_search()
+        self._clamp()
+        self._render()
+
+    def _render(self) -> None:
+        if self._panel is not None:
+            self._panel.render()
 
     def _scroll_to_line(self, line: int) -> None:
         if self.wrap:
@@ -461,17 +529,16 @@ class TextViewer(Widget):
                             self.left, content_wf, self._max_line)
 
         # Footer status bar — full-width 'status' surface reaching the bottom edge,
-        # its text inset by the l/r pad, matching the main window's StatusBar.
-        if self.searching or self.pattern:
-            n = len(self.matches)
-            here = (self.match_pos + 1) if n else 0
-            label = f" /{self.pattern}"
-            if not self.searching:
-                label += f"   [{here}/{n}]" if n else "   (no matches)"
-            draw_status_bar(ctx, fy, label, font=MONO, pad_x=pad_x, bottom_pad=pad_y)
-        else:
-            hint = " ↑↓ scroll · ←→ pan · w wrap · / search · n/N next · q close "
-            draw_status_bar(ctx, fy, hint, pad_x=pad_x, bottom_pad=pad_y)
+        # its text inset by the l/r pad, matching the main window's StatusBar. Its
+        # rect is captured so the ISearchBar overlay can pin exactly over it (the
+        # bar covers this hint while a search is open, showing pattern + counter).
+        self._footer_rect = (0.0, fy, wu, hu - fy)
+        wrap_k = keys_label_for_action("toggle_wrap", "w")
+        search_k = keys_label_for_action("search", "F")
+        quit_k = keys_label_for_action("quit", "q")
+        hint = (f" ↑↓ scroll · ←→ pan · {wrap_k} wrap · {search_k} search · "
+                f"{quit_k}/Esc close ")
+        draw_status_bar(ctx, fy, hint, pad_x=pad_x, bottom_pad=pad_y)
 
     def _draw_rows(self, ctx) -> None:
         """Render the visible rows into the clipped body. ``self.top``'s fractional
@@ -579,18 +646,22 @@ class TextViewer(Widget):
         if event.type is not EventType.KEY:
             return True  # modal: swallow non-key events
         key = event.key
-        if self.searching:
-            self._handle_search_key(event)
-            return True
-        # Close and help resolve through the shared, config-driven KEY_BINDINGS so
-        # they honour the user's rebinds, matching the main file manager. Esc is the
-        # universal modal dismiss and stays hardcoded; the viewer-only keys below
-        # (scroll, wrap, search, next-match) remain local to the viewer.
-        action = find_action_for_event(event)
-        if key == "escape" or action == "quit":
+        # Config-driven keys (quit / help / search / wrap) resolve through
+        # KEY_BINDINGS by name, so they honour the user's rebinds; each action is
+        # matched independently, which lets ``toggle_wrap`` share ``W`` with the
+        # file manager's ``compare_selection``. Esc is the universal modal dismiss;
+        # the scroll keys below are viewer-local. While a search is open the
+        # ISearchBar is the top layer and receives keys, so this isn't reached.
+        if key == "escape" or is_action_for_event(event, "quit"):
             self._close()
-        elif action == "help":
+        elif is_action_for_event(event, "help"):
             self._show_help()
+        elif is_action_for_event(event, "search"):
+            self._enter_search()
+        elif self._wrap_pressed(event):
+            self.wrap = not self.wrap
+            self.left = 0.0
+            self._wrap_w = -1
         elif key == "down":
             self.top += 1
         elif key == "up":
@@ -607,21 +678,16 @@ class TextViewer(Widget):
             self.left += 4
         elif key == "left" and not self.wrap:
             self.left = max(0.0, self.left - 4)
-        elif event.char == "w":
-            self.wrap = not self.wrap
-            self.left = 0.0
-            self._wrap_w = -1
-        elif event.char == "/":
-            self.searching = True
-            self.pattern = ""
-            self.matches = []
-            self.match_pos = -1
-        elif event.char == "n":
-            self._step_match(1)
-        elif event.char == "N":
-            self._step_match(-1)
         self._clamp()
         return True
+
+    def _wrap_pressed(self, event: Event) -> bool:
+        """Whether ``event`` toggles line wrap — the ``toggle_wrap`` binding, with a
+        literal ``w`` fallback for user configs predating that action (so wrap keeps
+        working when KEY_BINDINGS has no ``toggle_wrap`` entry)."""
+        if is_action_for_event(event, "toggle_wrap"):
+            return True
+        return not get_keys_for_action("toggle_wrap")[0] and event.char == "w"
 
     def _show_help(self) -> None:
         if self._panel is None:
@@ -631,30 +697,14 @@ class TextViewer(Widget):
             ("PgUp / PgDn", "scroll page"),
             ("Home / End", "top / bottom"),
             ("← / →", "scroll horizontally (no-wrap)"),
-            ("w", "toggle line wrap"),
-            ("/", "search"),
-            ("n / N", "next / prev match"),
+            (keys_label_for_action("toggle_wrap", "w"), "toggle line wrap"),
+            (keys_label_for_action("search", "F"), "incremental search"),
+            ("↑ / ↓ (in search)", "next / prev match"),
             (keys_label_for_action("help", "?"), "this help"),
             (keys_label_for_action("quit", "q") + " / Esc", "close"),
         ]
         show_markdown(self._panel, keys_markdown(rows),
                       title="Text Viewer — Keys", z=self._child_z)
-
-    def _handle_search_key(self, event: Event) -> None:
-        key = event.key
-        if key == "escape":
-            self.searching = False
-            self.pattern = ""
-            self.matches = []
-            self.match_pos = -1
-        elif key == "enter":
-            self.searching = False  # keep pattern + matches for n/N
-        elif key == "backspace":
-            self.pattern = self.pattern[:-1]
-            self._recompute_matches()
-        elif event.char and event.char.isprintable():
-            self.pattern += event.char
-            self._recompute_matches()
 
 
 def show_text_viewer(panel: Any, path, z: int = 80) -> TextViewer:
