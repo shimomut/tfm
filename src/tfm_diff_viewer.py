@@ -193,7 +193,10 @@ class _DiffPane(Widget):
         vfrac = v.top - first
         col0_int = int(v.left)
         xfrac = v.left - col0_int
-        window_end = col0_int + content_w + (1 if xfrac > 0 else 0)
+        # Two extra columns: a fractional visible width plus the fractional pan
+        # offset can push the visible span up to two columns past the whole count,
+        # so the partial right-edge column is drawn to be clipped, not dropped early.
+        window_end = col0_int + content_w + 2
         # Two extra rows: a fractional body height plus the fractional scroll
         # offset can push the visible span up to two rows past the whole count,
         # so the partial bottom row is drawn to be clipped, not dropped early.

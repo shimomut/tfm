@@ -81,7 +81,7 @@ class _GuiCtx:
     def draw_child(self, widget, x, y, w, h, **kw):
         self.kids.append((round(x, 3), round(y, 3), round(w, 3), round(h, 3)))
 
-    def draw_scrollbar(self, x, y, h, pos, ratio, style=None):
+    def draw_scrollbar(self, x, y, h, pos, ratio, style=None, **kw):
         self.bars.append((round(x, 3), round(y, 3)))
 
     def set_cursor(self, *a, **kw):
@@ -211,6 +211,31 @@ def test_diff_pane_insets_rows_from_edges_like_the_main_panes():
     grid = _GridCtx(60.0, 40.0)
     left.draw(grid)
     assert left._pad == 0.0 and left._content_x == gutter
+
+
+def test_text_viewer_draws_columns_to_cover_fractional_right_edge():
+    # Horizontal analog of the row-coverage fix: a fractional visible width plus a
+    # fractional pan offset must still draw the partial right-edge column, so
+    # characters don't vanish early while scrolling out at the right.
+    d = tempfile.mkdtemp()
+    p = Path(d) / "f.txt"
+    p.write_text("".join(chr(65 + (i % 26)) for i in range(300)) + "\n")  # one long line
+    v = TextViewer(p)
+    v.draw(_GuiCtx(100.3, 40.0))          # fractional width -> fractional content width
+    xs = []
+
+    class _Rec(_GuiCtx):
+        def draw_text(self, x, y, t, style=None, **kw):
+            if t.strip():
+                xs.append(x + len(t))     # right edge of this drawn run
+
+    # Pan fraction 0.9: with the content width's own fraction (~0.3) this pushes
+    # the visible span two whole columns past the count — the case the old single
+    # extra column missed.
+    v._draw_line(_Rec(100.3, 40.0), 0.0, 0, 5.9)
+    iw = 100.3 - 2 * PX
+    right_edge = v._content_x + (iw - v._gutter - 1)   # visible content right edge
+    assert max(xs) >= right_edge - 1e-6
 
 
 def test_dir_diff_viewer_bars_full_width_text_inset_and_hit_testing():

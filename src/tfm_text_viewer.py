@@ -504,12 +504,15 @@ class TextViewer(Widget):
     def _draw_line(self, ctx, y, line_idx, col0) -> None:
         """Draw source line ``line_idx`` showing columns [col0, col0+content_w).
         ``col0`` may be fractional: the view shifts left by its fractional part
-        (``xfrac``) for smooth horizontal scroll, with one extra column drawn so
-        the right edge fills; the gutter (drawn after) masks the left bleed."""
+        (``xfrac``) for smooth horizontal scroll; the gutter (drawn after) masks
+        the left bleed and the clip trims the right."""
         content_x, text_fg, bg = self._content_x, self._text_fg, self._bg
         col0_int = int(col0)
         xfrac = col0 - col0_int
-        window_end = col0_int + self._content_w + (1 if xfrac > 0 else 0)
+        # Two extra columns: a fractional visible width plus the fractional pan
+        # offset can push the visible span up to two columns past the whole count,
+        # so the partial right-edge column is drawn to be clipped, not dropped early.
+        window_end = col0_int + self._content_w + 2
         col = 0
         for text, fg in self.highlighted[line_idx]:
             seg_end = col + len(text)
