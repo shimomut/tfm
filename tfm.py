@@ -1534,15 +1534,6 @@ class TfmApp:
                      enabled=has_files, shortcut=sc("open_with_os")),
             MenuItem("Reveal in File Manager", on_select=self.reveal_in_os,
                      enabled=has_files, shortcut=sc("reveal_in_os")),
-            MenuItem("External Programs…", on_select=self.show_programs, shortcut=sc("programs")),
-            MenuItem("Subshell Here", on_select=self.subshell, shortcut=sc("subshell")),
-            SEPARATOR,
-            MenuItem("Parent Directory", on_select=lambda: self._menu("go_parent"),
-                     shortcut=sc("go_parent")),
-            MenuItem("Go to Favorite…", on_select=self.show_favorites, shortcut=sc("favorites")),
-            MenuItem("Jump to Path…", on_select=self.jump_to_path, shortcut=sc("jump_to_path")),
-            MenuItem("Drives…", on_select=self.show_drives, shortcut=sc("drives_dialog")),
-            MenuItem("History…", on_select=self.show_history, shortcut=sc("history")),
             SEPARATOR,
             MenuItem("New Folder…", on_select=self.create_directory, shortcut=sc("create_directory")),
             MenuItem("New File…", on_select=self.create_file, shortcut=sc("create_file")),
@@ -1566,6 +1557,20 @@ class TfmApp:
             SEPARATOR,
             MenuItem("Quit", on_select=self.confirm_quit, shortcut=sc("quit")),
             title="File",
+        )
+        go_menu = Menu(
+            MenuItem("Parent Directory", on_select=lambda: self._menu("go_parent"),
+                     shortcut=sc("go_parent")),
+            MenuItem("Go to Favorite…", on_select=self.show_favorites, shortcut=sc("favorites")),
+            MenuItem("Jump to Path…", on_select=self.jump_to_path, shortcut=sc("jump_to_path")),
+            MenuItem("Drives…", on_select=self.show_drives, shortcut=sc("drives_dialog")),
+            MenuItem("History…", on_select=self.show_history, shortcut=sc("history")),
+            title="Go",
+        )
+        tools_menu = Menu(
+            MenuItem("External Programs…", on_select=self.show_programs, shortcut=sc("programs")),
+            MenuItem("Subshell Here", on_select=self.subshell, shortcut=sc("subshell")),
+            title="Tools",
         )
         select_menu = Menu(
             MenuItem("Toggle Selection", on_select=lambda: self._menu("select_file"),
@@ -1610,8 +1615,10 @@ class TfmApp:
         )
         return Menu(
             MenuItem("File", submenu=file_menu),
+            MenuItem("Go", submenu=go_menu),
             MenuItem("Select", submenu=select_menu),
             MenuItem("View", submenu=view_menu),
+            MenuItem("Tools", submenu=tools_menu),
             MenuItem("Help", submenu=help_menu),
         )
 
