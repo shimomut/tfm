@@ -62,21 +62,41 @@ def _status_bg(theme) -> tuple[int, int, int] | None:
     return theme.surface_bg("status") or _content_bg(theme)
 
 
-def draw_status_bar(ctx, y: float, text: str, *, font=None) -> None:
-    """Paint a viewer's bottom status bar: fill the row at ``y`` with the theme
-    ``status`` surface across the exact sub-cell width and draw ``text`` on it in
-    a legible ink (auto-inked against the bar, so it reads on every theme's status
-    recipe). The full-window counterpart to the main window's ``StatusBar``, so
-    the three modal viewers end in the same themed bar as TFM proper rather than a
-    plain dim hint. ``font`` pins a fixed advance where the caller needs columns
-    to line up (the text viewer's search field)."""
+def draw_status_bar(ctx, y: float, text: str, *, font=None, pad_x: float = 0.0,
+                    bottom_pad: float = 0.0) -> None:
+    """Paint a viewer's bottom status bar, exactly like the main window's
+    ``StatusBar``: the ``status`` surface fills the **full** window width (edge to
+    edge) and reaches the bottom edge (``bottom_pad`` extra height below the row),
+    while only the *text* is inset — ``pad_x`` from the left. The bar text is
+    auto-inked so it reads on every theme's status recipe. ``font`` pins a fixed
+    advance where the caller needs columns to line up (the search field)."""
     wu, _hu = ctx.size_units
     theme = ctx.theme
     bar_bg = _status_bg(theme)
     fg = theme.muted_text if theme is not None else (150, 150, 150)
-    ctx.fill_rect(0, y, wu, 1.0, Style(bg=bar_bg))
-    label = elide(text, ctx.width, where="end", measure=ctx.measure_text)
-    ctx.draw_text(0, y, label, Style(fg=fg, bg=bar_bg, font=font))
+    ctx.fill_rect(0, y, wu, 1.0 + bottom_pad, Style(bg=bar_bg))
+    label = elide(text, max(0.0, wu - 2 * pad_x), where="end", measure=ctx.measure_text)
+    ctx.draw_text(pad_x, y, label, Style(fg=fg, bg=bar_bg, font=font))
+
+
+#: Content inset for the full-window modal viewers (text / diff / directory diff),
+#: matching the main window's ``BAR_PAD_PX``. A viewer fills the window with its
+#: own surface and draws its chrome (header, gutter, rows, scrollbars, footer)
+#: inset by this much, so it breathes in from the frame the same amount TFM's bars
+#: and log do. GUI only — a character grid has no sub-cell, so it collapses flush.
+VIEWER_PAD_PX = 4.0
+
+
+def viewer_pad(ctx) -> tuple[float, float]:
+    """The (x, y) content inset for a modal viewer, in base units: ``VIEWER_PAD_PX``
+    device pixels on a vector backend, zero on a character grid. The bars keep
+    their full-width surfaces (see :func:`draw_status_bar`); only text and the
+    scrolling body are inset by this, so a viewer breathes in like the main
+    window's chrome rather than sitting in a bordered card."""
+    if not ctx.vector_shapes:
+        return (0.0, 0.0)
+    bw, bh = ctx.base_size
+    return (VIEWER_PAD_PX / bw if bw else 0.0, VIEWER_PAD_PX / bh if bh else 0.0)
 
 #: pygments token category → RGB — the default syntax palette (VS Code Dark+),
 #: categorised by substring of the token name (mirroring ttk TFM's
@@ -363,8 +383,12 @@ class TextViewer(Widget):
     def draw(self, ctx) -> None:
         self._panel = ctx.panel
         theme = ctx.theme
-        w, h = ctx.width, ctx.height
         wu, hu = ctx.size_units  # exact (sub-cell) extent — anchor chrome to it
+        # Like the main window: the chrome surfaces fill the whole window, only
+        # text and the scrolling body are inset (pad_x left/right, pad_y for the
+        # header's top and the footer's bottom). Scroll is the only pointer event
+        # and carries no position, so the geometry needs no un-insetting.
+        pad_x, pad_y = viewer_pad(ctx)
         bg = _content_bg(theme)  # sit on TFM's own pane background, not popup_bg
         ctx.fill_rect(0, 0, wu, hu, Style(bg=bg))
 
@@ -372,66 +396,68 @@ class TextViewer(Widget):
         muted = theme.muted_text if theme is not None else (150, 150, 150)
         accent = theme.accent if theme is not None else (0, 122, 204)
 
-        # Header.
+        # Header — text inset from the top/left/right; its surface is the content
+        # background, which already fills the window edge to edge.
         total = len(self.lines)
         pos = int(self.top) + 1
+        iw = max(1.0, wu - 2 * pad_x)            # content width inside the l/r pad
         header = f" {self.path.name}  ({total} lines)"
-        ctx.draw_text(0, 0, header[:w], Style(fg=accent, bg=bg, attr=TextAttribute.BOLD))
+        ctx.draw_text(pad_x, pad_y, elide(header, iw, where="end", measure=ctx.measure_text),
+                      Style(fg=accent, bg=bg, attr=TextAttribute.BOLD))
         info = f"{pos}/{total}  {'WRAP' if self.wrap else ''} "
-        ctx.draw_text(max(0, wu - len(info)), 0, info, Style(fg=muted, bg=bg))
+        ctx.draw_text(max(pad_x, wu - pad_x - len(info)), pad_y, info, Style(fg=muted, bg=bg))
 
         gutter_w = self._gutter_w()
         self._gutter = gutter_w
         self._content_x = gutter_w
-        self._content_w = max(1, w - gutter_w - 1)
+        self._content_w = max(1, int(iw) - gutter_w - 1)
         # Fractional visible width for the h-scrollbar thumb (columns can be
         # sub-cell); text still lays out on the whole-column ``_content_w``.
-        content_wf = max(1.0, wu - gutter_w - 1)
+        content_wf = max(1.0, iw - gutter_w - 1)
         self._bg, self._text_fg, self._muted = bg, text_fg, muted
-        # A horizontal scrollbar (no-wrap only) steals a row when a line overruns
-        # the content width; the header and footer always take one each. The
-        # footer (and h-bar) anchor to ``hu`` so they sit flush with the pixel
-        # bottom, not a fractional row above it; the body fills the exact gap.
+        # The header takes one row plus its top pad; the footer one row plus its
+        # bottom pad (its status surface reaches the bottom edge). A horizontal
+        # scrollbar (no-wrap only) steals a row when a line overruns the width.
+        head_h = 1.0 + pad_y
+        fy = hu - 1.0 - pad_y                     # footer text row (surface below)
         show_hbar = not self.wrap and self._max_line > self._content_w
-        fy = hu - 1                              # footer, flush to the bottom
-        hbar_y = hu - 2                           # h-scrollbar, just above it
-        body_h = (hbar_y if show_hbar else fy) - 1
+        hbar_y = fy - 1.0                          # h-scrollbar, just above footer
+        body_h = (hbar_y if show_hbar else fy) - head_h
         self._view_h = max(1, int(body_h))
         if self.wrap:
             self._rebuild_wrap(self._content_w)
         self._clamp()
 
-        # Scrolling rows live in a clipped child so a fractional self.top renders
-        # a partial top/bottom row (smooth GUI scroll) without touching the header.
-        ctx.draw_child(self._body, 0, 1, wu, body_h)
+        # Scrolling rows live in a clipped child, inset by the l/r pad and sitting
+        # below the header; a fractional self.top renders partial top/bottom rows.
+        ctx.draw_child(self._body, pad_x, head_h, iw, body_h)
 
-        # Vertical scrollbar. Thumb from the fractional visible height.
+        # Vertical scrollbar, at the content's right edge (inset by the l/r pad).
         total_rows = self._total_rows()
         if total_rows > self._view_h:
             ratio = min(1.0, body_h / total_rows)
             denom = total_rows - self._view_h
             sbpos = self.top / denom if denom > 0 else 0.0
-            ctx.draw_scrollbar(wu - 1, 1, body_h,
+            ctx.draw_scrollbar(wu - pad_x - 1, head_h, body_h,
                                max(0.0, min(1.0, sbpos)), ratio)
 
         # Horizontal scrollbar, in the row between the content and the footer.
         if show_hbar:
-            draw_hscrollbar(ctx, self._content_x, hbar_y, content_wf,
+            draw_hscrollbar(ctx, pad_x + self._content_x, hbar_y, content_wf,
                             self.left, content_wf, self._max_line)
 
-        # Footer status bar — the themed 'status' surface, matching the main
-        # window's bottom bar; shows the search field while searching, else the
-        # key hints.
+        # Footer status bar — full-width 'status' surface reaching the bottom edge,
+        # its text inset by the l/r pad, matching the main window's StatusBar.
         if self.searching or self.pattern:
             n = len(self.matches)
             here = (self.match_pos + 1) if n else 0
             label = f" /{self.pattern}"
             if not self.searching:
                 label += f"   [{here}/{n}]" if n else "   (no matches)"
-            draw_status_bar(ctx, fy, label, font=MONO)
+            draw_status_bar(ctx, fy, label, font=MONO, pad_x=pad_x, bottom_pad=pad_y)
         else:
             hint = " ↑↓ scroll · ←→ pan · w wrap · / search · n/N next · q close "
-            draw_status_bar(ctx, fy, hint)
+            draw_status_bar(ctx, fy, hint, pad_x=pad_x, bottom_pad=pad_y)
 
     def _draw_rows(self, ctx) -> None:
         """Render the visible rows into the clipped body. ``self.top``'s fractional

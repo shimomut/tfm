@@ -27,7 +27,7 @@ from puikit.widgets.base import Widget
 from tfm_text_dialog import keys_markdown, show_markdown
 from tfm_text_viewer import (MONO, _ScrollBody, _content_bg, _highlight, _is_light,
                              _read_lines, _syntax_palette, draw_hscrollbar,
-                             draw_status_bar)
+                             draw_status_bar, viewer_pad)
 
 #: Semantic diff hues. The whole-row tints and the stronger changed-character
 #: tints are the theme's *content background* blended toward these, so a diff
@@ -246,6 +246,9 @@ class DiffViewer(Widget):
         self.hl2 = _highlight(self.lines2, path2, syntax)
         self.rows, self.blocks = compute_diff(self.lines1, self.lines2)
         self._panel: Any = None
+        # Chrome surfaces fill the window; text and the panes inset (see draw).
+        # _pad is cached to translate pointer events into the inset splitter.
+        self._pad = (0.0, 0.0)
         self._child_z = 90  # z for the help overlay; raised above this viewer in show_
         self.top = 0.0
         self.left = 0.0
@@ -299,6 +302,11 @@ class DiffViewer(Widget):
         self._panel = ctx.panel
         theme = ctx.theme
         wu, hu = ctx.size_units  # exact (sub-cell) extent — anchor chrome to it
+        # Like the main window: chrome surfaces (footer, content bg) fill the whole
+        # window; only text and the panes inset — pad_x left/right, pad_y at the
+        # header top (via the splitter's y origin) and the footer bottom.
+        pad_x, pad_y = viewer_pad(ctx)
+        self._pad = (pad_x, pad_y)
         bg = _content_bg(theme)  # sit on TFM's own pane background, not popup_bg
         ctx.fill_rect(0, 0, wu, hu, Style(bg=bg))
 
@@ -307,43 +315,43 @@ class DiffViewer(Widget):
         # when either side's content overruns its width. The reserve decision uses
         # the splitter's geometry from the *previous* frame (it persists), since
         # the current rects are only set when the splitter draws below; the bars
-        # are then positioned from the fresh rects. One row, header, and footer.
+        # are then positioned from the fresh rects.
         gutter = self._gutter_w()
-        lx, lcw, rx, rcw = self._pane_columns(wu, gutter)
+        iw = max(1.0, wu - 2 * pad_x)             # splitter width inside the l/r pad
+        lx, lcw, rx, rcw = self._pane_columns(iw, gutter)
         show_hbar = self._max_line > lcw or self._max_line > rcw
-        # Bottom chrome anchors to ``hu`` so the footer (and per-pane h-bars) sit
-        # flush with the pixel bottom; the panes fill the exact fractional gap.
-        foot_y = hu - 1
-        hbar_y = hu - 2
-        self._body_h = (hbar_y if show_hbar else foot_y) - 1
+        fy = hu - 1.0 - pad_y                     # footer text row (surface below)
+        hbar_y = fy - 1.0
+        content_bottom = hbar_y if show_hbar else fy
+        splitter_h = max(1.0, content_bottom - pad_y)  # splitter spans pad_y..content
+        self._body_h = splitter_h - 1.0           # pane body = splitter minus header
         self._view_h = max(1, int(self._body_h))
         self._clamp()
 
-        # Two panes + the draggable divider fill the area above the footer.
-        ctx.draw_child(self.splitter, 0, 0, wu, max(1.0, foot_y))
+        # Two panes + the draggable divider, inset from the top/left/right.
+        ctx.draw_child(self.splitter, pad_x, pad_y, iw, splitter_h)
 
-        # Shared vertical scrollbar over the right edge of the content. Thumb from
-        # the fractional visible height, so it matches the real viewport.
+        # Shared vertical scrollbar at the content's right edge (inset by l/r pad).
         if len(self.rows) > self._view_h:
             denom = len(self.rows) - self._view_h
             ratio = min(1.0, self._body_h / len(self.rows))
-            ctx.draw_scrollbar(wu - 1, 1, self._body_h,
+            ctx.draw_scrollbar(wu - pad_x - 1, pad_y + 1, self._body_h,
                                max(0.0, min(1.0, self.top / denom if denom else 0.0)), ratio)
 
-        # One horizontal scrollbar per pane, positioned from the now-current
-        # splitter rects, in the reserved row below the content.
+        # One horizontal scrollbar per pane, from the current splitter rects
+        # (splitter-local, so shifted by the l/r pad into screen space).
         if show_hbar:
-            lx, lcw, rx, rcw = self._pane_columns(wu, gutter)
+            lx, lcw, rx, rcw = self._pane_columns(iw, gutter)
             if self._max_line > lcw:
-                draw_hscrollbar(ctx, lx, hbar_y, lcw, self.left, lcw, self._max_line)
+                draw_hscrollbar(ctx, pad_x + lx, hbar_y, lcw, self.left, lcw, self._max_line)
             if self._max_line > rcw:
-                draw_hscrollbar(ctx, rx, hbar_y, rcw, self.left, rcw, self._max_line)
+                draw_hscrollbar(ctx, pad_x + rx, hbar_y, rcw, self.left, rcw, self._max_line)
 
-        # Bottom status bar — the themed 'status' surface, matching the main
-        # window (and the other two viewers), rather than a dim hint on content.
+        # Bottom status bar — full-width 'status' surface reaching the bottom edge,
+        # text inset, matching the main window (and the other two viewers).
         hint = (f" {len(self.rows)} rows · {len(self.blocks)} changes · "
                 "n/N jump · ←→ pan · drag divider · q close ")
-        draw_status_bar(ctx, foot_y, hint)
+        draw_status_bar(ctx, fy, hint, pad_x=pad_x, bottom_pad=pad_y)
 
     # --- events --------------------------------------------------------------
 
@@ -363,8 +371,11 @@ class DiffViewer(Widget):
             return True
         if event.type in self._MOUSE:
             # Route to the splitter so the divider can be dragged (the panes
-            # themselves are display-only).
-            self.splitter.handle_event(event)
+            # themselves are display-only). The splitter is drawn inset, so the
+            # pointer event is shifted into that inset space first.
+            px, py = self._pad
+            ev = event.translated(-px, -py) if (px or py) and event.x is not None else event
+            self.splitter.handle_event(ev)
             return True
         if event.type is not EventType.KEY:
             return True

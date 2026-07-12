@@ -46,7 +46,7 @@ from puikit.widgets.base import Widget
 
 from tfm_path import Path
 from tfm_str_format import format_size
-from tfm_text_viewer import MONO, _ScrollBody, draw_status_bar
+from tfm_text_viewer import MONO, _ScrollBody, draw_status_bar, viewer_pad
 from tfm_diff_viewer import show_diff_viewer
 from tfm_text_dialog import keys_markdown, show_markdown
 from tfm_config import KeyBindings
@@ -358,6 +358,9 @@ class DirectoryDiffView(Widget):
         self.active = "left"
         self._view_h = 1
         self._body_widget: Optional[_ScrollBody] = None
+        # Chrome bars fill the window; text and row columns inset (see draw). _pad
+        # is the resolved inset, cached for row/column pointer hit-testing.
+        self._pad = (0.0, 0.0)
         # Movable centre split: fraction of the content width given to the left
         # pane. Draggable by the gutter; nudged by ``[`` / ``]``.
         self._split_ratio = 0.5
@@ -1072,12 +1075,16 @@ class DirectoryDiffView(Widget):
         theme = ctx.theme
         w, h = ctx.width, ctx.height
         wu, hu = ctx.size_units  # exact (sub-cell) extent — anchor chrome to it
-        # Number of whole rows (row count / scroll math), but the *bottom* chrome
-        # is anchored to ``hu`` so the footer sits flush with the pixel edge
-        # instead of floating a fractional row above it (grid-snap gap).
-        foot_y = hu - 1          # footer line, flush to the bottom
-        det_y = hu - 2           # details line, just above it
-        body_h = hu - 3          # header (1) + body + details + footer (2)
+        # Like the main window: the chrome bars (header, details, footer) fill the
+        # window edge to edge; only their text and the row columns inset — pad_x
+        # left/right, pad_y at the header top and the footer bottom. Events stay in
+        # window coords (the pad is baked into the column geometry below), so
+        # hit-testing needs no translation.
+        pad_x, pad_y = viewer_pad(ctx)
+        self._pad = (pad_x, pad_y)
+        head_h = 1.0 + pad_y      # header bar height (reaches the top; text at pad_y)
+        foot_y = hu - 1.0 - pad_y  # footer text row; its status surface reaches hu
+        det_y = foot_y - 1.0       # details line, just above the footer
         accent = theme.accent if theme is not None else (0, 122, 204)
         muted = theme.muted_text if theme is not None else (150, 150, 150)
         # Surfaces: chrome (header/footer) sits on the lighter popup surface; the
@@ -1100,22 +1107,21 @@ class DirectoryDiffView(Widget):
         self._accent = accent
         self._sel_active = getattr(theme, "selection_active_bg", accent) if theme else accent
         self._sel_inactive = getattr(theme, "selection_inactive_bg", muted) if theme else muted
-        # Content fills the whole widget; the chrome bars are painted over it.
+        # Chrome surfaces fill the window edge to edge; text/columns inset over them.
         ctx.fill_rect(0, 0, wu, hu, Style(bg=content_bg))
-        ctx.fill_rect(0, 0, wu, 1.0, Style(bg=chrome_bg))    # header bar
-        ctx.fill_rect(0, det_y, wu, 1.0, Style(bg=chrome_bg))  # details bar
+        ctx.fill_rect(0, 0, wu, head_h, Style(bg=chrome_bg))    # header bar
+        ctx.fill_rect(0, det_y, wu, 1.0, Style(bg=chrome_bg))   # details bar
         # (the footer row below the details is painted as the themed status bar)
 
-        # Column geometry: [left tree] [ gutter ] [right tree] [scrollbar]. The
-        # split is user-movable and *pixel-smooth* — the split position is a
+        # Column geometry: [pad] [left tree] [ gutter ] [right tree] [scrollbar] [pad].
+        # The split is user-movable and *pixel-smooth* — the split position is a
         # fractional base-unit x (not a whole cell), so a GUI drag glides rather
         # than snapping column-by-column. Clamped so neither pane collapses;
         # too-narrow windows fall back to an even split.
         reserve = 1 if self.visible else 0
-        # Width is measured in the exact sub-cell extent (``wu``), so the split,
-        # the right pane, and the scrollbar reach the pixel edge instead of
-        # snapping to whole columns.
-        avail = max(2.0, wu - _GUTTER_W - reserve)
+        # ``avail`` is the split-able width — the exact sub-cell extent minus the
+        # gutter, the scrollbar, and the left/right content pad.
+        avail = max(2.0, wu - _GUTTER_W - reserve - 2 * pad_x)
         self._avail = avail
         if avail >= 2 * _MIN_PANE:
             split_x = avail * self._split_ratio
@@ -1124,28 +1130,29 @@ class DirectoryDiffView(Widget):
         else:
             split_x = avail / 2
             self._resizable = False
-        self._left_x = 0.0
-        self._sep_x = split_x
-        self._right_x = split_x + _GUTTER_W
+        self._left_x = pad_x
+        self._sep_x = pad_x + split_x
+        self._right_x = pad_x + split_x + _GUTTER_W
         self._left_w = split_x
         self._right_w = avail - split_x
 
-        # Rows sit between the header (row 0) and a details row + footer at the
-        # bottom two lines.
-        self._view_h = max(1, h - 3)
+        # Rows sit between the header (one row + its top pad) and the details +
+        # footer rows (the footer's surface reaching the bottom edge).
+        body_h = det_y - head_h
+        self._view_h = max(1, int(body_h))
 
-        # The splitter: a full-height band (header top → footer top, so it never
-        # leaves a gap below the last row) in its own tone. This *is* the divider
-        # — no separate hairline — and it's several pixels wide, not a stroke.
+        # The gutter spine: a full-height band (header top → details top) in its
+        # own tone. This *is* the divider — several pixels wide, not a stroke.
         ctx.fill_rect(self._sep_x, 0, float(_GUTTER_W), det_y, Style(bg=self._gutter_bg))
 
-        # Header: the two directory paths, active side in accent, on the chrome bar.
+        # Header: the two directory paths, active side in accent, inset by the pad.
         left_head = Style(fg=accent if self.active == "left" else self._text_fg, bg=chrome_bg,
                           attr=TextAttribute.BOLD)
         right_head = Style(fg=accent if self.active == "right" else self._text_fg, bg=chrome_bg,
                            attr=TextAttribute.BOLD)
-        ctx.draw_text(0, 0, truncate_to_width(str(self.left_path), int(self._left_w)), left_head)
-        ctx.draw_text(self._right_x, 0,
+        ctx.draw_text(self._left_x, pad_y,
+                      truncate_to_width(str(self.left_path), int(self._left_w)), left_head)
+        ctx.draw_text(self._right_x, pad_y,
                       truncate_to_width(str(self.right_path), int(self._right_w)), right_head)
 
         self._clamp_scroll()
@@ -1154,21 +1161,23 @@ class DirectoryDiffView(Widget):
             self._draw_status_screen(ctx, w, h, muted, bg)
         else:
             # The body clips to the exact fractional height, so the last row is a
-            # partial sliver that reaches the footer — no whole-cell gap above it.
-            ctx.draw_child(self._body, 0, 1, wu, body_h)
+            # partial sliver that reaches the footer. Full width (x=0); the rows
+            # inset themselves via the pad-baked column x's.
+            ctx.draw_child(self._body, 0, head_h, wu, body_h)
             if len(self.visible) > self._view_h:
                 denom = len(self.visible) - self._view_h
                 # Thumb size from the *fractional* visible height, so it reflects
                 # the real viewport, not a whole-row-snapped count.
                 ratio = min(1.0, body_h / len(self.visible))
-                ctx.draw_scrollbar(wu - 1, 1, body_h,
+                ctx.draw_scrollbar(wu - pad_x - 1, head_h, body_h,
                                    max(0.0, min(1.0, self.top / denom if denom else 0.0)), ratio)
 
-        ctx.draw_text(0, det_y, self._details_line()[:w],
+        ctx.draw_text(self._left_x, det_y,
+                      truncate_to_width(self._details_line(), int(max(1.0, wu - 2 * pad_x))),
                       Style(fg=self._text_fg, bg=chrome_bg))
-        # Bottom status bar — the themed 'status' surface, matching the main
-        # window (and the text / diff viewers), so the three viewers read alike.
-        draw_status_bar(ctx, foot_y, self._footer())
+        # Bottom status bar — full-width 'status' surface reaching the bottom edge,
+        # its text inset, matching the main window (and the text / diff viewers).
+        draw_status_bar(ctx, foot_y, self._footer(), pad_x=pad_x, bottom_pad=pad_y)
         self._update_cursor(ctx, hu)
 
     def _update_cursor(self, ctx, h: int) -> None:
@@ -1374,11 +1383,13 @@ class DirectoryDiffView(Widget):
     # --- mouse ---------------------------------------------------------------
 
     def _row_at(self, y: float) -> Optional[int]:
-        """Visible-list index under widget-local ``y`` (header is row 0, body
-        starts at row 1), or None if the click is outside the row area."""
-        if y < 1 or y >= 1 + self._view_h:
+        """Visible-list index under widget-local ``y``, or None if the click is
+        outside the row area. The body begins below the header (one row plus its
+        top pad), matching where ``draw`` placed the body child."""
+        head_h = 1.0 + self._pad[1]
+        if y < head_h or y >= head_h + self._view_h:
             return None
-        ri = int(self.top + (y - 1.0))
+        ri = int(self.top + (y - head_h))
         return ri if 0 <= ri < len(self.visible) else None
 
     def _side_at(self, x: float) -> Optional[str]:
@@ -1391,9 +1402,10 @@ class DirectoryDiffView(Widget):
         return None
 
     def _set_split_from_x(self, x: float) -> None:
-        # Keep the fractional pointer position (no cell rounding) so the split
-        # tracks the cursor pixel-for-pixel on a GUI backend.
-        split_x = max(float(_MIN_PANE), min(self._avail - _MIN_PANE, x))
+        # ``x`` is a window sep position; the split-able range starts after the
+        # left content pad, so undo it. Keep the fractional pointer position (no
+        # cell rounding) so the split tracks the cursor pixel-for-pixel on GUI.
+        split_x = max(float(_MIN_PANE), min(self._avail - _MIN_PANE, x - self._pad[0]))
         self._split_ratio = split_x / self._avail
         self._render()
 
@@ -1405,6 +1417,8 @@ class DirectoryDiffView(Widget):
         self._render()
 
     def _handle_mouse(self, event: Event) -> bool:
+        # Events stay in window coords; the l/r pad is baked into the column
+        # geometry (_left_x/_sep_x/_right_x) and _row_at, so no translation.
         x = event.x if event.x is not None else 0.0
         y = event.y if event.y is not None else 0.0
         in_gutter = self._sep_x <= x < self._right_x
