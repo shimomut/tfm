@@ -43,6 +43,12 @@ Done and wired (Phases 1–4, plus the GUI-polish pass):
   draw as vectors in GUI mode; dialogs grow past the pane while staying
   pane-anchored; directory listing is always async so navigation never blocks.
 - **edit_file / subshell** — terminal suspend/resume wired.
+- **Theme palette** — light/dark-aware file-type, cursor, and syntax-highlight
+  colors, all driven by the active theme and switched from one toggle.
+- **GUI fonts** — configurable proportional UI + monospaced faces and size from
+  `~/.tfm/config.py` (`UI_FONT_NAME` / `MONO_FONT_NAME` / `FONT_SIZE`), gui-gated.
+- **macOS app bundle** — build system rebuilt on PuiKit (ttk copy steps removed);
+  the bundle runs via PuiKit's PyObjC event loop.
 
 ---
 
@@ -118,39 +124,7 @@ scrollbar x, the body child rect, and the pointer hit-tests / gutter-drag band
 must shift together, or the split drag and row clicks will land off by the margin.
 Keep it a single named constant (e.g. `_MARGIN`) so it's tunable in one place.
 
-### 2.5 Color theme brush-up (file types, cursor, syntax)
-The port's palette is thin in three places; brush them up into one coherent,
-light/dark-aware scheme.
-
-- **File / directory type colors.** `tfm_file_pane.py:411` colors rows with just
-  `name_fg = theme.accent if is_dir else theme.text` — directory vs. everything
-  else. Restore richer type coloring (executable, symlink, archive, image /
-  media, source code, hidden, broken symlink, …) as ttk's `tfm_colors.py`
-  (`get_file_color`, executables green, etc.) did. Decide the category source: an
-  extension / mode → category map on the TFM side, keyed to the active theme.
-- **Cursor color.** The row cursor cue is a **hardcoded red** constant in
-  `tfm_file_pane.py` (`_CURSOR_*`, `_draw_cursor`) — not theme-driven and the
-  same on light and dark. Promote it to a theme role (active vs. inactive pane
-  variants) so it stays legible on either scheme and matches the palette.
-- **Syntax highlighting.** `tfm_text_viewer.py`'s `_SYNTAX` / `_syntax_fg` is a
-  **fixed VS-Code-dark** RGB map keyed by pygments token substring; it does not
-  adapt to a light theme. Make it theme-aware (a light + dark token palette, or
-  derive from theme roles), consistent with the rest of the UI.
-
-Cross-cutting:
-- **Where the palette lives** — the PuiKit `Theme` (`puikit/theme.py`) currently
-  has **no** file-type / cursor / syntax roles (only accent / text / chrome).
-  Decide: extend `Theme` with these roles (reusable, switches with the theme), or
-  keep a TFM-side palette module (a revived `tfm_colors.py`) selected by the
-  active scheme. Prefer whichever keeps the light/dark toggle (`toggle_color_scheme`)
-  driving *all three* palettes from one switch.
-- **Light + dark parity** — every new color needs both scheme values, not just a
-  dark one; verify contrast on each.
-- **Terminal quantization** — re-check the TUI palette on the VS Code integrated
-  terminal specifically (suspected 256-color / palette quantization differs from
-  Terminal.app); test there, not only in Terminal.app.
-
-### 2.6 Filepath TAB completion in input dialogs
+### 2.5 Filepath TAB completion in input dialogs
 Complete paths with TAB in the text-input prompts. `jump_to_path` in `tfm.py`
 even notes it: *"(TAB path completion is a later phase.)"* — the primary target,
 with the save-as / name prompts (`create_file`, `create_directory`,
@@ -184,77 +158,6 @@ To build:
   (the listing is synchronous inside the keystroke); case sensitivity per the
   platform.
 - Remove the "later phase" note from `jump_to_path` once wired.
-
-### 2.7 macOS app bundle — finish the PuiKit rebuild
-The `macos_app/` build system has been ported to PuiKit: `build.sh` bundles the
-`puikit` package (no more `${PROJECT_ROOT}/ttk` copy), the ttk
-`ttk_coregraphics_render*.so` copy step is gone, and `TFMAppDelegate.m` checks for
-`puikit` instead of `ttk`. What remains before a 1.0 `.dmg` ships:
-
-- **Verify the rebuilt bundle actually runs.** The Obj-C launcher creates its own
-  `NSApplication`, then embeds Python and calls `cli_main()`, which builds PuiKit's
-  PyObjC macOS backend — which *also* wants the shared `NSApp` / an AppKit run
-  loop. Confirm the single-process launcher hands control to the PuiKit event loop
-  correctly (window shows, native `NSMenu` menu bar, keyboard contract holds), or
-  simplify the launcher now that rendering is Python-side. Then run the
-  `macos_app/README.md` / `doc/dev/MACOS_APP_TESTING.md` smoke tests against the
-  rebuilt bundle.
-- **Bump the version.** `VERSION` still defaults to `0.99` (`build.sh:104`, and the
-  `Info.plist.template`); set the 1.0 string for release.
-
-### 2.8 Wire GUI fonts from config — docs + config-key sweep
-**Status: essentially DONE** — GUI renders a configurable proportional UI face by
-default and a configurable mono face for aligned content, both from `~/.tfm/config.py`
-(`main` passes `base_font`/`ui_font` gui-gated in `backend_kwargs`; PuiKit's
-`resolve_font` routes an unnamed `Font()` to `ui_font` and an unnamed
-`Font(monospace=True)` to the mono `base_font`). Only the config-key/doc sweep and an
-optional decision remain.
-
-PuiKit grounds the layout grid in a **base font that must be monospaced**, and
-expresses per-widget faces through `Style.font` (a `puikit.Font`): `font=None` or an
-unnamed `Font(monospace=True)` render on that grid, while a `Font(family=…)` renders
-**proportionally** on the flow path (`puikit/docs/font_system.md` §6/§9). Missing
-glyphs use the OS's native substitution — one family per font, no cascade list.
-
-**Config shape (decided): two GUI fonts + one size.**
-- `DESKTOP_UI_FONT_NAME` — **proportional**; TFM's **default** text face (file names,
-  labels, prompts, dialog chrome).
-- `DESKTOP_MONO_FONT_NAME` — **monospaced**; used where alignment matters (file
-  size/date columns, the text viewer, diff / dir-diff). It is *also* the backend **base
-  font**, so it must be monospaced.
-- `DESKTOP_FONT_SIZE` — one size applied to **both**: the base unit is derived from the
-  mono font at this size, and the UI font renders at the same size within those rows.
-
-This supersedes the earlier single-`DESKTOP_FONT_NAME` plan; that key splits into the
-two above (each still one family).
-
-**The load-bearing constraint:** the base font (grid grounding) must be monospaced — a
-proportional base would make the grid path force every glyph into a fixed base-unit
-cell. But "default proportional" needs no drawing convention on TFM's side: the Panel
-already substitutes `Font()` for `font=None` on GUI (above), so the mono base font stays
-the invisible grid grounding while ordinary text flows proportionally on its own.
-
-**TUI has no font feature:** curses has one terminal font; family and size are ignored
-and everything folds to the grid. Gate all of this on the `gui` backend.
-
-Remaining:
-- **`MONO` mismatch — auto-fixed.** Because an unnamed `Font(monospace=True)` now
-  resolves to `base_font`'s family, the size/date/viewer/diff columns follow
-  `DESKTOP_MONO_FONT_NAME` with no per-site edits. Dropping the redundant `MONO`
-  constants is optional cleanup; **do not** give a grid mono font a `family` (fails
-  `_is_grid_font` → flow path → de-aligned columns, the `#62` case).
-- Decide whether `DESKTOP_FONT_SIZE` stays startup-only or also drives the ttk-era
-  Cmd-+/Cmd-- live font-size adjustment (`doc/FONT_SIZE_ADJUSTMENT_FEATURE.md`) —
-  out of scope here, but the base-font seam is where it would hook in.
-- Update `src/_config.py`, `tfm_config.ConfigManager.validate_config`, and
-  `test/test_config_backend_settings.py` for the two new keys (`DESKTOP_UI_FONT_NAME`,
-  `DESKTOP_MONO_FONT_NAME`), replacing the interim single `DESKTOP_FONT_NAME`. Decide
-  the UI default: allow `None`/empty → the OS system UI font (`Font(family=None)`), or
-  ship a concrete proportional family. Mono defaults to `Menlo`.
-- Sweep the docs that still show the removed cascade-list form
-  (`doc/CONFIGURATION_FEATURE.md`, `doc/TFM_USER_GUIDE.md`,
-  `doc/FONT_SIZE_ADJUSTMENT_FEATURE.md`, `doc/DESKTOP_MODE_GUIDE.md`) to the two-key
-  form, and update the user's own `~/.tfm/config.py`.
 
 ---
 
