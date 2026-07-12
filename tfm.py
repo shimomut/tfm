@@ -3471,6 +3471,9 @@ def main() -> None:
     # GUI-only.
     if backend_name == "gui":
         cfg = get_config()
+        # Name the native window (and the macOS app menu, e.g. "Quit TFM");
+        # without this the GUI backend falls back to its default "PuiKit".
+        backend_kwargs["title"] = "TFM"
         backend_kwargs["base_font"] = Font(
             family=cfg.MONO_FONT_NAME,
             size=float(cfg.FONT_SIZE),
