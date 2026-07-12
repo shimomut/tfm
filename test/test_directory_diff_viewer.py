@@ -238,35 +238,49 @@ def test_directory_rows_draw_vector_chevron_not_glyph(trees):
 
 @pytest.fixture
 def lopsided(tmp_path):
-    """Left has a nested left-only subtree; right shares only the root, so the
-    missing (right) side must suppress the absent subtree's connector bars but
-    keep the root-level bar that still connects the tree."""
+    """Root dirs sorted 0lead < a_dir < m_dir < z_dir < zztrail. ``a_dir``/
+    ``z_dir`` exist on both sides; ``0lead`` (leads), the nested ``m_dir``
+    (bridges), and ``zztrail`` (trails) are left-only. On the right side these
+    exercise: a root-level leading row (spine still reaches the header), a
+    bridging row, a trailing row (no bar), and an absent deep subtree (blanked)."""
     left = tmp_path / "L"
     right = tmp_path / "R"
-    (left / "onlyL" / "deep").mkdir(parents=True)
-    (left / "onlyL" / "deep" / "f.txt").write_text("x")
-    right.mkdir()
-    (right / "onlyR.txt").write_text("y")  # a right root entry after "onlyL"
+    for base in (left, right):
+        (base / "a_dir").mkdir(parents=True)
+        (base / "z_dir").mkdir(parents=True)
+    (left / "0lead").mkdir()
+    (left / "zztrail").mkdir()
+    (left / "m_dir" / "deep").mkdir(parents=True)
+    (left / "m_dir" / "deep" / "f.txt").write_text("x")
     return Path(str(left)), Path(str(right))
 
 
-def test_missing_side_skips_absent_ancestor_connectors(lopsided):
+def test_missing_side_connector_spanning_rules(lopsided):
     view = _sync_view(*lopsided)
-    onlyL = _find(view.root, "onlyL")
-    deep = _find(onlyL, "deep")
-    f = _find(deep, "f.txt")
-    # f is left-only at depth 3. On the RIGHT side its ancestors onlyL/deep are
-    # absent; only the root (present on both) anchors a bar.
-    chain = view._connector_chain(f)
-    parents = [p for _, p in chain]
-    assert [view._present_on_side(p, side_is_left=False) for p in parents] == [True, False, False]
-    # On the LEFT side every ancestor exists, so the full chain stays.
-    assert all(view._present_on_side(p, side_is_left=True) for p in parents)
-    # Grid skeleton on the right: the root level keeps its bar, deeper (absent)
-    # levels are blanked out — no floating skeleton.
-    lines = view._tree_lines(f, branch=False, side_is_left=False)
-    assert lines[:2] in ("│ ", "  ")       # root-level bar preserved
-    assert lines[2:] == "    "             # onlyL / deep levels blanked
+    lead = _find(view.root, "0lead")
+    trail = _find(view.root, "zztrail")
+    m = _find(view.root, "m_dir")
+    f = _find(_find(m, "deep"), "f.txt")
+
+    # The chain is the ancestor node path; each level's owner is its parent.
+    assert [n.name for n in view._connector_chain(f)] == ["m_dir", "deep", "f.txt"]
+
+    # RIGHT side (0lead / m_dir / zztrail all absent there):
+    # - a root-level LEADING row still draws its bar: the root spine runs up to
+    #   the pane header even with nothing present above it.
+    assert view._tree_lines(lead, branch=False, side_is_left=False) == "│ "
+    # - a root-level TRAILING row draws nothing (no header below, nothing follows).
+    assert view._tree_lines(trail, branch=False, side_is_left=False).strip() == ""
+    # - a deep left-only row keeps the root bar; its absent ancestors (m_dir,
+    #   deep) stay blank — no floating skeleton.
+    right = view._tree_lines(f, branch=False, side_is_left=False)
+    assert right[:2] == "│ "
+    assert right[2:] == "    "
+
+    # LEFT side: every ancestor of f exists, so the chain renders in full.
+    left = view._tree_lines(f, branch=False, side_is_left=True)
+    assert left[:2] == "│ "        # root list continues (z_dir follows m_dir)
+    assert left.strip("│ ") == ""  # only bars/blanks, all ancestors present
 
 
 # --- progressive scanning (slice 3) ------------------------------------------

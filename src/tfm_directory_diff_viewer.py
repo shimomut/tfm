@@ -768,19 +768,17 @@ class DirectoryDiffView(Widget):
             for child in node.children:
                 self._flatten(child, out)
 
-    def _connector_chain(self, node: TreeNode) -> list[tuple[bool, TreeNode]]:
-        """One ``(is_last_child, parent)`` pair per depth level from the top
-        ancestor down to ``node`` (length == ``node.depth``). ``is_last`` drives
-        the connector glyph; ``parent`` lets a side suppress the level's bar when
-        that parent is absent on this side (so an absent subtree draws no floating
-        connector). Drives the drawn connector lines (vector path)."""
+    def _connector_chain(self, node: TreeNode) -> list[TreeNode]:
+        """The ancestor chain from the top ancestor down to ``node`` (length ==
+        ``node.depth``); each entry's ``parent`` owns the sibling list a connector
+        column represents. Drives the drawn connector lines (vector) and the
+        box-drawing skeleton (grid)."""
         nodes: list[TreeNode] = []
         cur: Optional[TreeNode] = node
         while cur is not None and cur.depth > 0:
             nodes.insert(0, cur)
             cur = cur.parent
-        return [(n.parent.children[-1] is n, n.parent)
-                for n in nodes if n.parent is not None]
+        return [n for n in nodes if n.parent is not None]
 
     @staticmethod
     def _present_on_side(node: Optional[TreeNode], side_is_left: bool) -> bool:
@@ -794,37 +792,60 @@ class DirectoryDiffView(Widget):
             return True
         return (node.left_path if side_is_left else node.right_path) is not None
 
-    def _tree_lines(self, node: TreeNode, *, branch: bool,
-                    side_is_left: Optional[bool] = None) -> str:
-        """Box-drawing prefix showing this node's place in the tree. With
-        ``branch`` the node's own level gets a ├─/└─ connector; without (a node
-        missing on this side) only ancestor continuation bars are drawn.
+    def _present_sibling_after(self, node: TreeNode, side_is_left: bool) -> bool:
+        """Whether a sibling ordered after ``node`` is present on this side — i.e.
+        the parent's connector line continues below ``node``'s row here."""
+        parent = node.parent
+        if parent is None:
+            return False
+        seen = False
+        for sib in parent.children:
+            if sib is node:
+                seen = True
+            elif seen and self._present_on_side(sib, side_is_left):
+                return True
+        return False
 
-        ``side_is_left`` (given only for a missing-side render) blanks any level
-        whose parent is absent on that side, so an absent subtree draws no
-        floating skeleton — only the bars whose parent is present here remain."""
+    def _present_sibling_before(self, node: TreeNode, side_is_left: bool) -> bool:
+        """Whether a sibling ordered before ``node`` is present on this side — i.e.
+        the parent's connector line has already started above ``node``'s row."""
+        parent = node.parent
+        if parent is None:
+            return False
+        for sib in parent.children:
+            if sib is node:
+                return False
+            if self._present_on_side(sib, side_is_left):
+                return True
+        return False
+
+    def _tree_lines(self, node: TreeNode, *, branch: bool, side_is_left: bool) -> str:
+        """Box-drawing prefix showing ``node``'s place in the tree on the given
+        side. Each level draws its column only where that level's sibling line
+        actually spans this row on this side — a present sibling both above and
+        below — so an absent subtree, and any leading/trailing run of absent rows,
+        draw no floating skeleton. With ``branch`` the node's own level adds a
+        ├─/└─ elbow (the present-side render); without it (a missing node) that
+        level is a bare bar or blank like the ancestors."""
         if node.depth == 0:
             return ""
-        chain: list[TreeNode] = []
-        cur: Optional[TreeNode] = node
-        while cur is not None and cur.parent is not None and cur.parent.depth >= 0:
-            chain.insert(0, cur)
-            cur = cur.parent
-            if cur.depth == 0:
-                break
+        chain = self._connector_chain(node)
+        depth = len(chain)
         out = []
         for i, anc in enumerate(chain):
-            parent = anc.parent
-            if parent is None:
+            if not self._present_on_side(anc.parent, side_is_left):
+                out.append("  ")  # this level's sibling list is absent here
                 continue
-            if side_is_left is not None and not self._present_on_side(parent, side_is_left):
-                out.append("  ")  # parent absent here → no floating bar
-                continue
-            is_last = parent.children[-1] is anc
-            if i == len(chain) - 1:
-                out.append(("└─" if is_last else "├─") if branch else ("  " if is_last else "│ "))
+            after = self._present_sibling_after(anc, side_is_left)
+            if i == depth - 1 and branch:
+                out.append("├─" if after else "└─")
             else:
-                out.append("  " if is_last else "│ ")
+                # Root's spine reaches up to the pane header (the parent dir), so
+                # its top-level line "starts" above even a leading absent row.
+                before = (anc.parent.depth == 0
+                          or self._present_on_side(anc, side_is_left)
+                          or self._present_sibling_before(anc, side_is_left))
+                out.append("│ " if (after and before) else "  ")
         return "".join(out)
 
     # --- navigation ----------------------------------------------------------
@@ -1240,7 +1261,7 @@ class DirectoryDiffView(Widget):
         pending = verdict == DifferenceType.PENDING
         suffix = " …" if (pending and not node.is_directory) else ""
         vector = ctx.vector_shapes
-        flags = self._connector_chain(node)
+        chain = self._connector_chain(node)
 
         def side(x: int, col_w: int, path, is_active: bool, side_is_left: bool) -> None:
             row_bg = bg
@@ -1252,7 +1273,7 @@ class DirectoryDiffView(Widget):
             elif path is None:
                 ctx.fill_rect(x, y, col_w, 1.0, Style(bg=self._empty_bg))
             if vector:
-                self._draw_side_vector(ctx, x, col_w, node, flags, path, y,
+                self._draw_side_vector(ctx, x, col_w, node, chain, path, y,
                                        fg, row_bg, suffix, side_is_left)
             else:
                 self._draw_side_grid(ctx, x, col_w, node, path, y, fg, row_bg,
@@ -1281,47 +1302,55 @@ class DirectoryDiffView(Widget):
             if lines.strip():
                 ctx.draw_text(x, y, lines[:col_w], Style(fg=self._muted, bg=row_bg, font=MONO))
             return
-        lines = self._tree_lines(node, branch=True)
+        lines = self._tree_lines(node, branch=True, side_is_left=side_is_left)
         marker = ("▾ " if node.is_expanded else "▸ ") if node.is_directory else ""
         label = lines + marker + node.name + ("/" if node.is_directory else "") + suffix
         ctx.draw_text(x, y, truncate_to_width(label, col_w), Style(fg=fg, bg=row_bg, font=MONO))
         if lines:  # redraw the tree lines muted over the label's start
             ctx.draw_text(x, y, lines[:col_w], Style(fg=self._muted, bg=row_bg, font=MONO))
 
-    def _draw_side_vector(self, ctx, x, col_w, node, flags, path, y,
+    def _draw_side_vector(self, ctx, x, col_w, node, chain, path, y,
                           fg, row_bg, suffix, side_is_left) -> None:
         """GUI / pixel tree column: connectors drawn as thin lines (aligned to a
         base-unit grid regardless of the proportional font) with the name in the
         proportional UI font, indented a fixed distance per depth and elided to
         the column by measured width."""
-        depth = len(flags)
+        depth = len(chain)
         line_style = Style(bg=self._muted)
         lw = 1.0 / max(1, ctx.base_size[0])   # ~1 device-pixel vertical stroke
         lh = 1.0 / max(1, ctx.base_size[1])   # ~1 device-pixel horizontal stroke
         mid = y + 0.5
         label_x = x + depth * _INDENT
-        for i, (is_last, parent) in enumerate(flags):
-            # Skip a level whose parent is absent on this side: its sibling bar
-            # would be a floating line in an empty column (a whole absent subtree
-            # otherwise renders as a column of disconnected bars). Levels whose
-            # parent IS present here still draw — that keeps the outer bars that
-            # connect the tree (the root's list always shows, as it exists on both
-            # sides), which is why a present node — all of whose ancestors exist on
-            # its own side — keeps its full connector chain.
-            if not self._present_on_side(parent, side_is_left):
+        for i, anc in enumerate(chain):
+            # A level's column exists here only if its sibling list does (parent
+            # present on this side); otherwise the whole absent subtree would draw
+            # a column of floating bars.
+            if not self._present_on_side(anc.parent, side_is_left):
                 continue
+            after = self._present_sibling_after(anc, side_is_left)
+            # The sibling line has "started" above this row when a sibling precedes
+            # it on this side, or the node itself is present — or the list is the
+            # root's, whose spine runs up to the pane header (the header names the
+            # parent directory), so the top-level line reaches it even across
+            # leading rows that are absent here.
+            before = (anc.parent.depth == 0
+                      or self._present_on_side(anc, side_is_left)
+                      or self._present_sibling_before(anc, side_is_left))
             cx = x + i * _INDENT + 0.5
             if i < depth - 1:
-                if not is_last:  # ancestor with siblings below → continuation bar
+                # Ancestor level: a continuation bar only where the sibling line
+                # spans this row — present both below (``after``) and above.
+                if after and before:
                     ctx.fill_rect(cx, y, lw, 1.0, line_style)
             elif path is not None:
-                # The node's own level: a stem from the top to the middle (full
-                # height when it has siblings below), plus an elbow to the label.
-                ctx.fill_rect(cx, y, lw, 1.0 if not is_last else 0.5, line_style)
+                # The node's own level: a stem to the middle (full height when a
+                # present sibling follows, so the line runs on), plus an elbow to
+                # the label.
+                ctx.fill_rect(cx, y, lw, 1.0 if after else 0.5, line_style)
                 ctx.fill_rect(cx, mid, max(0.0, label_x - cx), lh, line_style)
-            elif not is_last:
-                # Missing here but the parent list continues below: a bare
-                # continuation bar (no elbow — there is no label on this side).
+            elif after and before:
+                # Missing here but the line spans this row (bridging two present
+                # siblings, or reaching the header): a bare bar, no elbow.
                 ctx.fill_rect(cx, y, lw, 1.0, line_style)
         if path is None:
             return
