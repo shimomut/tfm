@@ -21,6 +21,32 @@ TFM supports different color schemes to look good in different terminal environm
 - Good for light terminal backgrounds
 - Professional, minimal look
 
+### Retro themes with screen effects
+
+Beyond the standard palettes (Dark+, Light+, Monokai, Dracula, Nord, Solarized,
+Gruvbox), TFM ships four **retro hardware** themes, each pairing a period-correct
+palette with a recommended *screen effect*:
+
+- **8bit** — a saturated NES-era palette behind a CRT-TV look (chunky scanlines, a
+  soft glow, a slight vignette and rolling band).
+- **Sci-Fi** — an emissive cyan HUD with amber highlights behind a holographic
+  look (heavy glow and bloom, a light scanline, an interference roll).
+- **Pocket LCD** — the four-shade pea-green of a classic pocket handheld as a
+  *flat reflective LCD*: no glow at all, and a dot-matrix pixel grid (fine dark
+  gaps on both axes, so the screen reads as discrete square pixels) with a soft
+  bezel vignette — no CRT scanlines.
+- **Segment LCD** — a blue negative/backlit digital display (dashboard / clock)
+  with a gentle backlit glow.
+
+Select any of them from **View → Theme** or by cycling with `T`.
+
+The screen effect is composited over the whole frame and is only rendered by the
+**GUI backend** (`tfm.py --backend gui` on macOS/Windows) — a terminal has no
+sub-cell pixels to filter and shows the palette alone. The effect turns on when
+you switch to the theme and off when you switch away. You can add your own themes
+(with or without an effect) via the `THEMES` dict in `~/.tfm/config.py`; see
+[Configuration](CONFIGURATION_FEATURE.md).
+
 ## What Gets Colored
 
 Both color schemes change:
