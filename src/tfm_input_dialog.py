@@ -250,7 +250,13 @@ class InputDialog(FocusContainer, Widget):
         if c is not None and c.active and self._overlay is not None:
             slot = self._overlay_slot()
             if slot is not None:
-                token_x = dx + field_x + 1.0 + ctx.measure_text(self.edit.text[:c.completion_start_pos])
+                # On-screen x of the token: measured from the field's *scroll*
+                # position (``_view``), so a long, horizontally-scrolled path still
+                # anchors the popup under the visible token, not off the right edge.
+                # If the token start is scrolled off the left, anchor at the field.
+                view = self.edit._view
+                start = max(c.completion_start_pos, view)
+                token_x = dx + field_x + 1.0 + ctx.measure_text(self.edit.text[view:start])
                 row_h = ctx.line_height(Style(fg=theme.text if theme else None))
                 sw, sh = self._panel.backend.size_units
                 slot.rect = Rect(*overlay_geometry(

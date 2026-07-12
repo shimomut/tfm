@@ -31,6 +31,9 @@ from puikit.widgets.base import Widget
 MAX_ROWS = 8
 #: Cap on the popup width, in base units.
 MAX_WIDTH = 60.0
+#: Left inset of the candidate text within the popup. The popup is shifted left by
+#: this much when positioned, so the text lines up with the token in the field.
+ROW_PAD_L = 1.0
 
 
 class CandidateListOverlay(Widget):
@@ -91,7 +94,7 @@ class CandidateListOverlay(Widget):
         vis = self.visible_rows()
         has_bar = n > vis
         bar_w = 1.0 if has_bar else 0.0
-        pad_l = 1.0
+        pad_l = ROW_PAD_L
         text_w = max(1.0, wu - pad_l - bar_w)
         ty = (row_h - 1.0) / 2.0  # center the text line within the row box
         measure = lambda t: ctx.measure_text(t)
@@ -146,16 +149,17 @@ def overlay_geometry(
     absolute column ``token_x``.
 
     Placed just **below** the field, or **above** it when there isn't room below
-    (Req 2.2/2.3), left-anchored at the token column (Req 6.7), sized to the
-    longest candidate (measured, so it fits on a proportional font too) and capped
-    at :data:`MAX_ROWS` rows — no border rows are reserved."""
+    (Req 2.2/2.3), left-anchored so the candidate *text* lines up with the token
+    column (Req 6.7) — the popup left edge is shifted left by the row's text inset
+    (:data:`ROW_PAD_L`). Sized to the longest candidate (measured, so it fits on a
+    proportional font too) and capped at :data:`MAX_ROWS` rows — no border rows."""
     vis = min(len(candidates), MAX_ROWS)
     h = max(row_h, vis * row_h)
     longest = max((measure(c) for c in candidates), default=8.0)
     bar = 1.0 if len(candidates) > MAX_ROWS else 0.0
-    w = min(longest + 2.0 + bar, MAX_WIDTH, max(8.0, screen_w))
+    w = min(longest + ROW_PAD_L + 1.0 + bar, MAX_WIDTH, max(8.0, screen_w))
 
-    x = max(0.0, min(token_x, max(0.0, screen_w - w)))
+    x = max(0.0, min(token_x - ROW_PAD_L, max(0.0, screen_w - w)))
     below = field_y + field_h
     if below + h <= screen_h:
         y = below
