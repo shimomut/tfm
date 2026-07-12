@@ -47,6 +47,7 @@ from puikit.posteffect import PRESETS as _POST_EFFECT_PRESETS  # noqa: E402
 from puikit.backends import create_backend  # noqa: E402
 from puikit.menu import Menu, MenuItem, SEPARATOR  # noqa: E402
 from puikit.text import elide  # noqa: E402
+from puikit.layout import SizeRequest  # noqa: E402
 from puikit.widgets import LayoutView, LogView, MenuBar, Splitter, show_message_box  # noqa: E402
 from puikit.widgets.base import Widget  # noqa: E402
 
@@ -316,6 +317,38 @@ def _archive_header_label(path_str: str) -> str:
     return f"[{archive_name}]/{internal}" if internal else f"[{archive_name}]"
 
 
+#: Content inset for the chrome bars (pane header / footer, global status), in
+#: device pixels on a vector backend. This replaces the old window-level margin
+#: (``Panel.set_layout(margin_px=…)``): each bar's *surface* fills its whole slot
+#: — edge to edge — while only its *text* is inset by this much, so the colored
+#: bars reach the window frame with no gap and the content still breathes. See
+#: ``_bar_pad`` for the grid fallback and the FilePane's own ``CONTENT_PAD_CELLS``.
+BAR_PAD_PX = 4.0
+
+
+def _bar_pad(ctx) -> tuple[float, float]:
+    """``(x, y)`` content inset for a chrome bar, in base units, from its
+    DrawContext. On a vector backend both are ``BAR_PAD_PX`` device pixels. On a
+    character grid the horizontal inset is one whole cell (matching the single
+    leading space the bars carried before) and the vertical inset is zero — a
+    grid cannot spend a fraction of a row, and a whole extra row would waste
+    space on a terminal."""
+    if not ctx.vector_shapes:
+        return (1.0, 0.0)
+    bw, bh = ctx.base_size
+    return (BAR_PAD_PX / bw if bw else 0.0, BAR_PAD_PX / bh if bh else 0.0)
+
+
+def _bar_height(ctx) -> SizeRequest:
+    """Height request (base units) for a ``size="content"`` chrome bar that
+    reserves ``BAR_PAD_PX`` of vertical padding on top of its single text row —
+    the header pads its top, the status bar its bottom. Vector backends only;
+    a grid keeps the bare one-row height (``ctx.snap``)."""
+    pad = 0.0 if ctx.snap else (BAR_PAD_PX / ctx.base_h if ctx.base_h else 0.0)
+    h = 1.0 + pad
+    return SizeRequest(min=h, preferred=h, max=h)
+
+
 class PaneHeader(Widget):
     """The location bar above a pane: its current path, brighter when active."""
 
@@ -326,22 +359,30 @@ class PaneHeader(Widget):
     def draw(self, ctx) -> None:
         pane = self.app.pane(self.pane_name)
         active = self.app.pm.active_pane == self.pane_name
+        # Inset the text from the top/left/right; the surface fills the whole slot.
+        pad_x, pad_y = _bar_pad(ctx)
+        avail = max(0.0, ctx.size_units[0] - 2 * pad_x)
         virtual = pane.get("virtual")
         if virtual:
             # Not a directory: a search-results feed. Say so (and which pane an
             # operation will hit) rather than showing the — misleading — root path.
             mode = "content" if virtual["mode"] == "content" else "filename"
             n = len(pane["files"])
-            label = f' ⌕ "{virtual["query"]}" — {n} result{"" if n == 1 else "s"} ({mode})'
-            text = elide(label, ctx.width, where="end", measure=ctx.measure_text)
+            label = f'⌕ "{virtual["query"]}" — {n} result{"" if n == 1 else "s"} ({mode})'
+            text = elide(label, avail, where="end", measure=ctx.measure_text)
         elif self.app._is_archive(pane["path"]):
             # A browsed archive: show [archive.zip]/sub rather than the raw URI.
-            label = " " + _archive_header_label(str(pane["path"]))
-            text = elide(label, ctx.width, where="middle", measure=ctx.measure_text)
+            label = _archive_header_label(str(pane["path"]))
+            text = elide(label, avail, where="middle", measure=ctx.measure_text)
         else:
-            text = elide(" " + str(pane["path"]), ctx.width, where="middle", measure=ctx.measure_text)
+            text = elide(str(pane["path"]), avail, where="middle", measure=ctx.measure_text)
         fg = ctx.theme.accent if active else ctx.theme.text
-        ctx.draw_text(0, 0, text, Style(fg=fg, attr=TextAttribute.BOLD))
+        ctx.draw_text(pad_x, pad_y, text, Style(fg=fg, attr=TextAttribute.BOLD))
+
+    def measure(self, ctx, axis, available) -> SizeRequest:
+        # Reserve a strip of top padding above the path (vector backends); the
+        # bar is placed with size="content" so this height wins. See _bar_height.
+        return _bar_height(ctx) if axis == "y" else SizeRequest()
 
 
 class PaneFooter(Widget):
@@ -358,15 +399,17 @@ class PaneFooter(Widget):
         self.rect = ctx.screen_rect
         pane = self.app.pane(self.pane_name)
         active = self.app.pm.active_pane == self.pane_name
+        pad_x, _ = _bar_pad(ctx)  # left/right inset; the surface fills the slot
+        avail = max(0.0, ctx.size_units[0] - 2 * pad_x)
         dirs, files = self.app.counts(pane)
         nsel = len(pane["selected_files"])
         sel = f" ({nsel} selected)" if nsel else ""
         filt = f"  |  Filter: {pane['filter_pattern']}" if pane["filter_pattern"] else ""
         sort = self.app.flm.get_sort_description(pane)
-        text = f" {dirs} dirs, {files} files{sel}  |  {sort}{filt}"
+        text = f"{dirs} dirs, {files} files{sel}  |  {sort}{filt}"
         fg = ctx.theme.text if active else ctx.theme.muted_text
         attr = TextAttribute.BOLD if active else TextAttribute.NORMAL
-        ctx.draw_text(0, 0, elide(text, ctx.width, measure=ctx.measure_text), Style(fg=fg, attr=attr))
+        ctx.draw_text(pad_x, 0, elide(text, avail, measure=ctx.measure_text), Style(fg=fg, attr=attr))
 
 
 class StatusBar(Widget):
@@ -413,9 +456,18 @@ class StatusBar(Widget):
         return self._hints_cache
 
     def draw(self, ctx) -> None:
+        # Left/right inset; the bottom padding is the extra row height reserved
+        # by measure(), so the text stays at the top (y=0) of the taller slot.
+        pad_x, _ = _bar_pad(ctx)
+        avail = max(0.0, ctx.size_units[0] - 2 * pad_x)
         hints = self.ISEARCH_HINTS if self.app._isearch_active else self._hints()
-        text = elide(" " + hints, ctx.width, where="end", measure=ctx.measure_text)
-        ctx.draw_text(0, 0, text, Style(fg=ctx.theme.muted_text))
+        text = elide(hints, avail, where="end", measure=ctx.measure_text)
+        ctx.draw_text(pad_x, 0, text, Style(fg=ctx.theme.muted_text))
+
+    def measure(self, ctx, axis, available) -> SizeRequest:
+        # Reserve a strip of bottom padding below the hints (vector backends);
+        # placed with size="content" so this height wins. See _bar_height.
+        return _bar_height(ctx) if axis == "y" else SizeRequest()
 
 
 class _StreamToLog:
@@ -614,13 +666,14 @@ class TfmApp:
                 Item(
                     VSplit(
                         Item(self.content_splitter, weight=1, hints={"surface": "content"}),
-                        Item(self.status, size=1, hints={"surface": "status"}),
+                        # "content" (not size=1): the status bar measures itself a
+                        # touch taller to pad its hints up from the window's bottom.
+                        Item(self.status, size="content", hints={"surface": "status"}),
                         divider="subtle",
                     ),
                     weight=1,
                 ),
             ),
-            margin_px=4,
         )
         # (the theme + picker list were resolved above, before the menu / widgets)
         self.log_info(f"TFM on PuiKit — {self.pm.left_pane['path']}")
@@ -679,7 +732,9 @@ class TfmApp:
         # isearch overlay exactly on it.
         self._footers[name] = footer
         return LayoutView(VSplit(
-            Item(PaneHeader(self, name), size=1, hints={"surface": "header"}),
+            # "content" (not size=1): the header measures itself a touch taller so
+            # it can pad the path text down from the window's top edge (§_bar_pad).
+            Item(PaneHeader(self, name), size="content", hints={"surface": "header"}),
             Item(view, weight=1, hints={"surface": "content"}),
             Item(footer, size=1, hints={"surface": "footer"}),
             divider="subtle",
