@@ -41,7 +41,7 @@ from puikit.backend import Style, TextAttribute
 from puikit.event import Event, EventType
 from puikit.panel import Rect
 from puikit.text import elide, truncate_to_width
-from puikit.widgets import show_message_box
+from puikit.widgets import DragBar, show_message_box
 from puikit.widgets.base import Widget
 
 from tfm_path import Path
@@ -362,11 +362,13 @@ class DirectoryDiffView(Widget):
         # is the resolved inset, cached for row/column pointer hit-testing.
         self._pad = (0.0, 0.0)
         # Movable centre split: fraction of the content width given to the left
-        # pane. Draggable by the gutter; nudged by ``[`` / ``]``.
+        # pane. Draggable by the gutter; nudged by ``[`` / ``]``. The shared
+        # DragBar carries the grab mechanics (offset-preserving drag, hover dwell,
+        # and the neutral band brighten) so the gutter feels identical to the main
+        # window's footer divider, which delegates to the same helper.
         self._split_ratio = 0.5
         self._resizable = False       # set each draw once geometry is known
-        self._dragging_split = False
-        self._drag_offset = 0.0       # pointer offset within the grabbed band
+        self._drag = DragBar()
         self._avail = 2               # content width (excludes gutter/scrollbar)
         # Double-click bookkeeping (no backend click-count; detect by time+row).
         self._last_click_row = -1
@@ -1180,23 +1182,30 @@ class DirectoryDiffView(Widget):
         # Bottom status bar — full-width 'status' surface reaching the bottom edge,
         # its text inset, matching the main window (and the text / diff viewers).
         draw_status_bar(ctx, foot_y, self._footer(), pad_x=pad_x, bottom_pad=pad_y)
-        self._update_cursor(ctx, hu)
 
-    def _update_cursor(self, ctx, h: int) -> None:
-        """Claim the pointer shape every frame. This is a full-window modal, so
-        without an explicit request the resize cursor of a widget *underneath*
-        (the app's pane Splitter) leaks through at its fixed centre. We show
-        ``col-resize`` only over our own gutter (or mid-drag) and reset to the
-        default everywhere else — always overriding whatever drew below."""
-        over = self._dragging_split
-        if not over and self._resizable:
-            panel = getattr(ctx, "panel", None)
-            p = panel.pointer if panel is not None else None
-            if p is not None:
-                sx, sy, _sw, _sh = ctx.screen_rect
-                lx, ly = p[0] - sx, p[1] - sy
-                over = self._sep_x <= lx < self._right_x and 0 <= ly < h - 2
-        ctx.set_cursor("col-resize" if over else None)
+        # Gutter feedback. The cursor is immediate on hover/drag; the neutral band
+        # brighten dwells (DragBar) so a pointer merely sweeping across does not
+        # flash it. Drawn last so the wash overlays the gutter spine and its
+        # verdict glyphs. This is a full-window modal, so we claim the pointer
+        # shape every frame — otherwise the resize cursor of the pane Splitter
+        # *underneath* leaks through at its fixed centre.
+        hovered = self._gutter_hovered(ctx, hu)
+        ctx.set_cursor("col-resize" if (hovered or self._drag.dragging) else None)
+        active = self._drag.dragging or self._drag.hover_active(ctx, hovered)
+        self._drag.draw_highlight(ctx, self._sep_x, 0, float(_GUTTER_W), det_y, active)
+
+    def _gutter_hovered(self, ctx, h: float) -> bool:
+        """True when the pointer is over the gutter band and the split is
+        resizable, so the cursor and the band brighten can respond."""
+        if not self._resizable:
+            return False
+        panel = getattr(ctx, "panel", None)
+        p = panel.pointer if panel is not None else None
+        if p is None:
+            return False
+        sx, sy, _sw, _sh = ctx.screen_rect
+        lx, ly = p[0] - sx, p[1] - sy
+        return self._sep_x <= lx < self._right_x and 0 <= ly < h - 2
 
     def _draw_status_screen(self, ctx, w: int, h: int, muted, bg) -> None:
         if self._scanning:
@@ -1429,8 +1438,10 @@ class DirectoryDiffView(Widget):
         in_gutter = self._sep_x <= x < self._right_x
         if event.type is EventType.MOUSE_DOWN:
             if in_gutter and self._resizable:
-                self._dragging_split = True
-                self._drag_offset = x - self._sep_x  # grab point within the band
+                # Grab the gutter: the DragBar records where in the band the press
+                # landed relative to the divider so the split tracks the pointer's
+                # motion (no jump to the pressed point).
+                self._drag.begin(x, self._sep_x)
                 return True
             # Click-to-select: move the cursor to the row and focus its side.
             ri = self._row_at(y)
@@ -1444,11 +1455,11 @@ class DirectoryDiffView(Widget):
                 self._render()
             return True
         if event.type is EventType.MOUSE_DRAG:
-            if self._dragging_split:
-                self._set_split_from_x(x - self._drag_offset)
+            if self._drag.dragging:
+                self._set_split_from_x(self._drag.position_for(x))
             return True
         if event.type is EventType.MOUSE_UP:
-            self._dragging_split = False
+            self._drag.end()
             return True
         if event.type is EventType.MOUSE_CLICK:
             # A release over the same widget the press began on. Double-click

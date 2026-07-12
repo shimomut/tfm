@@ -182,6 +182,39 @@ def test_navigation_events_render(backend, trees):
         panel.render()  # each must not raise
 
 
+def test_gutter_drag_is_offset_preserving_and_brightens(trees):
+    # The centre gutter drags through the shared DragBar: grabbing it off the
+    # divider line does not jump the split to the pressed point, and while
+    # dragging the whole band brightens (GUI profile: transparency composites).
+    from puikit.widgets import dragbar as dragbar_mod
+
+    backend = MemoryBackend(width=100, height=30, capabilities=PROFILE_GUI_DESKTOP)
+    panel = Panel(backend)
+    view = show_directory_diff_viewer(panel, *trees, background=False)
+    panel.render()
+    assert view._resizable
+    ratio0 = view._split_ratio
+    gx = view._sep_x + 1.0  # inside the 3-unit gutter, off its left edge
+
+    # Press: arms the drag WITHOUT moving the split (no jump to the pressed point).
+    panel.dispatch_event(Event(type=EventType.MOUSE_DOWN, x=gx, y=5.0, button="left"))
+    assert view._drag.dragging
+    assert view._split_ratio == pytest.approx(ratio0)
+
+    # While dragging, the gutter band brightens with the neutral wash.
+    panel.render()
+    assert backend.style_at(round(view._sep_x) + 1, 3).bg == dragbar_mod._WASH
+
+    # Drag right by 10: the split tracks the pointer's motion (offset preserved),
+    # so the left pane grows.
+    panel.dispatch_event(Event(type=EventType.MOUSE_DRAG, x=gx + 10.0, y=5.0, button="left"))
+    assert view._split_ratio > ratio0
+
+    # Release ends the drag; the brighten stops.
+    panel.dispatch_event(Event(type=EventType.MOUSE_UP, x=gx + 10.0, y=5.0, button="left"))
+    assert not view._drag.dragging
+
+
 def test_escape_closes(backend, trees):
     panel = Panel(backend)
     show_directory_diff_viewer(panel, *trees, background=False)

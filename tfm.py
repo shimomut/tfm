@@ -654,6 +654,13 @@ class TfmApp:
             # would waste a row. Still draggable via the grab margin; the vector
             # backend keeps its hairline.
             flat=True,
+            # The footer IS the visible divider, so make its whole height (the
+            # 1-base-unit ``Item(footer, size=1)`` slot in ``_pane_column``)
+            # grabbable — not just the hairline at its bottom edge. Without this
+            # the vector backend's grab margin is a few pixels and the footer
+            # reads as draggable but mostly isn't. Only the first (upper) side is
+            # widened; the log below keeps the default margin.
+            grab_first=1.0,
         )
         self.panel.set_layout(
             VSplit(
