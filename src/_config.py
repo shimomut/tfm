@@ -301,6 +301,10 @@ class Config:
         # open viewer), and each context matches its own action by name via
         # KeyBindings.is_action_for_event, so the shared key is unambiguous.
         'toggle_wrap': ['W'],                  # Text viewer: toggle line wrapping
+        # 'M' likewise shares with 'move_files' / 'create_directory' (file list
+        # only); in an open viewer it toggles the raw text view and the file
+        # type's rich renderer (Markdown for *.md), matched by name in-context.
+        'toggle_view_mode': ['M'],             # Text viewer: toggle rendered (Markdown) / raw text
 
         # === Display & Appearance ===
         'toggle_hidden': ['.'],                # Toggle visibility of hidden files (dotfiles)

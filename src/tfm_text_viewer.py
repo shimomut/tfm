@@ -33,7 +33,11 @@ from puikit.widgets.base import Widget
 from tfm_config import (get_keys_for_action, is_action_for_event,
                         keys_label_for_action)
 from tfm_isearch_bar import ViewerISearch
+from tfm_log_manager import getLogger
 from tfm_text_dialog import keys_markdown, show_markdown
+from tfm_viewer_registry import rich_renderer_for
+
+logger = getLogger("TextViewer")
 
 try:
     from pygments.lexers import get_lexer_for_filename, get_lexer_by_name, TextLexer
@@ -235,6 +239,22 @@ def _read_lines(path) -> tuple[list[str], bool]:
     return [_expand_tabs(line) for line in content.splitlines()], False
 
 
+def _read_source(path) -> str | None:
+    """Read ``path`` as raw text (tabs and line endings intact) for a rich
+    renderer, trying the same encodings as :func:`_read_lines`. Returns ``None``
+    when it can't be read at all (missing / OS error); a binary file still
+    decodes via the latin-1 fallback, so the renderer — not this reader — decides
+    what to make of it."""
+    for encoding in ("utf-8", "latin-1", "cp1252"):
+        try:
+            return path.read_text(encoding=encoding)
+        except UnicodeDecodeError:
+            continue
+        except (FileNotFoundError, OSError):
+            return None
+    return None
+
+
 def _highlight(lines: list[str], path, palette: dict | None = None) -> list[list[tuple[str, Any]]]:
     """Map each line to a list of ``(text, fg)`` segments, colored per ``palette``
     (a token-category → RGB map; the active theme's syntax palette, defaulting to
@@ -319,6 +339,14 @@ class TextViewer(Widget):
         self.path = path
         self.lines, self.is_error = _read_lines(path)
         self.highlighted = _highlight(self.lines, path, syntax)
+        # Optional rich (formatted) renderer for this file type — Markdown for
+        # *.md today (see tfm_viewer_registry). The viewer always opens in raw
+        # text; when a renderer exists, ``toggle_view_mode`` swaps to it in place.
+        # The rich widget is built lazily on first switch and cached, so each mode
+        # keeps its own scroll position across toggles. ``mode`` is "text" | "rich".
+        self._rich = rich_renderer_for(path)
+        self.mode = "text"
+        self._rich_widget: Widget | None = None
         self._panel: Any = None
         self._child_z = 90  # z for the help overlay; raised above this viewer in show_
         self.top = 0.0       # first visible display row (vertical scroll)
@@ -487,8 +515,21 @@ class TextViewer(Widget):
         header = f" {self.path.name}  ({total} lines)"
         ctx.draw_text(pad_x, pad_y, elide(header, iw, where="end", measure=ctx.measure_text),
                       Style(fg=accent, bg=header_bg, attr=TextAttribute.BOLD))
-        info = f"{pos}/{total}  {'WRAP' if self.wrap else ''} "
+        # The right-aligned tag names the current view: the rendered renderer's
+        # name in rich mode, the line position (+ WRAP) in raw text mode.
+        if self.mode == "rich" and self._rich_widget is not None:
+            info = f"{self._rich.name} "
+        else:
+            info = f"{pos}/{total}  {'WRAP' if self.wrap else ''} "
         ctx.draw_text(max(pad_x, wu - pad_x - len(info)), pad_y, info, Style(fg=muted, bg=header_bg))
+
+        self._bg, self._text_fg, self._muted = bg, text_fg, muted
+        # Rich (formatted) mode: the embedded renderer owns the whole body — it
+        # draws and scrolls itself, with its own scrollbar — so the plain gutter,
+        # h-scrollbar and row layout are skipped entirely.
+        if self.mode == "rich" and self._rich_widget is not None:
+            self._draw_rich(ctx, wu, hu, pad_x, pad_y, iw, head_h)
+            return
 
         gutter_w = self._gutter_w()
         self._gutter = gutter_w
@@ -497,7 +538,6 @@ class TextViewer(Widget):
         # Fractional visible width for the h-scrollbar thumb (columns can be
         # sub-cell); text still lays out on the whole-column ``_content_w``.
         content_wf = max(1.0, iw - gutter_w - 1)
-        self._bg, self._text_fg, self._muted = bg, text_fg, muted
         # The footer takes one row plus its bottom pad (its status surface reaches
         # the bottom edge). A horizontal scrollbar (no-wrap only) steals a row when
         # a line overruns the width. (``head_h`` was set with the header above.)
@@ -536,8 +576,28 @@ class TextViewer(Widget):
         wrap_k = keys_label_for_action("toggle_wrap", "w")
         search_k = keys_label_for_action("search", "F")
         quit_k = keys_label_for_action("quit", "q")
-        hint = (f" ↑↓ scroll · ←→ pan · {wrap_k} wrap · {search_k} search · "
-                f"{quit_k}/Esc close ")
+        # When a rich renderer exists, advertise the toggle to it (e.g. "M markdown");
+        # elide handles the longer hint on a narrow window.
+        if self._rich is not None:
+            view_k = keys_label_for_action("toggle_view_mode", "M")
+            hint = (f" ↑↓ scroll · {wrap_k} wrap · {search_k} search · "
+                    f"{view_k} {self._rich.name.lower()} · {quit_k}/Esc close ")
+        else:
+            hint = (f" ↑↓ scroll · ←→ pan · {wrap_k} wrap · {search_k} search · "
+                    f"{quit_k}/Esc close ")
+        draw_status_bar(ctx, fy, hint, pad_x=pad_x, bottom_pad=pad_y)
+
+    def _draw_rich(self, ctx, wu, hu, pad_x, pad_y, iw, head_h) -> None:
+        """Draw the rich (formatted) body: the embedded renderer fills the area
+        between the header and footer, inset by the l/r pad like the raw body, and
+        scrolls itself. Only the footer chrome (toggle-back hint) is TFM's."""
+        fy = hu - 1.0 - pad_y                     # footer text row (surface below)
+        body_h = max(1.0, fy - head_h)
+        ctx.draw_child(self._rich_widget, pad_x, head_h, iw, body_h)
+        self._footer_rect = (0.0, fy, wu, hu - fy)
+        view_k = keys_label_for_action("toggle_view_mode", "M")
+        quit_k = keys_label_for_action("quit", "q")
+        hint = f" ↑↓ scroll · {view_k} raw text · {quit_k}/Esc close "
         draw_status_bar(ctx, fy, hint, pad_x=pad_x, bottom_pad=pad_y)
 
     def _draw_rows(self, ctx) -> None:
@@ -634,8 +694,36 @@ class TextViewer(Widget):
         if panel is not None and panel.has_layers and panel._layers[-1].widget is self:
             panel.pop_layer()
 
+    def _toggle_view_mode(self) -> None:
+        """Switch between the raw text view and this file type's rich renderer
+        (the ``toggle_view_mode`` action). A no-op for a type with no registered
+        renderer. The rich widget is built once, from the file source, and cached
+        — so each mode keeps its own scroll position across toggles. If the source
+        can't be read as text, the switch is refused and the viewer stays raw.
+
+        Uses the content colors captured by the last :meth:`draw` (the viewer is
+        always drawn once before any key event), so the rendered document sits on
+        the same surface as the raw view."""
+        if self._rich is None:
+            return
+        if self.mode == "rich":
+            self.mode = "text"
+            return
+        if self._rich_widget is None:
+            source = _read_source(self.path)
+            if source is None:
+                logger.warning(f"Cannot render {self.path.name}: unreadable as text")
+                return
+            style = Style(fg=self._text_fg or (212, 212, 212), bg=self._bg)
+            self._rich_widget = self._rich.build(source, style=style)
+        self.mode = "rich"
+
     def handle_event(self, event: Event) -> bool:
         if event.type is EventType.MOUSE_SCROLL:
+            # Rich mode: the embedded renderer owns scrolling (its own offset).
+            if self.mode == "rich" and self._rich_widget is not None:
+                self._rich_widget.handle_event(event)
+                return True
             uy = event.hints.get("scroll_units")
             self.top -= float(uy) if uy is not None else float(event.scroll)
             ux = event.hints.get("scroll_units_x")  # precise horizontal swipe
@@ -652,11 +740,23 @@ class TextViewer(Widget):
         # file manager's ``compare_selection``. Esc is the universal modal dismiss;
         # the scroll keys below are viewer-local. While a search is open the
         # ISearchBar is the top layer and receives keys, so this isn't reached.
+        # Quit / help / the view-mode toggle apply in both raw and rich modes.
         if key == "escape" or is_action_for_event(event, "quit"):
             self._close()
-        elif is_action_for_event(event, "help"):
+            return True
+        if is_action_for_event(event, "help"):
             self._show_help()
-        elif is_action_for_event(event, "search"):
+            return True
+        if self._view_mode_pressed(event):
+            self._toggle_view_mode()
+            return True
+        # Rich mode: the embedded renderer owns navigation (arrows / page / home /
+        # end / in-document link jumps); forward and let it repaint. Incremental
+        # search and line-wrap are raw-text-only, so they don't apply here.
+        if self.mode == "rich" and self._rich_widget is not None:
+            self._rich_widget.handle_event(event)
+            return True
+        if is_action_for_event(event, "search"):
             self._enter_search()
         elif self._wrap_pressed(event):
             self.wrap = not self.wrap
@@ -689,6 +789,15 @@ class TextViewer(Widget):
             return True
         return not get_keys_for_action("toggle_wrap")[0] and event.char == "w"
 
+    def _view_mode_pressed(self, event: Event) -> bool:
+        """Whether ``event`` toggles the view mode — the ``toggle_view_mode``
+        binding, with a literal ``m`` fallback for user configs predating that
+        action (so the Markdown toggle works even when a user's ``KEY_BINDINGS``
+        — merged from an older template — has no ``toggle_view_mode`` entry)."""
+        if is_action_for_event(event, "toggle_view_mode"):
+            return True
+        return not get_keys_for_action("toggle_view_mode")[0] and event.char == "m"
+
     def _show_help(self) -> None:
         if self._panel is None:
             return
@@ -700,6 +809,12 @@ class TextViewer(Widget):
             (keys_label_for_action("toggle_wrap", "w"), "toggle line wrap"),
             (keys_label_for_action("search", "F"), "incremental search"),
             ("↑ / ↓ (in search)", "next / prev match"),
+        ]
+        # Only offer the view-mode toggle for a file type that has a rich renderer.
+        if self._rich is not None:
+            rows.append((keys_label_for_action("toggle_view_mode", "M"),
+                         f"toggle {self._rich.name} / raw text"))
+        rows += [
             (keys_label_for_action("help", "?"), "this help"),
             (keys_label_for_action("quit", "q") + " / Esc", "close"),
         ]
