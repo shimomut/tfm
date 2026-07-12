@@ -768,21 +768,41 @@ class DirectoryDiffView(Widget):
             for child in node.children:
                 self._flatten(child, out)
 
-    def _connector_chain(self, node: TreeNode) -> list[bool]:
-        """One ``is_last_child`` flag per depth level from the top ancestor down
-        to ``node`` (length == ``node.depth``). Drives both the box-drawing
-        connectors (grid) and the drawn connector lines (vector)."""
+    def _connector_chain(self, node: TreeNode) -> list[tuple[bool, TreeNode]]:
+        """One ``(is_last_child, parent)`` pair per depth level from the top
+        ancestor down to ``node`` (length == ``node.depth``). ``is_last`` drives
+        the connector glyph; ``parent`` lets a side suppress the level's bar when
+        that parent is absent on this side (so an absent subtree draws no floating
+        connector). Drives the drawn connector lines (vector path)."""
         nodes: list[TreeNode] = []
         cur: Optional[TreeNode] = node
         while cur is not None and cur.depth > 0:
             nodes.insert(0, cur)
             cur = cur.parent
-        return [n.parent.children[-1] is n for n in nodes if n.parent is not None]
+        return [(n.parent.children[-1] is n, n.parent)
+                for n in nodes if n.parent is not None]
 
-    def _tree_lines(self, node: TreeNode, *, branch: bool) -> str:
+    @staticmethod
+    def _present_on_side(node: Optional[TreeNode], side_is_left: bool) -> bool:
+        """Whether ``node`` exists on the given side (so a connector bar for its
+        child list is meaningful there). The synthetic root (depth 0) holds no
+        paths but is the shared container both panes derive from, so it counts as
+        present on both sides; a directory missing on this side returns False."""
+        if node is None:
+            return False
+        if node.depth == 0:
+            return True
+        return (node.left_path if side_is_left else node.right_path) is not None
+
+    def _tree_lines(self, node: TreeNode, *, branch: bool,
+                    side_is_left: Optional[bool] = None) -> str:
         """Box-drawing prefix showing this node's place in the tree. With
         ``branch`` the node's own level gets a ├─/└─ connector; without (a node
-        missing on this side) only ancestor continuation bars are drawn."""
+        missing on this side) only ancestor continuation bars are drawn.
+
+        ``side_is_left`` (given only for a missing-side render) blanks any level
+        whose parent is absent on that side, so an absent subtree draws no
+        floating skeleton — only the bars whose parent is present here remain."""
         if node.depth == 0:
             return ""
         chain: list[TreeNode] = []
@@ -796,6 +816,9 @@ class DirectoryDiffView(Widget):
         for i, anc in enumerate(chain):
             parent = anc.parent
             if parent is None:
+                continue
+            if side_is_left is not None and not self._present_on_side(parent, side_is_left):
+                out.append("  ")  # parent absent here → no floating bar
                 continue
             is_last = parent.children[-1] is anc
             if i == len(chain) - 1:
@@ -1219,7 +1242,7 @@ class DirectoryDiffView(Widget):
         vector = ctx.vector_shapes
         flags = self._connector_chain(node)
 
-        def side(x: int, col_w: int, path, is_active: bool) -> None:
+        def side(x: int, col_w: int, path, is_active: bool, side_is_left: bool) -> None:
             row_bg = bg
             fg = self._muted if pending else base_fg
             if focused:
@@ -1230,27 +1253,32 @@ class DirectoryDiffView(Widget):
                 ctx.fill_rect(x, y, col_w, 1.0, Style(bg=self._empty_bg))
             if vector:
                 self._draw_side_vector(ctx, x, col_w, node, flags, path, y,
-                                       fg, row_bg, suffix)
+                                       fg, row_bg, suffix, side_is_left)
             else:
-                self._draw_side_grid(ctx, x, col_w, node, path, y, fg, row_bg, suffix)
+                self._draw_side_grid(ctx, x, col_w, node, path, y, fg, row_bg,
+                                     suffix, side_is_left)
 
-        side(self._left_x, self._left_w, node.left_path, self.active == "left")
+        side(self._left_x, self._left_w, node.left_path, self.active == "left", True)
         # The verdict glyph rides on the full-height splitter band (painted once
         # in draw()); its bg matches so the band stays continuous behind it.
         sep = _SEPARATOR.get(verdict, " ! ")
         sep_fg = _DIFF_FG if is_diff else self._muted
         ctx.draw_text(self._sep_x, y, sep,
                       Style(fg=sep_fg, bg=self._gutter_bg, attr=TextAttribute.BOLD, font=MONO))
-        side(self._right_x, self._right_w, node.right_path, self.active == "right")
+        side(self._right_x, self._right_w, node.right_path, self.active == "right", False)
 
-    def _draw_side_grid(self, ctx, x, col_w, node, path, y, fg, row_bg, suffix) -> None:
+    def _draw_side_grid(self, ctx, x, col_w, node, path, y, fg, row_bg, suffix,
+                        side_is_left) -> None:
         """Terminal / character-grid tree column: box-drawing connectors in the
         cell grid (monospace, so ├ └ │ align and column-count truncation is
         exact)."""
         col_w = int(col_w)  # a fractional split width still slices whole cells
         if path is None:
-            lines = self._tree_lines(node, branch=False)
-            if lines:
+            # Missing on this side: draw only the connector bars whose parent is
+            # present here (an absent subtree is blanked), so the tree stays
+            # connected without floating skeleton in an empty column.
+            lines = self._tree_lines(node, branch=False, side_is_left=side_is_left)
+            if lines.strip():
                 ctx.draw_text(x, y, lines[:col_w], Style(fg=self._muted, bg=row_bg, font=MONO))
             return
         lines = self._tree_lines(node, branch=True)
@@ -1261,7 +1289,7 @@ class DirectoryDiffView(Widget):
             ctx.draw_text(x, y, lines[:col_w], Style(fg=self._muted, bg=row_bg, font=MONO))
 
     def _draw_side_vector(self, ctx, x, col_w, node, flags, path, y,
-                          fg, row_bg, suffix) -> None:
+                          fg, row_bg, suffix, side_is_left) -> None:
         """GUI / pixel tree column: connectors drawn as thin lines (aligned to a
         base-unit grid regardless of the proportional font) with the name in the
         proportional UI font, indented a fixed distance per depth and elided to
@@ -1272,7 +1300,16 @@ class DirectoryDiffView(Widget):
         lh = 1.0 / max(1, ctx.base_size[1])   # ~1 device-pixel horizontal stroke
         mid = y + 0.5
         label_x = x + depth * _INDENT
-        for i, is_last in enumerate(flags):
+        for i, (is_last, parent) in enumerate(flags):
+            # Skip a level whose parent is absent on this side: its sibling bar
+            # would be a floating line in an empty column (a whole absent subtree
+            # otherwise renders as a column of disconnected bars). Levels whose
+            # parent IS present here still draw — that keeps the outer bars that
+            # connect the tree (the root's list always shows, as it exists on both
+            # sides), which is why a present node — all of whose ancestors exist on
+            # its own side — keeps its full connector chain.
+            if not self._present_on_side(parent, side_is_left):
+                continue
             cx = x + i * _INDENT + 0.5
             if i < depth - 1:
                 if not is_last:  # ancestor with siblings below → continuation bar
@@ -1283,7 +1320,8 @@ class DirectoryDiffView(Widget):
                 ctx.fill_rect(cx, y, lw, 1.0 if not is_last else 0.5, line_style)
                 ctx.fill_rect(cx, mid, max(0.0, label_x - cx), lh, line_style)
             elif not is_last:
-                # Missing on this side: only the continuation bar, no elbow.
+                # Missing here but the parent list continues below: a bare
+                # continuation bar (no elbow — there is no label on this side).
                 ctx.fill_rect(cx, y, lw, 1.0, line_style)
         if path is None:
             return

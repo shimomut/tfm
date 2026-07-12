@@ -236,6 +236,39 @@ def test_directory_rows_draw_vector_chevron_not_glyph(trees):
     assert "sub" in text  # the label still renders next to the chevron
 
 
+@pytest.fixture
+def lopsided(tmp_path):
+    """Left has a nested left-only subtree; right shares only the root, so the
+    missing (right) side must suppress the absent subtree's connector bars but
+    keep the root-level bar that still connects the tree."""
+    left = tmp_path / "L"
+    right = tmp_path / "R"
+    (left / "onlyL" / "deep").mkdir(parents=True)
+    (left / "onlyL" / "deep" / "f.txt").write_text("x")
+    right.mkdir()
+    (right / "onlyR.txt").write_text("y")  # a right root entry after "onlyL"
+    return Path(str(left)), Path(str(right))
+
+
+def test_missing_side_skips_absent_ancestor_connectors(lopsided):
+    view = _sync_view(*lopsided)
+    onlyL = _find(view.root, "onlyL")
+    deep = _find(onlyL, "deep")
+    f = _find(deep, "f.txt")
+    # f is left-only at depth 3. On the RIGHT side its ancestors onlyL/deep are
+    # absent; only the root (present on both) anchors a bar.
+    chain = view._connector_chain(f)
+    parents = [p for _, p in chain]
+    assert [view._present_on_side(p, side_is_left=False) for p in parents] == [True, False, False]
+    # On the LEFT side every ancestor exists, so the full chain stays.
+    assert all(view._present_on_side(p, side_is_left=True) for p in parents)
+    # Grid skeleton on the right: the root level keeps its bar, deeper (absent)
+    # levels are blanked out — no floating skeleton.
+    lines = view._tree_lines(f, branch=False, side_is_left=False)
+    assert lines[:2] in ("│ ", "  ")       # root-level bar preserved
+    assert lines[2:] == "    "             # onlyL / deep levels blanked
+
+
 # --- progressive scanning (slice 3) ------------------------------------------
 
 
