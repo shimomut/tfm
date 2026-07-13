@@ -134,7 +134,8 @@ def _resolve_post_effect(value) -> "PostEffect | None":
 
 def _theme(bg, fg, muted, accent, surface, selection, *, accent2=None,
            status=None, footer=None, directory=None, isearch_match=None,
-           syntax=None, file_types=None, cursor=None, post_effect=None) -> Theme:
+           syntax=None, file_types=None, cursor=None, selection_fill=None,
+           post_effect=None) -> Theme:
     ac2 = accent if accent2 is None else accent2
     p = {"bg": bg, "fg": fg, "muted": muted, "accent": accent, "accent2": ac2,
          "surface": surface}
@@ -161,6 +162,12 @@ def _theme(bg, fg, muted, accent, surface, selection, *, accent2=None,
         extras["cursor"] = dict(cursor)
     if isearch_match is not None:
         extras["isearch_match"] = isearch_match(p) if callable(isearch_match) else isearch_match
+    # A pinned file-pane selection fill: used verbatim as the selected-row bg
+    # instead of the accent-tinted, legibility-corrected default. For a 2-colour
+    # theme (black accent) that default corrects itself to invisibility; a dark
+    # pinned fill gives a bold, inverted selection (the row text auto-inks light).
+    if selection_fill is not None:
+        extras["selection_fill"] = selection_fill(p) if callable(selection_fill) else selection_fill
     if syntax is not None:
         extras["syntax"] = dict(syntax)
     # A theme may *recommend* a post-processing effect (a CRT/phosphor look): it
@@ -232,25 +239,13 @@ _THEME_SPECS: list[tuple[str, dict]] = [
                              accent=(38, 139, 210), surface=(234, 228, 206), selection=(150, 195, 230),
                              accent2=(211, 54, 130), directory=(181, 137, 0))),
     # --- retro hardware looks: each pairs a period-correct palette with a
-    # recommended GUI-backend ``post_effect`` — a physical-screen texture (glow /
-    # scanlines / vignette) composited over the whole frame on a pixel backend
-    # (macOS / Windows GUI), and silently ignored by a terminal. The theme carries
-    # the color identity; the effect adds the screen's material feel. No effect
-    # sets a ``tint`` — each palette is already the color it wants to be, so the
-    # effect only textures it (unlike a mono theme that forces a hue via tint).
+    # recommended GUI-backend ``post_effect`` — an emissive screen texture (glow /
+    # bloom / scanline / vignette) composited over the whole frame on a pixel
+    # backend (macOS / Windows GUI), and silently ignored by a terminal. The theme
+    # carries the color identity; the effect adds the screen's material feel. No
+    # effect sets a ``tint`` — each palette is already the color it wants to be, so
+    # the effect only textures it (unlike a mono theme that forces a hue via tint).
     #
-    # 8bit: a saturated NES-era palette on an indigo black, behind a CRT-TV look
-    # (chunky scanlines, a soft bloom, a slight vignette and rolling band).
-    ("8bit", dict(bg=(24, 20, 44), fg=(248, 248, 248), muted=(140, 140, 176),
-                  accent=(60, 188, 252), surface=(44, 40, 76), selection=(92, 60, 168),
-                  accent2=(248, 152, 56),
-                  file_types={"directory": (252, 188, 60), "link": (88, 248, 152)},
-                  cursor={"active": (248, 56, 96), "inactive": (140, 60, 76)},
-                  syntax={"keyword": (248, 56, 96), "string": (88, 216, 84),
-                          "comment": (120, 120, 160), "number": (252, 216, 84),
-                          "operator": (248, 120, 248), "builtin": (60, 188, 252)},
-                  post_effect={"bloom": 0.18, "scanline": 0.22, "vignette": 0.18,
-                               "glow": 0.10, "roll": 0.06})),
     # Sci-Fi: an emissive cyan HUD with amber highlights on near-black, behind a
     # holographic look (heavy glow + bloom, a light scanline, an interference roll).
     # status/footer are a dark cyan blend of the background rather than solid accent.
@@ -266,53 +261,40 @@ _THEME_SPECS: list[tuple[str, dict]] = [
                             "operator": (180, 160, 255), "builtin": (100, 245, 255)},
                     post_effect={"bloom": 0.34, "scanline": 0.16, "vignette": 0.22,
                                  "glow": 0.30, "roll": 0.14})),
-    # Pocket LCD: the four-shade olive green of the classic pea-green pocket
-    # handheld — a light-polarity mono theme (dark green text on the lightest
-    # green). Its effect is a *flat reflective LCD*: no bloom or glow (an LCD does
-    # not emit a halo) and no CRT scanlines — instead a dot-matrix `pixelgrid`
-    # (fine dark gaps on both axes, so the screen reads as discrete square pixels)
-    # plus a light vignette for the plastic bezel shadow.
-    ("Pocket LCD", dict(bg=(155, 188, 15), fg=(15, 56, 15), muted=(48, 98, 48),
-                      accent=(15, 56, 15), surface=(185, 210, 45), selection=(48, 98, 48),
-                      accent2=(48, 98, 48),
-                      # Raised panels (header / popup) are a *paler* green than the
-                      # screen, not a darker one: the pocket LCD palette is so
-                      # low-contrast that the app's legibility auto-ink would otherwise
-                      # flip the dark-green header text to white on a mid-green panel.
-                      # A pale panel keeps the header text authentically dark green.
-                      #
-                      # accent is the darkest green (focus ring / active header text),
-                      # so the bars can't default to it — that would be a dark strip
-                      # under a light header. Blend the light bg toward the mid green
-                      # for a light panel, keeping the whole screen uniformly green.
-                      status=lambda p: mix(p["bg"], p["muted"], 0.25),
-                      footer=lambda p: mix(p["bg"], p["muted"], 0.25),
-                      file_types={"directory": (15, 56, 15), "link": (48, 98, 48)},
-                      cursor={"active": (15, 56, 15), "inactive": (48, 98, 48)},
-                      syntax={"keyword": (15, 56, 15), "string": (48, 98, 48),
-                              "comment": (120, 152, 20), "number": (15, 56, 15),
-                              "operator": (48, 98, 48), "builtin": (15, 56, 15)},
-                      post_effect={"pixelgrid": 0.16, "vignette": 0.14})),
-    # Segment LCD: a blue negative/backlit digital display (dashboard / clock) —
-    # pale blue-white segments on a dark desaturated navy. Its effect is a gentle
-    # *backlit* glow (a little bloom + glow, a barely-there scanline, an edge
-    # vignette for the backlight falloff) — subtler than a CRT, brighter than the
-    # flat Pocket LCD.
-    ("Segment LCD", dict(bg=(10, 16, 30), fg=(176, 208, 240), muted=(72, 96, 128),
-                         accent=(128, 176, 232), surface=(16, 26, 46), selection=(36, 60, 96),
-                         accent2=(150, 190, 224),
-                         # A negative LCD is a dark substrate with lit segments — keep
-                         # the bars dark (a faint accent wash of the bg) rather than a
-                         # bright accent strip, so the whole display stays dark.
-                         status=lambda p: mix(p["bg"], p["accent"], 0.22),
-                         footer=lambda p: mix(p["bg"], p["accent"], 0.22),
-                         file_types={"directory": (208, 228, 248), "link": (110, 150, 200)},
-                         cursor={"active": (208, 228, 248), "inactive": (72, 96, 128)},
-                         syntax={"keyword": (150, 190, 224), "string": (176, 208, 240),
-                                 "comment": (72, 96, 128), "number": (208, 228, 248),
-                                 "operator": (128, 176, 232), "builtin": (150, 190, 224)},
-                         post_effect={"bloom": 0.10, "scanline": 0.05, "vignette": 0.16,
-                                      "glow": 0.12})),
+    # Segment LCD: a positive/reflective digital display — a sage-green base with
+    # near-black "segments" (just two colors: the green + black). A light-polarity
+    # mono theme; because the text is genuine black (maximally dark), the app's
+    # legibility auto-ink never needs to lift it, so it stays black on every green.
+    # Its only effect is a soft `drop_shadow` — every drawn element (the black
+    # segments, the cursor outline, fills) casts a shadow, the embossed look of a
+    # reflective LCD. No scanline / glow / low-res.
+    # The green is a *light* sage on purpose, for two reasons. (1) The app's
+    # legibility auto-ink keeps text black only where black out-contrasts white on
+    # the surface — a mid/dark green flips it to white — so a light green keeps
+    # genuine black segments on every surface. (2) The file pane's selection fill is
+    # the pane bg nudged toward the accent (here black) but pulled back until black
+    # row text is legible; on a green that only *just* clears that floor it gets
+    # pulled all the way back to the bg and the selection vanishes. Extra lightness
+    # gives it headroom, so the selection settles a visibly darker shade.
+    ("Segment LCD", dict(bg=(209, 225, 173), fg=(22, 32, 22), muted=(72, 90, 58),
+                         accent=(22, 32, 22), surface=(220, 233, 188), selection=(176, 196, 132),
+                         accent2=(22, 32, 22),
+                         # Chrome bars are a slightly darker sage (still green) with black
+                         # text, not a black strip — the whole screen stays one green.
+                         status=lambda p: mix(p["bg"], p["muted"], 0.16),
+                         footer=lambda p: mix(p["bg"], p["muted"], 0.16),
+                         file_types={"directory": (22, 32, 22), "link": (58, 82, 48)},
+                         # Bold inverted selection (row text auto-inks light over it),
+                         # so selected files read clearly in the two-colour palette —
+                         # the accent-tinted default corrects itself invisible here.
+                         selection_fill=(70, 100, 58),
+                         # Active cursor is the black frame; the inactive pane's is a
+                         # mid-green frame — clearly softer, so the focused pane reads.
+                         cursor={"active": (22, 32, 22), "inactive": (120, 140, 95)},
+                         syntax={"keyword": (22, 32, 22), "string": (58, 82, 48),
+                                 "comment": (110, 128, 92), "number": (22, 32, 22),
+                                 "operator": (72, 90, 58), "builtin": (22, 32, 22)},
+                         post_effect={"drop_shadow": 0.6})),
 ]
 
 THEMES: list[tuple[str, Theme]] = [(name, _theme(**spec)) for name, spec in _THEME_SPECS]
@@ -326,7 +308,7 @@ _THEME_OVERRIDE_MAP = {
     "accent2": "accent2", "surface": "surface", "selection": "selection",
     "status": "status", "footer": "footer", "directory": "directory",
     "isearch_match": "isearch_match", "syntax": "syntax", "file_types": "file_types",
-    "cursor": "cursor", "post_effect": "post_effect",
+    "cursor": "cursor", "selection_fill": "selection_fill", "post_effect": "post_effect",
 }
 
 #: Sub-dict theme keys that deep-merge (the user recolors only the entries they

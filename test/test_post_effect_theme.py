@@ -73,11 +73,11 @@ class ResolvePostEffect(unittest.TestCase):
 
 
 class RetroBuiltinThemes(unittest.TestCase):
-    """The four built-in retro hardware themes are registered and each carries a
+    """The built-in retro hardware themes are registered and each carries a
     screen-effect recommendation, so selecting one from View ▸ Theme applies its
     look on a pixel backend (and is ignored by a terminal)."""
 
-    RETRO = ("8bit", "Sci-Fi", "Pocket LCD", "Segment LCD")
+    RETRO = ("Sci-Fi", "Segment LCD")
 
     def _by_name(self):
         return dict(tfm.THEMES)
@@ -90,18 +90,11 @@ class RetroBuiltinThemes(unittest.TestCase):
             self.assertIsInstance(effect, PostEffect, name)
             self.assertFalse(effect.is_noop, f"{name} effect should do something")
 
-    def test_pocket_lcd_is_a_flat_dot_matrix(self):
-        # A reflective LCD does not emit a halo (no bloom, no glow) and it is a
-        # dot-matrix, not a CRT: it uses the two-axis `pixelgrid` texture, not
-        # horizontal `scanline` banding. This sets it apart from the CRT/backlit looks.
-        eff = self._by_name()["Pocket LCD"].extras["post_effect"]
-        self.assertEqual((eff.bloom, eff.glow), (0.0, 0.0))
-        self.assertEqual(eff.scanline, 0.0)
-        self.assertTrue(eff.pixelgrid > 0)
-
-    def test_sci_fi_glows_the_most(self):
-        effects = {n: self._by_name()[n].extras["post_effect"] for n in self.RETRO}
-        self.assertEqual(max(self.RETRO, key=lambda n: effects[n].glow), "Sci-Fi")
+    def test_sci_fi_glows_more_than_segment_lcd(self):
+        # Sci-Fi is the emissive-HUD look; Segment LCD is a subtler backlit glow.
+        by = self._by_name()
+        self.assertGreater(by["Sci-Fi"].extras["post_effect"].glow,
+                           by["Segment LCD"].extras["post_effect"].glow)
 
     def test_retro_themes_survive_a_config_rebuild(self):
         # They are built-ins, so they appear in the runtime list even with an empty

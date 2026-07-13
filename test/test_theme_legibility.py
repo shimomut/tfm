@@ -178,6 +178,48 @@ def test_render_lifts_directory_and_keeps_legible_file():
     assert file_fg == theme.text
 
 
+def test_selection_fill_override_pins_the_selected_row_bg():
+    """A theme's ``extras['selection_fill']`` is used verbatim as the selected-row
+    background on the active pane — the two-colour escape hatch — instead of the
+    accent-tinted, legibility-corrected default (which corrects itself invisible)."""
+    from puikit import Item, Panel, VSplit
+    from puikit.backends.memory_backend import MemoryBackend
+    from tfm_file_pane import FilePane
+
+    bg, fg, muted, accent, surface, selection = PALETTES["Light+"]
+    sel_fill = (70, 100, 58)
+    theme = derive_theme(background=bg, foreground=fg, muted=muted, accent=accent,
+                         surface=surface, selection=selection,
+                         extras={"selection_fill": sel_fill})
+
+    class _Entry:
+        def __init__(self, name):
+            self.name = name
+
+        def is_dir(self):
+            return False
+
+        def __str__(self):
+            return "/x/" + self.name
+
+    f = _Entry("picked.txt")
+    pane = {
+        "files": [f],
+        "file_info": {str(f): {"size_str": "1.0K", "date_str": "", "is_dir": False}},
+        "virtual": None, "selected_files": {str(f)}, "focused_index": 0,
+    }
+    backend = MemoryBackend(width=40, height=8)
+    panel = Panel(backend, theme=theme)
+    fp = FilePane(pane)
+    fp.active = True  # active pane uses the pinned fill verbatim
+    panel.set_layout(VSplit(Item(fp, hints={"surface": "content"})))
+    panel.render()
+
+    r0 = backend.snapshot()[0]
+    x = next(i for i, c in enumerate(r0) if c.isalpha())
+    assert backend.style_at(x, 0).bg == sel_fill
+
+
 def test_log_message_lifted_on_light_theme():
     """TFM's own log lines now resolve to ``theme.text`` at draw time (see
     ``log_info``), but a widget can still hand the log a fixed RGB style with no

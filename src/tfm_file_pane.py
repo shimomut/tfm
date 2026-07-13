@@ -455,12 +455,21 @@ class FilePane(Widget):
         gui_cursor = is_cursor and not grid
         base = ctx.background or DEFAULT_BG
         if selected:
-            ratio = SELECT_MIX_ACTIVE if self.active else SELECT_MIX_INACTIVE
-            # The accent tint reads as "selected"; on a light theme it lands
-            # mid-luminance and can't bear the row's body text, so nudge it back
-            # toward the pane background just enough to clear the body floor (a
-            # no-op on dark themes, where the dark tint already has headroom).
-            row_bg = ensure_text_headroom(_mix(base, theme.accent, ratio), base, LC_BODY)
+            pinned = theme.extras.get("selection_fill")
+            if pinned is not None:
+                # A theme may pin the selection fill (a 2-colour LCD theme, where the
+                # accent-tinted fill below corrects itself to invisibility). Used
+                # verbatim on the active pane; blended toward the pane bg on the
+                # inactive one so the focused pane's selection still reads louder.
+                # The row text auto-inks over it (a dark fill inverts it to light).
+                row_bg = pinned if self.active else _mix(base, pinned, 0.55)
+            else:
+                ratio = SELECT_MIX_ACTIVE if self.active else SELECT_MIX_INACTIVE
+                # The accent tint reads as "selected"; on a light theme it lands
+                # mid-luminance and can't bear the row's body text, so nudge it back
+                # toward the pane background just enough to clear the body floor (a
+                # no-op on dark themes, where the dark tint already has headroom).
+                row_bg = ensure_text_headroom(_mix(base, theme.accent, ratio), base, LC_BODY)
         elif is_match:
             # Base hue = the theme's secondary accent (or an isearch_match
             # override), blended into the pane bg — distinct from the accent
