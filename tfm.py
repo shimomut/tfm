@@ -246,21 +246,23 @@ _THEME_SPECS: list[tuple[str, dict]] = [
     # effect sets a ``tint`` — each palette is already the color it wants to be, so
     # the effect only textures it (unlike a mono theme that forces a hue via tint).
     #
-    # Sci-Fi: an emissive cyan HUD with amber highlights on near-black, behind a
-    # holographic look (heavy glow + bloom, a light scanline, an interference roll).
-    # status/footer are a dark cyan blend of the background rather than solid accent.
-    ("Sci-Fi", dict(bg=(2, 12, 18), fg=(170, 240, 255), muted=(70, 130, 150),
-                    accent=(0, 220, 255), surface=(6, 28, 40), selection=(12, 82, 108),
-                    accent2=(255, 176, 64),
-                    status=lambda p: mix(p["bg"], p["accent"], 0.22),
-                    footer=lambda p: mix(p["bg"], p["accent"], 0.22),
-                    file_types={"directory": (100, 245, 255), "link": (180, 160, 255)},
-                    cursor={"active": (255, 176, 64), "inactive": (120, 90, 40)},
-                    syntax={"keyword": (0, 220, 255), "string": (120, 255, 200),
-                            "comment": (70, 120, 140), "number": (255, 176, 64),
-                            "operator": (180, 160, 255), "builtin": (100, 245, 255)},
-                    post_effect={"bloom": 0.34, "scanline": 0.16, "vignette": 0.22,
-                                 "glow": 0.30, "roll": 0.14})),
+    # Sci-Fi: a tactical-HUD look (à la a mission-select map screen) — soft
+    # cyan-white text on a deep tactical navy, cool cyan chrome, and a warm amber
+    # selection accent (the cursor) that pops against the cyan. A strong, wide bloom
+    # halo + glow give the emissive holographic feel; NO scanlines and NO rolling
+    # band (with no scanlines the bloom is free to spread into a broad glow).
+    # status/footer are a cyan blend of the navy, not a solid bar.
+    ("Sci-Fi", dict(bg=(16, 30, 50), fg=(200, 224, 245), muted=(98, 128, 164),
+                    accent=(96, 186, 255), surface=(26, 46, 74), selection=(32, 68, 108),
+                    accent2=(255, 158, 54),
+                    status=lambda p: mix(p["bg"], p["accent"], 0.20),
+                    footer=lambda p: mix(p["bg"], p["accent"], 0.20),
+                    file_types={"directory": (130, 205, 255), "link": (176, 186, 255)},
+                    cursor={"active": (255, 158, 54), "inactive": (122, 98, 58)},
+                    syntax={"keyword": (96, 186, 255), "string": (255, 182, 98),
+                            "comment": (98, 128, 164), "number": (255, 158, 54),
+                            "operator": (176, 186, 255), "builtin": (140, 212, 255)},
+                    post_effect={"bloom": 0.45, "vignette": 0.26, "glow": 0.22})),
     # Segment LCD: a positive/reflective digital display — a sage-green base with
     # near-black "segments" (just two colors: the green + black). A light-polarity
     # mono theme; because the text is genuine black (maximally dark), the app's

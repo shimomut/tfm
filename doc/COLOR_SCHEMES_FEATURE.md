@@ -27,8 +27,9 @@ Beyond the standard palettes (Dark+, Light+, Monokai, Dracula, Nord, Solarized,
 Gruvbox), TFM ships two **retro hardware** themes, each pairing a period-correct
 palette with a recommended *screen effect*:
 
-- **Sci-Fi** — an emissive cyan HUD with amber highlights behind a holographic
-  look (heavy glow and bloom, a light scanline, an interference roll).
+- **Sci-Fi** — a tactical-HUD look: soft cyan-white text on a deep navy, cool cyan
+  chrome and a warm amber selection accent, behind a strong emissive bloom halo and
+  glow with a vignette — no scanlines, no rolling glitch.
 - **Segment LCD** — a positive/reflective digital display: near-black "segments"
   on a sage-green base (just two colours), flat — no scanlines or glow — where the
   black segments (text) cast a soft drop shadow for an embossed LCD look.
