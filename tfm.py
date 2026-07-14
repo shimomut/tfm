@@ -59,7 +59,8 @@ PANES_FRACTION = 0.74
 _FILTER_HISTORY_KEY = "filter.history"
 _FILTER_HISTORY_MAX = 100
 
-from tfm_config import KeyBindings, get_config, get_favorite_directories  # noqa: E402
+from tfm_backend_detector import is_desktop_mode  # noqa: E402
+from tfm_config import KeyBindings, config_manager, get_config, get_favorite_directories  # noqa: E402
 from tfm_file_list_manager import FileListManager  # noqa: E402
 from tfm_file_monitor_manager import FileMonitorManager  # noqa: E402
 from tfm_file_pane import FilePane  # noqa: E402
@@ -1455,6 +1456,12 @@ class TfmApp:
         elif action == "subshell":
             self.subshell()
             return False
+        elif action == "edit_config":
+            self.edit_config()
+            return False  # hands over to the editor; self-renders on return
+        elif action == "reload_config":
+            self.reload_config()
+            return False  # reload_config renders once applied
         elif action == "filter":
             self.enter_filter()
             return False  # the dialog drives its own redraw
@@ -1638,6 +1645,11 @@ class TfmApp:
         tools_menu = Menu(
             MenuItem("External Programs…", on_select=self.show_programs, shortcut=sc("programs")),
             MenuItem("Subshell Here", on_select=self.subshell, shortcut=sc("subshell")),
+            SEPARATOR,
+            MenuItem("Edit Configuration…", on_select=self.edit_config,
+                     shortcut=sc("edit_config")),
+            MenuItem("Reload Configuration", on_select=self.reload_config,
+                     shortcut=sc("reload_config")),
             title="Tools",
         )
         select_menu = Menu(
@@ -1770,6 +1782,62 @@ class TfmApp:
         shell = os.environ.get("SHELL", "/bin/sh")
         self.log_info(f"Subshell in {path} — exit the shell to return")
         self._run_in_terminal([shell], cwd=str(path))
+
+    def edit_config(self) -> None:
+        """Open the user's ``~/.tfm/config.py`` in the configured editor
+        (``TEXT_EDITOR``), creating it from the template on first use.
+
+        In terminal mode the editor takes over the terminal and blocks, so we
+        reload on return (see :meth:`reload_config`). In GUI mode ``TEXT_EDITOR``
+        (e.g. VS Code) opens in its own window and ``subprocess.run`` returns
+        immediately — before any edit is saved — so auto-reloading here would be
+        premature. We leave it to the user to apply changes via
+        Tools ▸ Reload Configuration once saved."""
+        path = config_manager.config_file
+        if not path.exists():
+            if config_manager.create_default_config():
+                self.log_info(f"Created default config at {path}")
+            else:
+                self.log_info(f"Could not create config file at {path}")
+                return
+        editor = getattr(self.config, "TEXT_EDITOR", "vim")
+        self._run_in_terminal(shlex.split(editor) + [str(path)])
+        if is_desktop_mode():
+            self.log_info("Opened config — use Tools ▸ Reload Configuration to "
+                          "apply your changes once saved.")
+            self.panel.render()
+        else:
+            self.reload_config()
+
+    def reload_config(self) -> None:
+        """Re-read ``~/.tfm/config.py`` and apply what can change at runtime.
+
+        Key bindings and the config reference threaded through the running
+        subsystems (file ops, panes, monitoring, views) are refreshed live, so
+        rebindings, file associations, external programs, favorites and editor
+        settings take effect immediately. Appearance and layout read once at
+        launch — theme/colors, fonts, pane and log ratios, monitoring
+        intervals — only fully apply on the next start; we say so rather than
+        pretend otherwise."""
+        new_config = config_manager.reload_config()
+        # Surface non-fatal validation problems (out-of-range ratios, bad sort
+        # mode, …) but still apply — a reload should reflect what's on disk.
+        for err in config_manager.validate_config(new_config):
+            self.log_info(f"Config warning: {err}")
+
+        self.config = new_config
+        # Rebuild the keymap from the (possibly rebound) KEY_BINDINGS.
+        self.keys = KeyBindings(new_config.KEY_BINDINGS)
+        # Re-point the config reference every long-lived subsystem holds so
+        # their on-demand reads pick up the new values without a rebuild.
+        for holder in (self._fileops, self.flm, self.pm, self.file_monitor,
+                       self.left_view, self.right_view):
+            holder.config = new_config
+
+        self.log_info("Configuration reloaded — key bindings and file settings "
+                      "applied; theme, layout and font changes take effect on "
+                      "the next launch.")
+        self.panel.render()
 
     def file_details(self) -> None:
         """Show stat details for the focused entry — or an aggregate summary plus
@@ -3402,6 +3470,8 @@ class TfmApp:
             ("quick_sort_ext", "Quick-sort by extension (repeat: reverse)"),
         )),
         ("Other", (
+            ("edit_config", "Edit ~/.tfm/config.py, then reload"),
+            ("reload_config", "Reload ~/.tfm/config.py"),
             ("help", "Show this help"),
             ("quit", "Quit TFM"),
         )),

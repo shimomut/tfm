@@ -316,6 +316,12 @@ class Config:
         # === External Programs ===
         'programs': ['X'],                     # Show external programs menu
         'subshell': ['Shift-X'],               # Enter subshell (command line) mode
+
+        # === Configuration ===
+        # Unbound by default (reachable via the Tools menu). Assign a key here to
+        # open/reload this file without leaving TFM, e.g. 'edit_config': ['Y'].
+        'edit_config': [],                     # Edit this config.py in TEXT_EDITOR, then reload
+        'reload_config': [],                   # Re-read this config.py and apply live
     }
 
     # Windows has no Command key, and Alt-Enter is the platform fullscreen-toggle
