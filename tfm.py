@@ -2070,11 +2070,14 @@ class TfmApp:
                              title="Favorites", icon="info")
             self.panel.render()
             return
+        # Middle-elide the "name — path" rows so a long path keeps its tail (the
+        # leaf directory) rather than being clipped away (issue #211).
         show_filter_list(
             self.panel, favorites, title="Go to Favorite",
             to_label=lambda fav: f"{fav['name']}  —  {fav['path']}",
             on_accept=self._jump_to_favorite,
             region=self._active_pane_region(),
+            elide_where="middle",
         )
         self.panel.render()
 
@@ -2187,7 +2190,8 @@ class TfmApp:
             self.panel, drives, title="Drives",
             to_label=lambda d: f"{d['name']}  —  {d['path']}",
             on_accept=self._go_to_drive,
-            region=self._active_pane_region())
+            region=self._active_pane_region(),
+            elide_where="middle")  # keep the path tail visible (issue #211)
         self.panel.render()
 
     def _go_to_drive(self, drive: dict) -> None:
@@ -2460,9 +2464,13 @@ class TfmApp:
                              title="History", icon="info")
             self.panel.render()
             return
+        # Middle-elide long paths ("/Users/…/deep/dir") so the tail — the actual
+        # destination directory — stays visible, instead of an end clip that
+        # hides it (issue #211).
         show_filter_list(
             self.panel, items, title="History", to_label=lambda p: p,
-            on_accept=self._go_to_history, region=self._active_pane_region())
+            on_accept=self._go_to_history, region=self._active_pane_region(),
+            elide_where="middle")
         self.panel.render()
 
     def _go_to_history(self, path: str) -> None:

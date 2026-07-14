@@ -77,6 +77,8 @@ class ProgressiveSearchDialog(FocusContainer, Widget):
         titles: dict[str, str] | None = None,
         initial_mode: str = "filename",
         result_cap: int = _RESULT_CAP,
+        ellipsis: str = "…",
+        elide_where: str = "end",
     ):
         self._search_iter = search_iter
         self.to_label = to_label
@@ -102,7 +104,12 @@ class ProgressiveSearchDialog(FocusContainer, Widget):
         self._error: str | None = None
 
         self.query_edit = TextEdit(on_change=lambda _t: self._start_search())
-        self.list = ListView([], on_select=lambda i, _label: self._accept_index(i))
+        # Mark over-long result rows with a trailing "…" rather than a silent
+        # hard clip (issue #211). End elision suits both modes: a filename row
+        # keeps its leading directories, a "path:line: text" row keeps the file
+        # and the start of the matched line.
+        self.list = ListView([], on_select=lambda i, _label: self._accept_index(i),
+                             ellipsis=ellipsis, elide_where=elide_where)
         self._focused: Any = self.query_edit
         self._query_rect = Rect(0.0, 0.0, 0.0, 0.0)
         self._list_rect = Rect(0.0, 0.0, 0.0, 0.0)
@@ -390,6 +397,8 @@ def show_progressive_search(
     initial_mode: str = "filename",
     result_cap: int = _RESULT_CAP,
     region: tuple[float, float] | None = None,
+    ellipsis: str = "…",
+    elide_where: str = "end",
     z: int = 70,
 ) -> ProgressiveSearchDialog:
     """Push a modal :class:`ProgressiveSearchDialog` over ``panel`` and return it.
@@ -404,7 +413,7 @@ def show_progressive_search(
     dialog = ProgressiveSearchDialog(
         search_iter=search_iter, to_label=to_label, on_accept=on_accept,
         on_cancel=on_cancel, titles=titles, initial_mode=initial_mode,
-        result_cap=result_cap,
+        result_cap=result_cap, ellipsis=ellipsis, elide_where=elide_where,
     )
     sw, sh = panel.backend.size_units
     w = max(36.0, min(sw * 0.6, 72.0))

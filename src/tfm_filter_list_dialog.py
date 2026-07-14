@@ -61,6 +61,8 @@ class FilterListDialog(FocusContainer, Widget):
         on_accept: Callable[[Any], None] | None = None,
         on_cancel: Callable[[], None] | None = None,
         on_accept_text: Callable[[str], None] | None = None,
+        ellipsis: str = "",
+        elide_where: str = "end",
     ):
         self.all_items = list(items)
         self.to_label = to_label
@@ -80,6 +82,8 @@ class FilterListDialog(FocusContainer, Widget):
         self.list = ListView(
             [self.to_label(v) for v in self.all_items],
             on_select=lambda i, _label: self._accept_index(i),
+            ellipsis=ellipsis,
+            elide_where=elide_where,
         )
         # The filter field holds focus so typing flows there and the IME engages;
         # the arrows are routed to the list explicitly (see handle_event).
@@ -259,6 +263,8 @@ def show_filter_list(
     on_cancel: Callable[[], None] | None = None,
     on_accept_text: Callable[[str], None] | None = None,
     region: tuple[float, float] | None = None,
+    ellipsis: str = "…",
+    elide_where: str = "end",
     z: int = 70,
 ) -> FilterListDialog:
     """Push a modal :class:`FilterListDialog` over ``panel`` and return it.
@@ -271,10 +277,16 @@ def show_filter_list(
     the dialog within instead of the whole window — used to place a pane-targeting
     picker (favorites, drives, …) over the active pane, so the user can tell which
     pane it will act on. The dialog is centered on the pane's center and may run a
-    bit wider than the pane for comfort (see :func:`tfm_dialog_geometry`)."""
+    bit wider than the pane for comfort (see :func:`tfm_dialog_geometry`).
+
+    ``ellipsis``/``elide_where`` control how over-long rows are abbreviated (see
+    ``ListView``): the default marks a truncated row with a trailing ``…``; pass
+    ``elide_where="middle"`` for a path list so the meaningful tail stays visible
+    (History, Favorites and Drives do this). Pass ``ellipsis=""`` for a hard clip
+    with no marker."""
     dialog = FilterListDialog(
         items, title=title, to_label=to_label, on_accept=on_accept, on_cancel=on_cancel,
-        on_accept_text=on_accept_text,
+        on_accept_text=on_accept_text, ellipsis=ellipsis, elide_where=elide_where,
     )
     sw, sh = panel.backend.size_units
     w = max(36.0, min(sw * 0.6, 72.0))
