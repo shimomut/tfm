@@ -1551,6 +1551,12 @@ class TfmApp:
                 pane["path"] = Path(f"archive://{entry.absolute()}#")
                 self._refresh(pane, on_ready=self._restore_remembered_cursor)
                 self.log_info(f"Entered archive {entry.name}")
+            else:
+                # A plain file: open it in the built-in ("embedded") viewer — the
+                # same one V uses, which routes *.md to the Markdown renderer and
+                # shows a placeholder for binaries (issue #212). Enter was
+                # previously a no-op on files.
+                show_text_viewer(self.panel, entry)
         except Exception as exc:
             self.log_info(f"Cannot open {entry.name}: {exc}")
 
@@ -3420,7 +3426,7 @@ class TfmApp:
             ("cursor_down", "Move cursor down"),
             ("page_up", "Scroll up by page"),
             ("page_down", "Scroll down by page"),
-            ("open_item", "Enter directory"),
+            ("open_item", "Open: enter a directory/archive, or view a file"),
             ("go_parent", "Go to parent directory"),
             ("switch_pane", "Switch active pane"),
             ("nav_left", "Focus left pane / go to parent"),

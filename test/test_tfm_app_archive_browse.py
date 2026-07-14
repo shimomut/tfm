@@ -16,6 +16,7 @@ import tempfile
 import types
 import unittest
 import zipfile
+from unittest.mock import patch
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(_HERE, "..", "src"))
@@ -118,10 +119,17 @@ class TestOpenEntersArchive(unittest.TestCase):
         self.assertEqual(pane["path"], "archive:///d/outer.zip#")  # unchanged
         self.assertEqual(app._refresh_calls, [])
 
-    def test_plain_file_does_nothing(self):
+    def test_plain_file_opens_builtin_viewer(self):
+        # A non-directory, non-archive file opens in the built-in viewer (issue
+        # #212) — it is not treated as a directory/archive (no path change, no
+        # relist).
         app = _app()
-        pane = _pane("/d", [FakeEntry("notes.txt", abspath="/d/notes.txt")])
-        app._open(pane)
+        entry = FakeEntry("notes.txt", abspath="/d/notes.txt")
+        pane = _pane("/d", [entry])
+        with patch("tfm.show_text_viewer") as show:
+            app._open(pane)
+        show.assert_called_once()
+        self.assertIs(show.call_args.args[1], entry)  # opened on the focused file
         self.assertEqual(pane["path"], "/d")
         self.assertEqual(app._refresh_calls, [])
 
