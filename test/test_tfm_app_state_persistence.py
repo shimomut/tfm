@@ -196,6 +196,8 @@ class SaveApplicationState(StatePersistenceTestBase):
             directory = str(pane["path"])
             pane["files"] = [Path(os.path.join(directory, n)) for n in ("x", "y", "z")]
             pane["focused_index"] = 1
+        # __init__ isn't run in this shell; seed the history the way it would.
+        app._seed_history()
         return app
 
     def test_layout_saved_from_live_splitter_fractions(self):
@@ -217,6 +219,39 @@ class SaveApplicationState(StatePersistenceTestBase):
         recent = self.sm.load_recent_directories()
         self.assertIn(str(app.pm.left_pane["path"]), recent)
         self.assertIn(str(app.pm.right_pane["path"]), recent)
+
+    def test_full_history_trail_persisted_most_recent_first(self):
+        app = self._app_ready_to_save()
+        # Simulate navigation beyond the two starting panes, including a revisit.
+        for d in (self.left_saved, self.right_saved, self.left_saved):
+            app._record_history_path(d)
+
+        app._save_application_state()
+
+        recent = self.sm.load_recent_directories()
+        # Most-recent-first, de-duplicated: the revisited dir collapses to a
+        # single, front-most entry rather than only the two panes' final paths.
+        self.assertEqual(recent[0], self.left_saved)
+        self.assertEqual(recent[1], self.right_saved)
+        self.assertEqual(recent.count(self.left_saved), 1)
+        # The two starting panes are still present, now older in the trail.
+        self.assertIn(str(app.pm.left_pane["path"]), recent)
+        self.assertIn(str(app.pm.right_pane["path"]), recent)
+
+    def test_history_seeded_from_db_on_startup(self):
+        # A prior session persisted a most-recent-first trail.
+        self.sm.save_recent_directories(
+            [self.right_saved, self.left_saved], tfm._HISTORY_MAX)
+        app = self.make_app()  # panes point at left_start / right_start
+
+        app._seed_history()
+
+        items = app._recent_dirs_most_recent_first()
+        # The two starting dirs are the most-recent entries...
+        self.assertEqual(items[0], self.right_start)
+        self.assertEqual(items[1], self.left_start)
+        # ...and the persisted trail is restored beneath them, in order.
+        self.assertLess(items.index(self.right_saved), items.index(self.left_saved))
 
     def test_cursor_saved_then_restored_roundtrip(self):
         app = self._app_ready_to_save()

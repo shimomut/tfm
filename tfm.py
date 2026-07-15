@@ -59,6 +59,10 @@ PANES_FRACTION = 0.74
 _FILTER_HISTORY_KEY = "filter.history"
 _FILTER_HISTORY_MAX = 100
 
+#: Cap on the recent-directory history behind the History picker, applied both
+#: in memory (``_record_history_path``) and when persisted to the state DB.
+_HISTORY_MAX = 100
+
 from tfm_backend_detector import is_desktop_mode  # noqa: E402
 from tfm_config import KeyBindings, config_manager, get_config, get_favorite_directories  # noqa: E402
 from tfm_file_list_manager import FileListManager  # noqa: E402
@@ -634,12 +638,10 @@ class TfmApp:
         self._restore_layout_and_paths()
         self.flm.refresh_files(self.pm.left_pane)
         self.flm.refresh_files(self.pm.right_pane)
-        #: Recent-directory history for the history picker — a bounded, in-order
+        #: Recent-directory history for the History picker — a bounded, in-order
         #: list of visited paths, recorded on every directory change (see
-        #: ``_record_history``). Seeded with the two starting directories.
-        self._history: list[str] = []
-        for p in (self.pm.left_pane["path"], self.pm.right_pane["path"]):
-            self._record_history_path(str(p))
+        #: ``_record_history_path``) and persisted across restarts (#220).
+        self._seed_history()
 
         #: Pane footers by name, so ``enter_isearch`` can read the active footer's
         #: captured rect and position the isearch overlay exactly on it.
@@ -927,11 +929,11 @@ class TfmApp:
             self.pm.save_cursor_position(self.pm.left_pane)
             self.pm.save_cursor_position(self.pm.right_pane)
 
-            left_path = str(self.pm.left_pane['path'])
-            right_path = str(self.pm.right_pane['path'])
-            self.state_manager.add_recent_directory(left_path)
-            if left_path != right_path:
-                self.state_manager.add_recent_directory(right_path)
+            # Persist the full visited-directory trail (most-recent-first,
+            # de-duplicated) so the History picker survives restarts (#220),
+            # rather than only the two panes' final paths.
+            self.state_manager.save_recent_directories(
+                self._recent_dirs_most_recent_first(), _HISTORY_MAX)
 
             self.state_manager.cleanup_session()
         except Exception as e:
@@ -1285,13 +1287,36 @@ class TfmApp:
         self._record_history_path(str(pane["path"]))
         self._list_pane(self._pane_name_of(pane), on_ready=on_ready)
 
+    def _seed_history(self) -> None:
+        """Populate the recent-directory history from the persisted
+        ``recent.directories`` (oldest first, so the History picker survives
+        restarts, #220), then the two current pane directories, which thus become
+        the most-recent entries."""
+        self._history: list[str] = []
+        for p in reversed(self.state_manager.load_recent_directories()):
+            self._record_history_path(str(p))
+        for p in (self.pm.left_pane["path"], self.pm.right_pane["path"]):
+            self._record_history_path(str(p))
+
     def _record_history_path(self, path: str) -> None:
         """Append ``path`` to the recent-directory history, coalescing an
         immediate repeat (a same-directory refresh from create/rename doesn't add
         a duplicate) and capping the list length."""
         if not self._history or self._history[-1] != path:
             self._history.append(path)
-            del self._history[:-100]
+            del self._history[:-_HISTORY_MAX]
+
+    def _recent_dirs_most_recent_first(self) -> list[str]:
+        """The visited-directory history as a most-recent-first, de-duplicated
+        list — the order the History picker shows and the form persisted to the
+        state DB (``recent.directories``)."""
+        seen: set[str] = set()
+        out: list[str] = []
+        for p in reversed(self._history):
+            if p not in seen:
+                seen.add(p)
+                out.append(p)
+        return out
 
     # --- actions -------------------------------------------------------------
 
@@ -2460,11 +2485,7 @@ class TfmApp:
     def show_history(self) -> None:
         """The recent-directory picker: pick a previously visited directory and
         jump the active pane there. Shows most-recent-first, de-duplicated."""
-        seen, items = set(), []
-        for p in reversed(self._history):
-            if p not in seen:
-                seen.add(p)
-                items.append(p)
+        items = self._recent_dirs_most_recent_first()
         if not items:
             show_message_box(self.panel, "No directory history yet.",
                              title="History", icon="info")
