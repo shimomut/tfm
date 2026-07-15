@@ -48,12 +48,23 @@ to; **M** does nothing there.
 | PgUp / PgDn | Scroll a page |
 | Home / End | Jump to top / bottom |
 | Mouse wheel | Scroll |
+| **F** | Incremental search |
 | **M** | Switch back to raw text |
 | **?** | Key help |
 | **Q** / Esc | Close the viewer |
 
-Incremental search (**F**) and line wrap (**W**) apply to the **raw text** view.
-To search within a Markdown file, switch to raw text first.
+### Searching the rendered view
+
+Incremental search (**F**) works in the rendered view as well as in raw text.
+Press **F**, type a pattern, and every occurrence is highlighted where it appears
+in the formatted document — matches inside styled text (a heading, a **bold** run,
+inline `code`, a link) keep their own color under the highlight. **↑** / **↓**
+jump to the previous / next match, **Enter** keeps the current position, and
+**Esc** cancels and returns to where you were. Matching is case-insensitive, and
+the footer counter shows *current / total*.
+
+Line wrap (**W**) still applies only to the raw text view (the rendered document
+already wraps prose to the pane).
 
 ## Notes
 

@@ -160,3 +160,123 @@ def test_quit_closes_from_rich_mode(backend, md_file):
     assert type(panel._layers[-1].widget).__name__ == "TextViewer"
     v.handle_event(_key("escape"))
     assert not panel.has_layers or type(panel._layers[-1].widget).__name__ != "TextViewer"
+
+
+# --- incremental search in rich (Markdown) mode ------------------------------
+#
+# The ``search`` binding opens the shared ISearchBar in rich mode too; the viewer
+# delegates the match set / scrolling / highlighting to the embedded MarkdownView
+# (issue #213). The MarkdownView's own search behavior is covered exhaustively in
+# PuiKit's test_markdown_view.py; these check the viewer wires it up.
+
+
+def _type(panel, text):
+    for ch in text:
+        panel.dispatch_event(_key(ch, ch))
+
+
+def _into_rich(panel, md_file):
+    v = show_text_viewer(panel, md_file)
+    panel.render()
+    v._toggle_view_mode()
+    panel.render()                       # lay the document out (knows it overflows)
+    assert v.mode == "rich"
+    return v
+
+
+def test_rich_search_opens_and_matches(backend, md_file):
+    panel = Panel(backend)
+    v = _into_rich(panel, md_file)
+
+    panel.dispatch_event(_key("f", "f"))             # 'search' binding
+    panel.render()
+    assert v._isearch.active
+    assert type(panel._layers[-1].widget).__name__ == "ISearchBar"
+
+    _type(panel, "paragraph")                        # 60 "Paragraph number N" blocks
+    panel.render()
+    mv = v._rich_widget
+    assert mv._search_pattern == "paragraph"
+    assert mv._search_rows                           # matched some display rows
+    assert v._search_status() == mv.search_status()  # counter delegates
+    assert v._search_status()[0] >= 1
+
+
+def test_rich_search_navigation_moves_offset(backend, md_file):
+    panel = Panel(backend)
+    v = _into_rich(panel, md_file)
+    mv = v._rich_widget
+
+    panel.dispatch_event(_key("f", "f"))
+    _type(panel, "paragraph")
+    panel.render()
+    assert len(mv._search_rows) >= 3
+    first_off = mv.offset
+    panel.dispatch_event(_key("down"))               # next match
+    panel.render()
+    assert mv._search_pos == 1
+    assert mv.offset >= first_off
+    panel.dispatch_event(_key("up"))                 # back to first
+    panel.render()
+    assert mv._search_pos == 0
+
+
+def test_rich_search_cancel_restores_and_clears(backend, md_file):
+    panel = Panel(backend)
+    v = _into_rich(panel, md_file)
+    mv = v._rich_widget
+    assert mv.offset == 0.0
+
+    panel.dispatch_event(_key("f", "f"))
+    _type(panel, "paragraph")
+    panel.dispatch_event(_key("down"))               # scroll away from the origin
+    panel.render()
+    assert mv.offset > 0.0
+    panel.dispatch_event(_key("escape"))             # cancel -> restore + clear
+    panel.render()
+    assert not v._isearch.active
+    assert mv._search_pattern == "" and mv._search_rows == []
+    assert mv.offset == 0.0                           # pre-search origin restored
+    assert type(panel._layers[-1].widget).__name__ == "TextViewer"
+
+
+def test_rich_search_accept_keeps_position(backend, md_file):
+    panel = Panel(backend)
+    v = _into_rich(panel, md_file)
+    mv = v._rich_widget
+
+    panel.dispatch_event(_key("f", "f"))
+    _type(panel, "paragraph")
+    panel.dispatch_event(_key("down"))
+    panel.render()
+    kept = mv.offset
+    assert kept > 0.0
+    panel.dispatch_event(_key("enter"))              # accept -> keep scroll, clear
+    panel.render()
+    assert not v._isearch.active
+    assert mv._search_pattern == "" and mv._search_rows == []
+    assert mv.offset == kept
+
+
+def test_rich_search_no_match_status_zero(backend, md_file):
+    panel = Panel(backend)
+    v = _into_rich(panel, md_file)
+    mv = v._rich_widget
+
+    panel.dispatch_event(_key("f", "f"))
+    _type(panel, "zzz-no-such-text")
+    panel.render()
+    assert mv._search_rows == []
+    assert v._search_status() == (0, 0)
+    assert mv.offset == 0.0                           # nothing matched: origin kept
+
+
+def test_search_key_ignored_by_renderer_in_rich_mode(backend, md_file):
+    # The viewer must intercept the search key before forwarding to the renderer,
+    # so search opens rather than being swallowed as an unknown key.
+    panel = Panel(backend)
+    v = _into_rich(panel, md_file)
+    assert not v._isearch.active
+    handled = v.handle_event(_key("f", "f"))
+    assert handled is True
+    assert v._isearch.active

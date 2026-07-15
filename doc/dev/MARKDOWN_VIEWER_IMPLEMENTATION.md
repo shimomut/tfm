@@ -61,10 +61,38 @@ it.
   remembered rich mode, the widget is `None` on the first frame; `draw` builds it
   there (`_ensure_rich_widget`, now that colors are known) and, if the source
   can't be rendered, drops back to raw for that file. Raw mode is unchanged.
-- `handle_event()`: `quit` / `help` / the view toggle are handled in **both**
-  modes. In rich mode every other key and mouse-scroll is **forwarded** to the
+- `handle_event()`: `quit` / `help` / the view toggle / **incremental search**
+  are handled in **both** modes. The `search` key is intercepted *before* the
+  rich forward (the renderer has no search of its own, so it would swallow the
+  key); every other key and mouse-scroll in rich mode is **forwarded** to the
   embedded widget (it owns arrows / page / home / end / in-document link jumps).
-  Incremental search and line wrap remain raw-text-only.
+  Line wrap remains raw-text-only.
+
+### Incremental search in the rendered view (issue #213)
+
+Search reuses the same `ViewerISearch` / `ISearchBar` overlay the raw view uses;
+only the match set changes target by mode. `TextViewer` keeps its five search
+callbacks (`_search_recompute` / `_search_step` / `_search_status` /
+`_search_accept` / `_search_cancel`) and `_enter_search`, each of which now
+branches on `_search_target_is_rich()` (rich mode with a built widget):
+
+- **Raw mode** — unchanged: the callbacks drive `TextViewer`'s own line-based
+  match set (`self.matches`, `self.match_pos`, highlighted in `_draw_matches`).
+- **Rich mode** — the callbacks delegate to the embedded `MarkdownView`'s
+  `search_*` API: `search_begin` (remember the pre-search scroll on open),
+  `search_set` (live per-keystroke recompute + scroll), `search_navigate`
+  (±1 match), `search_status` (counter), `search_accept` / `search_cancel`.
+
+Match finding, scroll-to-match and highlight drawing live in `MarkdownView`
+(PuiKit), not `TextViewer`, because they need the widget's own wrapped,
+proportional layout (row tops, per-span x positions). The navigable unit is the
+**display row** that contains the pattern (mirroring the raw view, which walks
+matching *lines*); every occurrence is highlighted in place by redrawing the
+matched substrings with an amber-tinted background, preserving each styled run's
+own color/font so headings, `code`, links, etc. stay recognisable. The match set
+is keyed on `(pattern, wrap width)` so a resize that re-wraps the document
+rebuilds it (`_sync_search` in `draw`). The footer hint in `_draw_rich` advertises
+the `search` key in rich mode.
 
 ### Key binding
 
@@ -125,8 +153,17 @@ independently even though they share the Markdown renderer.
 mapping and plain-type fallback; a `.md` opening raw with a renderer available; a
 plain file having no renderer (toggle no-op); toggle builds/caches the
 `MarkdownView` and each mode keeps its scroll; the `M` key path (via the literal
-fallback); both modes draw without crashing; rich-mode scroll forwarding; and
-quit closing from rich mode.
+fallback); both modes draw without crashing; rich-mode scroll forwarding; quit
+closing from rich mode; and **rich-mode incremental search** — opening the bar
+with `F`, the counter/status delegating to the embedded widget, `↑`/`↓`
+navigation moving the offset, `Enter` keeping the position, `Esc` restoring the
+pre-search scroll and clearing, a no-match showing `0/0`, and the search key being
+intercepted rather than swallowed by the renderer.
+
+The `MarkdownView.search_*` API itself (match finding, case-insensitivity,
+nearest-at/after-offset, wrap navigation, no-match origin restore, in-place
+highlighting that preserves run color, and rebuild-on-rewrap) is covered
+exhaustively in PuiKit's `tests/test_markdown_view.py`.
 
 `test/test_viewer_mode_memory.py` (parametrized TUI + GUI profiles) covers the
 per-type memory: no state manager or nothing stored → opens raw; a remembered

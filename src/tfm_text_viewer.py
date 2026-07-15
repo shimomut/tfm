@@ -420,14 +420,25 @@ class TextViewer(Widget):
 
     # --- search --------------------------------------------------------------
 
+    def _search_target_is_rich(self) -> bool:
+        """Whether an open search should drive the embedded rich renderer (rich
+        mode with its widget built) instead of the raw-text match set. The rich
+        widget owns its own search (match finding / scroll / highlight over its
+        wrapped, proportional layout); this viewer only delegates."""
+        return self.mode == "rich" and self._rich_widget is not None
+
     def _enter_search(self) -> None:
         """Open the incremental-search overlay pinned to the footer (the ``search``
-        binding). Reuses the main file manager's ``ISearchBar`` via
-        :class:`ViewerISearch`."""
+        binding), in either view mode. Reuses the main file manager's ``ISearchBar``
+        via :class:`ViewerISearch`; in rich mode the callbacks below drive the
+        embedded renderer's own search instead of the raw-text match set."""
         if self._isearch.active or self._footer_rect is None:
             return
-        self._search_origin_top = self.top
-        self._clear_search()
+        if self._search_target_is_rich():
+            self._rich_widget.search_begin()
+        else:
+            self._search_origin_top = self.top
+            self._clear_search()
         self._isearch.open(self._panel, self._footer_rect, self._child_z)
 
     def _clear_search(self) -> None:
@@ -440,7 +451,12 @@ class TextViewer(Widget):
         """Live per-keystroke: recompute the matching lines (case-insensitive
         *contains*), highlight them, and jump to the nearest match at/after the
         current scroll position — or back to the pre-search view when nothing
-        matches (mirrors the main file manager's isearch)."""
+        matches (mirrors the main file manager's isearch). In rich mode the
+        embedded renderer runs the same search over its own layout."""
+        if self._search_target_is_rich():
+            self._rich_widget.search_set(pattern)
+            self._render()
+            return
         self.pattern = pattern
         pat = pattern.lower()
         self.matches = [i for i, line in enumerate(self.lines) if pat in line.lower()] \
@@ -458,6 +474,10 @@ class TextViewer(Widget):
     def _search_step(self, delta: int) -> None:
         """Up (``delta<0``) / Down (``delta>0``): walk to the previous / next
         match, wrapping at the ends. A no-op with no matches."""
+        if self._search_target_is_rich():
+            self._rich_widget.search_navigate(delta)
+            self._render()
+            return
         if not self.matches:
             return
         self.match_pos = (self.match_pos + delta) % len(self.matches)
@@ -467,16 +487,26 @@ class TextViewer(Widget):
     def _search_status(self) -> tuple[int, int]:
         """``(position, total)`` for the bar's counter: the 1-based index of the
         current match (0 when off any match) and the match count."""
+        if self._search_target_is_rich():
+            return self._rich_widget.search_status()
         n = len(self.matches)
         return (self.match_pos + 1 if (n and self.match_pos >= 0) else 0, n)
 
     def _search_accept(self) -> None:
         """Enter: keep the current match's scroll position; clear the highlights."""
+        if self._search_target_is_rich():
+            self._rich_widget.search_accept()
+            self._render()
+            return
         self._clear_search()
         self._render()
 
     def _search_cancel(self) -> None:
         """Esc / outside click: restore the pre-search scroll and clear."""
+        if self._search_target_is_rich():
+            self._rich_widget.search_cancel()
+            self._render()
+            return
         self.top = self._search_origin_top
         self._clear_search()
         self._clamp()
@@ -612,8 +642,10 @@ class TextViewer(Widget):
         ctx.draw_child(self._rich_widget, pad_x, head_h, iw, body_h)
         self._footer_rect = (0.0, fy, wu, hu - fy)
         view_k = keys_label_for_action("toggle_view_mode", "M")
+        search_k = keys_label_for_action("search", "F")
         quit_k = keys_label_for_action("quit", "q")
-        hint = f" ↑↓ scroll · {view_k} raw text · {quit_k}/Esc close "
+        hint = (f" ↑↓ scroll · {search_k} search · {view_k} raw text · "
+                f"{quit_k}/Esc close ")
         draw_status_bar(ctx, fy, hint, pad_x=pad_x, bottom_pad=pad_y)
 
     def _draw_rows(self, ctx) -> None:
@@ -803,15 +835,19 @@ class TextViewer(Widget):
         if self._view_mode_pressed(event):
             self._toggle_view_mode()
             return True
+        # Incremental search applies in both modes: open it before the rich
+        # renderer would swallow the key (it has no search of its own — this
+        # viewer drives the shared bar and delegates to the renderer's match set).
+        if is_action_for_event(event, "search"):
+            self._enter_search()
+            return True
         # Rich mode: the embedded renderer owns navigation (arrows / page / home /
-        # end / in-document link jumps); forward and let it repaint. Incremental
-        # search and line-wrap are raw-text-only, so they don't apply here.
+        # end / in-document link jumps); forward and let it repaint. Line-wrap is
+        # raw-text-only, so it doesn't apply here.
         if self.mode == "rich" and self._rich_widget is not None:
             self._rich_widget.handle_event(event)
             return True
-        if is_action_for_event(event, "search"):
-            self._enter_search()
-        elif self._wrap_pressed(event):
+        if self._wrap_pressed(event):
             self.wrap = not self.wrap
             self.left = 0.0
             self._wrap_w = -1
