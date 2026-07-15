@@ -50,6 +50,11 @@ except ImportError:
 MONO = Font(monospace=True)
 _TAB = 8
 
+#: State-manager key prefix for a file type's remembered view mode. The value
+#: ("rich" | "text") is stored per lower-cased extension (e.g. "viewer_mode:.md"),
+#: so a type reopens in the mode last chosen for it (issue #217).
+_VIEW_MODE_STATE_PREFIX = "viewer_mode:"
+
 
 def _content_bg(theme) -> tuple[int, int, int] | None:
     """The file-pane content surface, so a full-window viewer sits on TFM's own
@@ -335,17 +340,23 @@ class TextViewer(Widget):
 
     focusable = True
 
-    def __init__(self, path, *, syntax: dict | None = None):
+    def __init__(self, path, *, syntax: dict | None = None, state_manager=None):
         self.path = path
         self.lines, self.is_error = _read_lines(path)
         self.highlighted = _highlight(self.lines, path, syntax)
         # Optional rich (formatted) renderer for this file type — Markdown for
-        # *.md today (see tfm_viewer_registry). The viewer always opens in raw
-        # text; when a renderer exists, ``toggle_view_mode`` swaps to it in place.
-        # The rich widget is built lazily on first switch and cached, so each mode
-        # keeps its own scroll position across toggles. ``mode`` is "text" | "rich".
+        # *.md today (see tfm_viewer_registry). When a renderer exists,
+        # ``toggle_view_mode`` swaps to it in place; the rich widget is built
+        # lazily — on first switch, or on the first draw when we open straight
+        # into rich — and cached, so each mode keeps its own scroll position
+        # across toggles. ``mode`` is "text" | "rich" and starts at the mode last
+        # chosen for this file *type* (persisted per extension via the state
+        # manager, e.g. ".md" -> "rich"), so a preference for rendered Markdown
+        # survives close/reopen and restarts (issue #217). It falls back to raw
+        # "text" when the type has no renderer or nothing was stored.
         self._rich = rich_renderer_for(path)
-        self.mode = "text"
+        self._state_manager = state_manager
+        self.mode = self._remembered_view_mode()
         self._rich_widget: Widget | None = None
         self._panel: Any = None
         self._child_z = 90  # z for the help overlay; raised above this viewer in show_
@@ -526,7 +537,12 @@ class TextViewer(Widget):
         self._bg, self._text_fg, self._muted = bg, text_fg, muted
         # Rich (formatted) mode: the embedded renderer owns the whole body — it
         # draws and scrolls itself, with its own scrollbar — so the plain gutter,
-        # h-scrollbar and row layout are skipped entirely.
+        # h-scrollbar and row layout are skipped entirely. When we open straight
+        # into a *remembered* rich mode the widget is built here on the first
+        # frame, now that the content colors are known; if the source can't be
+        # rendered we quietly drop back to raw for this file.
+        if self.mode == "rich" and self._rich_widget is None and not self._ensure_rich_widget():
+            self.mode = "text"
         if self.mode == "rich" and self._rich_widget is not None:
             self._draw_rich(ctx, wu, hu, pad_x, pad_y, iw, head_h)
             return
@@ -694,29 +710,66 @@ class TextViewer(Widget):
         if panel is not None and panel.has_layers and panel._layers[-1].widget is self:
             panel.pop_layer()
 
+    def _ensure_rich_widget(self) -> bool:
+        """Build (once) and cache this file's rich renderer widget on the viewer's
+        current content surface, returning whether a rich widget is available.
+        ``False`` when the type has no renderer or the source can't be read as
+        text — the caller then stays in (or falls back to) raw text mode. Uses the
+        content colors captured by the last :meth:`draw`, so the rendered document
+        sits on the same surface as the raw view."""
+        if self._rich is None:
+            return False
+        if self._rich_widget is not None:
+            return True
+        source = _read_source(self.path)
+        if source is None:
+            logger.warning(f"Cannot render {self.path.name}: unreadable as text")
+            return False
+        style = Style(fg=self._text_fg or (212, 212, 212), bg=self._bg)
+        self._rich_widget = self._rich.build(source, style=style)
+        return True
+
+    def _view_mode_state_key(self) -> str | None:
+        """State-manager key for this file type's remembered view mode, or
+        ``None`` when persistence doesn't apply — no state manager, or a type with
+        no rich renderer (nothing to remember)."""
+        if self._state_manager is None or self._rich is None:
+            return None
+        return _VIEW_MODE_STATE_PREFIX + self.path.suffix.lower()
+
+    def _remembered_view_mode(self) -> str:
+        """The persisted view mode ("rich" | "text") for this file's type,
+        defaulting to raw "text" when nothing is stored or persistence doesn't
+        apply. Read once at construction to pick the opening mode (issue #217)."""
+        key = self._view_mode_state_key()
+        if key is None:
+            return "text"
+        return "rich" if self._state_manager.get_state(key) == "rich" else "text"
+
+    def _remember_view_mode(self) -> None:
+        """Persist the current view mode for this file's type, so files of the
+        same type reopen the same way (issue #217)."""
+        key = self._view_mode_state_key()
+        if key is not None:
+            self._state_manager.set_state(key, self.mode)
+
     def _toggle_view_mode(self) -> None:
         """Switch between the raw text view and this file type's rich renderer
-        (the ``toggle_view_mode`` action). A no-op for a type with no registered
-        renderer. The rich widget is built once, from the file source, and cached
-        — so each mode keeps its own scroll position across toggles. If the source
-        can't be read as text, the switch is refused and the viewer stays raw.
-
-        Uses the content colors captured by the last :meth:`draw` (the viewer is
-        always drawn once before any key event), so the rendered document sits on
-        the same surface as the raw view."""
+        (the ``toggle_view_mode`` action) and remember the choice for the type, so
+        same-type files reopen the same way (issue #217). A no-op for a type with
+        no registered renderer. The rich widget is built once, from the file
+        source, and cached — so each mode keeps its own scroll position across
+        toggles. If the source can't be read as text, the switch is refused, the
+        viewer stays raw, and nothing is persisted."""
         if self._rich is None:
             return
         if self.mode == "rich":
             self.mode = "text"
-            return
-        if self._rich_widget is None:
-            source = _read_source(self.path)
-            if source is None:
-                logger.warning(f"Cannot render {self.path.name}: unreadable as text")
-                return
-            style = Style(fg=self._text_fg or (212, 212, 212), bg=self._bg)
-            self._rich_widget = self._rich.build(source, style=style)
-        self.mode = "rich"
+        elif self._ensure_rich_widget():
+            self.mode = "rich"
+        else:
+            return  # unreadable as text; stay raw, don't persist
+        self._remember_view_mode()
 
     def handle_event(self, event: Event) -> bool:
         if event.type is EventType.MOUSE_SCROLL:
@@ -822,11 +875,15 @@ class TextViewer(Widget):
                       title="Text Viewer — Keys", z=self._child_z)
 
 
-def show_text_viewer(panel: Any, path, z: int = 80) -> TextViewer:
+def show_text_viewer(panel: Any, path, z: int = 80, state_manager=None) -> TextViewer:
     """Push a full-window modal :class:`TextViewer` over ``panel``. The ``reflow``
     callback re-derives the layer rect from the live window size each render, so
-    the viewer follows terminal / window resizes."""
-    viewer = TextViewer(path, syntax=_syntax_palette(panel))
+    the viewer follows terminal / window resizes. When a ``state_manager`` is
+    given, the last view mode chosen for each file type is remembered through it,
+    so e.g. Markdown files reopen rendered once you've toggled one (issue #217);
+    without one the viewer just opens raw and persists nothing."""
+    viewer = TextViewer(path, syntax=_syntax_palette(panel),
+                        state_manager=state_manager)
     sw, sh = panel.backend.size_units
     viewer._panel = panel
     viewer._child_z = z + 10  # help overlay stacks above the viewer's own layer

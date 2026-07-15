@@ -82,6 +82,7 @@ def _app():
     app._exit_virtual = lambda pane: pane.__setitem__("virtual", None)
     app._fileops = _RecordingFileOps()
     app.panel = object()
+    app.state_manager = None  # viewer opens without per-type mode memory here
     return app
 
 

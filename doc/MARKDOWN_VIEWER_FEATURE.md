@@ -7,9 +7,10 @@ text view.
 
 ## Opening a file
 
-Press **V** on a Markdown file (or any text file) to open the viewer. It always
-opens in the **raw text** view first, exactly like any other file, with line
-numbers, syntax highlighting, incremental search and line wrapping.
+Press **V** on a Markdown file (or any text file) to open the viewer. The **raw
+text** view — line numbers, syntax highlighting, incremental search and line
+wrapping — is the starting point, unless you've told TFM you prefer the rendered
+view for this kind of file (see *Remembering your choice* below).
 
 ## Switching to the rendered view
 
@@ -22,6 +23,15 @@ toggle between:
 Press **M** again to switch back. The two views are independent: each remembers
 where you had scrolled to, so toggling back and forth returns you to where you
 were in each.
+
+## Remembering your choice
+
+TFM remembers the view you last chose **per file type** and reopens that type the
+same way next time. Toggle a `.md` file to the rendered view and every `.md` file
+you open afterwards — this session and after a restart — opens rendered; toggle
+one back to raw and `.md` files open raw again. The preference is tracked
+separately for each extension, and only for types that actually have a rendered
+view (a `.txt` or `.py` always opens raw, since there's nothing to remember).
 
 The footer shows which key toggles the view, and the top-right of the header
 shows the current view (the line position in raw text, or the renderer's name —

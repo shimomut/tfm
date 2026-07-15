@@ -1581,7 +1581,7 @@ class TfmApp:
                 # same one V uses, which routes *.md to the Markdown renderer and
                 # shows a placeholder for binaries (issue #212). Enter was
                 # previously a no-op on files.
-                show_text_viewer(self.panel, entry)
+                show_text_viewer(self.panel, entry, state_manager=self.state_manager)
         except Exception as exc:
             self.log_info(f"Cannot open {entry.name}: {exc}")
 
@@ -2718,7 +2718,7 @@ class TfmApp:
                 return
         except Exception:
             pass
-        show_text_viewer(self.panel, entry)
+        show_text_viewer(self.panel, entry, state_manager=self.state_manager)
         self.panel.render()
 
     def diff_files(self) -> None:
