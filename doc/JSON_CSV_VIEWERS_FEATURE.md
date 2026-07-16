@@ -31,10 +31,16 @@ records.
 
 ## CSV / TSV (`*.csv`, `*.tsv`)
 
-The rich view is an **aligned table**. The header row stays frozen at the top
-while the body scrolls, columns are sized to their content (numeric columns
-right-align), and the grid scrolls both vertically and horizontally so wide
-tables stay readable. A `.tsv` file is split on tabs, a `.csv` file on commas.
+The rich view is an **aligned table** with ruled grid lines. The header row stays
+frozen at the top while the body scrolls, columns are sized to their content
+(numeric columns right-align), and the grid scrolls both vertically and
+horizontally so wide tables stay readable. A `.tsv` file is split on tabs, a
+`.csv` file on commas.
+
+The grid lines follow the display: on the graphical app they're crisp
+device-thin rules around every cell; on the terminal they're box-drawing
+characters (`│` column separators and a `├─┼─┤` line under the header), with the
+body rows zebra-striped for separation.
 
 | Key | Action |
 |-----|--------|

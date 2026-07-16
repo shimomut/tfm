@@ -72,8 +72,22 @@ share one column geometry. Rendering:
   extends a rectangular block (`_selection_range`); keyboard arrows move a current
   cell (Shift extends). `Cmd/Ctrl+C` copies the block as TSV, `Cmd/Ctrl+A`
   selects the whole body. Search matches body rows containing the pattern
-  (`_recompute`), with in-place highlighting; `_span_x` maps an absolute-column
-  span to the visible horizontal window for both the selection and match paint.
+  (`_recompute`), with in-place highlighting; the selection also moves to the
+  matching cell (`_select_match` → `_match_col`), panning both axes.  `_span_x`
+  maps an absolute-column span to the visible horizontal window for both the
+  selection and match paint.
+- **Grid lines ("keisen").** Column geometry reserves a one-column border edge
+  (`_edges`) with one pad column on each side of the cell text (`_content_x`),
+  matching MarkdownView's table metrics; the line strings carry only the cell
+  text on a blank field so the rules are overlaid at draw time (`_draw_grid`). A
+  vector backend strokes `ctx.draw_hairline` for a full grid — every column edge
+  full height, every row boundary, top/bottom frame. A character grid draws `│`
+  bars down each column edge (one glyph per cell) and a box-drawing `├─┼─┤`
+  header separator (`_draw_hsep`, using `_box_glyph` junctions), and zebra-stripes
+  the body rows (a per-row rule would cost a whole text row there) — so on the TUI
+  the table matches MarkdownView's. The header zone is one row taller on the grid
+  (it reserves the separator row); the rules stop at the content bottom, not the
+  empty body track below a short table.
 
 Both widgets are exported from `puikit/widgets/__init__.py`.
 
