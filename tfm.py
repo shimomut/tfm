@@ -26,6 +26,7 @@ import platform
 import queue
 import re
 import shlex
+import shutil
 import subprocess
 import threading
 import time
@@ -76,6 +77,7 @@ from tfm_isearch_bar import ISearchBar  # noqa: E402
 from tfm_pane_manager import PaneManager  # noqa: E402
 from tfm_path import Path  # noqa: E402
 from tfm_state_manager import get_state_manager  # noqa: E402
+from tfm_str_format import format_size  # noqa: E402
 from tfm_batch_rename_dialog import show_batch_rename  # noqa: E402
 from tfm_compare_dialog import show_compare_select  # noqa: E402
 from tfm_compare_selection import compute_compare_selection  # noqa: E402
@@ -397,6 +399,12 @@ def _archive_header_label(path_str: str) -> str:
 #: ``_bar_pad`` for the grid fallback and the FilePane's own ``CONTENT_PAD_CELLS``.
 BAR_PAD_PX = 4.0
 
+#: How long (seconds) a pane's disk-usage reading is cached before the footer
+#: re-queries the filesystem. The footer redraws every frame, so an uncached
+#: ``statvfs`` per draw would be wasteful — and could stall on a slow network
+#: mount. A short TTL keeps the readout fresh without hammering the syscall.
+DISK_USAGE_TTL = 5.0
+
 
 def _bar_pad(ctx) -> tuple[float, float]:
     """``(x, y)`` content inset for a chrome bar, in base units, from its
@@ -480,8 +488,26 @@ class PaneFooter(Widget):
         sort = self.app.flm.get_sort_description(pane)
         text = f"{dirs} dirs, {files} files{sel}  |  {sort}{filt}"
         fg = ctx.theme.text if active else ctx.theme.muted_text
-        attr = TextAttribute.BOLD if active else TextAttribute.NORMAL
-        ctx.draw_text(pad_x, 0, elide(text, avail, measure=ctx.measure_text), Style(fg=fg, attr=attr))
+        style = Style(fg=fg, attr=TextAttribute.BOLD if active else TextAttribute.NORMAL)
+
+        # Free/total space of the pane's filesystem, right-aligned so it stays put
+        # (and readable) while the left summary elides as the pane narrows. Absent
+        # for remote panes (S3/SCP) or a filesystem that can't be queried.
+        reserved = 0.0
+        disk = self.app.disk_free_total(pane)
+        if disk is not None:
+            free, total = disk
+            disk_text = f"{format_size(free)} free / {format_size(total)}"
+            disk_w = ctx.measure_text(disk_text)
+            gap = ctx.measure_text("   ")
+            # Draw only when the summary still gets room after the readout + gap;
+            # on a very narrow pane, give the whole bar back to the summary.
+            if disk_w + gap < avail:
+                ctx.draw_text(pad_x + avail - disk_w, 0, disk_text, style)
+                reserved = disk_w + gap
+
+        left = elide(text, max(0.0, avail - reserved), measure=ctx.measure_text)
+        ctx.draw_text(pad_x, 0, left, style)
 
 
 class StatusBar(Widget):
@@ -646,6 +672,10 @@ class TfmApp:
         #: Pane footers by name, so ``enter_isearch`` can read the active footer's
         #: captured rect and position the isearch overlay exactly on it.
         self._footers: dict[str, PaneFooter] = {}
+        #: TTL cache for the footer's disk-usage readout, keyed by directory
+        #: string → ``(monotonic_timestamp, (free, total) | None)``. See
+        #: ``disk_free_total`` and ``DISK_USAGE_TTL``.
+        self._disk_usage_cache: dict[str, tuple[float, tuple[int, int] | None]] = {}
         #: Incremental-search state. The prompt is an overlay layer pinned to the
         #: pane footer (``ISearchBar``); the list above stays visible and its
         #: cursor keeps moving as you type. ``_isearch_origin`` is the pre-search
@@ -1241,6 +1271,32 @@ class TfmApp:
         info = pane.get("file_info", {})
         dirs = sum(1 for f in pane["files"] if info.get(str(f), {}).get("is_dir"))
         return dirs, len(pane["files"]) - dirs
+
+    def disk_free_total(self, pane: dict) -> tuple[int, int] | None:
+        """``(free_bytes, total_bytes)`` for the pane's filesystem, or ``None``
+        when the path is remote (S3/SCP) or the filesystem can't be queried
+        (e.g. the directory was just deleted, or it's a browsed archive).
+
+        Cached per path with a short TTL (:data:`DISK_USAGE_TTL`): the footer
+        calls this every frame, and an uncached ``statvfs`` per draw would be
+        wasteful and could stall on a slow network mount."""
+        path = pane["path"]
+        if path.is_remote():
+            return None
+        key = str(path)
+        now = time.monotonic()
+        cached = self._disk_usage_cache.get(key)
+        if cached is not None and now - cached[0] < DISK_USAGE_TTL:
+            return cached[1]
+        try:
+            usage = shutil.disk_usage(key)
+            result = (usage.free, usage.total)
+        except OSError:
+            # Expected/benign for a display-only readout (missing path, archive
+            # URI, unsupported filesystem): fall back to showing nothing.
+            result = None
+        self._disk_usage_cache[key] = (now, result)
+        return result
 
     def log_info(self, message: str) -> None:
         """Append a line to the log pane in the theme's primary text color. The
