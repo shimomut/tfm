@@ -218,6 +218,97 @@ class ArchiveDiskSpaceError(ArchiveError):
     pass
 
 
+class ArchivePasswordRequired(ArchiveError):
+    """A password is required to read the archive, or the one supplied is wrong."""
+    pass
+
+
+class ArchiveEncryptionUnsupported(ArchiveError):
+    """The archive uses an encryption scheme TFM cannot decrypt (e.g. WinZip AES).
+
+    Python's ``zipfile`` only decrypts legacy ZipCrypto (traditional PKWARE
+    encryption); AES-encrypted entries (WinZip, compression method 99) cannot be
+    opened at all."""
+    pass
+
+
+# --- encrypted-zip password registry ----------------------------------------
+#
+# Passwords the user has supplied for encrypted archives, keyed by the archive
+# file's absolute path. Populated by the UI once a correct password is entered
+# and consulted by ZipHandler when reading encrypted entries, so viewing files
+# inside a browsed password-protected zip keeps working for the session without
+# re-prompting. Cleared implicitly when the process exits (nothing is persisted).
+_archive_passwords: Dict[str, bytes] = {}
+_archive_passwords_lock = threading.RLock()
+
+#: ZIP general-purpose bit-flag 0 marks an entry as encrypted.
+_ZIP_ENCRYPTED_FLAG = 0x1
+#: WinZip AES entries advertise compression method 99 (the real method lives in
+#: an extra field). Python's zipfile cannot decrypt these — only ZipCrypto.
+_ZIP_AES_METHOD = 99
+
+
+def _archive_password_key(archive_path: Path) -> str:
+    """The registry key for an archive file — its absolute path as a string."""
+    return str(archive_path.absolute())
+
+
+def set_archive_password(archive_path: Path, password: bytes) -> None:
+    """Remember ``password`` (bytes) for ``archive_path`` for the rest of the
+    session, so subsequent reads of its encrypted entries don't re-prompt."""
+    with _archive_passwords_lock:
+        _archive_passwords[_archive_password_key(archive_path)] = password
+
+
+def get_archive_password(archive_path: Path) -> Optional[bytes]:
+    """The remembered password for ``archive_path``, or None if none is known."""
+    with _archive_passwords_lock:
+        return _archive_passwords.get(_archive_password_key(archive_path))
+
+
+def clear_archive_password(archive_path: Path) -> None:
+    """Forget any remembered password for ``archive_path`` (e.g. after it proves
+    wrong)."""
+    with _archive_passwords_lock:
+        _archive_passwords.pop(_archive_password_key(archive_path), None)
+
+
+def zip_encryption_status(zf: zipfile.ZipFile) -> str:
+    """Classify an open ``ZipFile``'s encryption:
+
+    - ``'none'``      — no encrypted entries.
+    - ``'zipcrypto'`` — legacy PKWARE encryption, decryptable with a password.
+    - ``'aes'``       — WinZip AES, which Python's zipfile cannot decrypt.
+
+    ``'aes'`` wins if any entry uses it (the archive can't be fully extracted)."""
+    status = 'none'
+    for info in zf.infolist():
+        if info.flag_bits & _ZIP_ENCRYPTED_FLAG:
+            if info.compress_type == _ZIP_AES_METHOD:
+                return 'aes'
+            status = 'zipcrypto'
+    return status
+
+
+def verify_zip_password(zf: zipfile.ZipFile, password: Optional[bytes]) -> None:
+    """Probe that ``password`` opens ``zf``'s encrypted entries, raising if not.
+
+    A no-op when nothing is encrypted. Opening the smallest encrypted entry
+    validates the ZipCrypto password header (a 12-byte check) cheaply, without
+    reading whole files. Raises ``RuntimeError`` for a missing/wrong ZipCrypto
+    password and ``NotImplementedError`` for AES (unsupported)."""
+    encrypted = [
+        info for info in zf.infolist()
+        if not info.is_dir() and (info.flag_bits & _ZIP_ENCRYPTED_FLAG)
+    ]
+    if not encrypted:
+        return
+    probe = min(encrypted, key=lambda info: info.file_size)
+    with zf.open(probe, pwd=password) as fh:
+        fh.read(1)
+
+
 class ArchiveHandler:
     """
     Base class for handling archive file access and caching of archive contents.
@@ -564,8 +655,18 @@ class ZipHandler(ArchiveHandler):
             )
         
         try:
-            # Extract file contents
-            return self._archive_obj.read(entry.internal_path)
+            # Extract file contents. The registered password (if any) is only
+            # consulted for encrypted entries; it is ignored otherwise.
+            return self._archive_obj.read(
+                entry.internal_path, pwd=get_archive_password(self._archive_path)
+            )
+        except NotImplementedError as e:
+            raise ArchiveEncryptionUnsupported(
+                f"Unsupported encryption reading {internal_path}: {e}",
+                f"Cannot read '{internal_path}': its encryption (e.g. AES) is not supported"
+            )
+        except RuntimeError as e:
+            raise self._read_runtime_error(e, internal_path)
         except PermissionError as e:
             raise ArchivePermissionError(
                 f"Permission denied extracting file: {e}",
@@ -586,14 +687,53 @@ class ZipHandler(ArchiveHandler):
                 f"Error extracting file: {e}",
                 f"Cannot extract '{internal_path}': {e}"
             )
-    
+
+    def _read_runtime_error(self, exc: RuntimeError, internal_path: str) -> ArchiveError:
+        """Map a ``RuntimeError`` raised by a decryption read to a typed archive
+        error. Python's zipfile signals a missing or wrong password with a
+        ``RuntimeError`` whose message mentions the password/encryption; anything
+        else is treated as a generic extraction failure."""
+        msg = str(exc).lower()
+        if "password" in msg or "encrypted" in msg:
+            return ArchivePasswordRequired(
+                f"Password required for {internal_path}: {exc}",
+                f"'{self._archive_path.name}' is password-protected — a valid password is required"
+            )
+        return ArchiveExtractionError(
+            f"Error extracting {internal_path}: {exc}",
+            f"Cannot extract '{internal_path}': {exc}"
+        )
+
+    def encryption_status(self) -> str:
+        """Classify this zip's encryption — ``'none'``, ``'zipcrypto'``, or
+        ``'aes'`` (see :func:`zip_encryption_status`). Opens the archive first."""
+        if not self._is_open:
+            self.open()
+        if not self._archive_obj:
+            return 'none'
+        return zip_encryption_status(self._archive_obj)
+
+    def verify_password(self, password: bytes) -> bool:
+        """Return True if ``password`` correctly opens this zip's encrypted
+        entries. A wrong ZipCrypto password returns False; ``NotImplementedError``
+        (AES) propagates, since that isn't a wrong-password condition."""
+        if not self._is_open:
+            self.open()
+        if not self._archive_obj:
+            return False
+        try:
+            verify_zip_password(self._archive_obj, password)
+            return True
+        except RuntimeError:
+            return False
+
     def extract_to_file(self, internal_path: str, target_path: Path):
         """Extract a file to the filesystem"""
         if not self._is_open:
             self.open()
-        
+
         normalized_path = self._normalize_path(internal_path)
-        
+
         # Check if entry exists
         entry = self._entry_cache.get(normalized_path)
         if not entry:
@@ -601,17 +741,27 @@ class ZipHandler(ArchiveHandler):
                 f"File not found in archive: {internal_path}",
                 f"File '{internal_path}' does not exist in archive"
             )
-        
+
         if entry.is_dir:
             raise ArchiveExtractionError(
                 f"Cannot extract directory as file: {internal_path}",
                 f"'{internal_path}' is a directory, not a file"
             )
-        
+
         try:
-            # Extract file contents
-            data = self._archive_obj.read(entry.internal_path)
-            
+            # Extract file contents (registered password used only if encrypted).
+            try:
+                data = self._archive_obj.read(
+                    entry.internal_path, pwd=get_archive_password(self._archive_path)
+                )
+            except NotImplementedError as e:
+                raise ArchiveEncryptionUnsupported(
+                    f"Unsupported encryption reading {internal_path}: {e}",
+                    f"Cannot read '{internal_path}': its encryption (e.g. AES) is not supported"
+                )
+            except RuntimeError as e:
+                raise self._read_runtime_error(e, internal_path)
+
             # Write to target
             try:
                 target_path.write_bytes(data)
@@ -637,7 +787,8 @@ class ZipHandler(ArchiveHandler):
             except Exception:
                 pass  # Ignore errors setting mtime
             
-        except (ArchivePermissionError, ArchiveDiskSpaceError):
+        except (ArchivePermissionError, ArchiveDiskSpaceError,
+                ArchivePasswordRequired, ArchiveEncryptionUnsupported):
             # Re-raise our custom exceptions
             raise
         except Exception as e:
@@ -1911,4 +2062,87 @@ class ArchivePathImpl(PathImpl):
     def as_posix(self) -> str:
         """Return the string representation with forward slashes."""
         return self._uri
+
+
+# --- UI-facing encrypted-archive helpers -------------------------------------
+#
+# Thin wrappers the app layer uses to gate reads of files inside a browsed,
+# password-protected zip. They keep the app from reaching into ``_impl`` and the
+# cache internals directly.
+
+
+def get_member_archive_path(path) -> Optional[Path]:
+    """The archive *file* Path backing ``path`` when ``path`` is an entry inside a
+    browsed archive (an ``archive://`` URI), else None (an ordinary file)."""
+    impl = getattr(path, '_impl', None)
+    if isinstance(impl, ArchivePathImpl):
+        return impl._archive_path
+    return None
+
+
+def archive_password_state(path) -> str:
+    """Password gate state for a Path that may be a member of a browsed archive:
+
+    - ``'ok'``   — not an archive entry, not a zip, unencrypted, or a password is
+                   already known: reading can proceed.
+    - ``'need'`` — an encrypted ZipCrypto entry with no password yet: prompt.
+    - ``'aes'``  — encryption TFM cannot decrypt (WinZip AES).
+
+    Ordinary filesystem paths always return ``'ok'`` cheaply (no archive is
+    opened), so callers can route every read through this gate."""
+    archive_path = get_member_archive_path(path)
+    if archive_path is None:
+        return 'ok'
+    try:
+        handler = get_archive_cache().get_handler(archive_path)
+    except Exception:
+        # Can't classify (e.g. corrupt archive) — let the normal read path report.
+        return 'ok'
+    if not isinstance(handler, ZipHandler):
+        return 'ok'  # only zip supports password-protected extraction here
+    try:
+        status = handler.encryption_status()
+    except Exception:
+        return 'ok'
+    if status == 'aes':
+        return 'aes'
+    if status == 'zipcrypto' and get_archive_password(archive_path) is None:
+        return 'need'
+    return 'ok'
+
+
+def try_archive_password(path, password: str) -> bool:
+    """Verify ``password`` against the archive backing ``path`` and, on success,
+    remember it for the session. Returns True when the password is correct.
+
+    ``password`` is encoded UTF-8 (zip passwords are bytes); most passwords are
+    ASCII, for which this is exact."""
+    archive_path = get_member_archive_path(path)
+    if archive_path is None:
+        return False
+    try:
+        handler = get_archive_cache().get_handler(archive_path)
+    except Exception:
+        return False
+    if not isinstance(handler, ZipHandler):
+        return False
+    pwd = password.encode('utf-8')
+    try:
+        if handler.verify_password(pwd):
+            set_archive_password(archive_path, pwd)
+            return True
+    except Exception:
+        return False
+    return False
+
+
+def zip_encryption_status_path(path: str) -> str:
+    """Classify a local ``.zip`` file by filesystem path — ``'none'``,
+    ``'zipcrypto'``, or ``'aes'`` (see :func:`zip_encryption_status`). Returns
+    ``'none'`` if the file can't be opened or classified."""
+    try:
+        with zipfile.ZipFile(path) as zf:
+            return zip_encryption_status(zf)
+    except Exception:
+        return 'none'
 

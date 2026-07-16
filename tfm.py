@@ -1580,8 +1580,9 @@ class TfmApp:
                 # A plain file: open it in the built-in ("embedded") viewer — the
                 # same one V uses, which routes *.md to the Markdown renderer and
                 # shows a placeholder for binaries (issue #212). Enter was
-                # previously a no-op on files.
-                show_text_viewer(self.panel, entry, state_manager=self.state_manager)
+                # previously a no-op on files. A file inside a password-protected
+                # zip prompts for the password before the viewer opens (#180).
+                self._ensure_archive_password(entry, lambda: self._open_viewer(entry))
         except Exception as exc:
             self.log_info(f"Cannot open {entry.name}: {exc}")
 
@@ -2704,9 +2705,59 @@ class TfmApp:
         show_batch_rename(self.panel, files, on_done=done)
         self.panel.render()
 
+    def _ensure_archive_password(self, entry, on_ready) -> None:
+        """Gate opening ``entry`` when it lives inside an encrypted zip.
+
+        For a file inside a password-protected ZipCrypto archive with no password
+        yet known, prompt (masked), verify, remember it for the session, then run
+        ``on_ready()``. AES-encrypted archives (which Python can't decrypt) are
+        refused with a clear message. Ordinary files, unencrypted archive entries,
+        and archives whose password is already known run ``on_ready()`` at once.
+
+        ``on_ready`` is responsible for its own redraw, since the prompt path
+        reaches it from an asynchronous dialog callback."""
+        from tfm_archive import (
+            archive_password_state, get_member_archive_path, try_archive_password)
+        state = archive_password_state(entry)
+        if state == "ok":
+            on_ready()
+            return
+        if state == "aes":
+            self.log_info(f"Cannot open {entry.name}: AES-encrypted zips are not supported")
+            self.panel.render()
+            return
+        # state == "need": prompt for the ZipCrypto password.
+        archive = get_member_archive_path(entry)
+        archive_name = archive.name if archive is not None else entry.name
+
+        def accept(password: str) -> None:
+            if not password:
+                self.panel.render()
+                return
+            if try_archive_password(entry, password):
+                on_ready()
+            else:
+                prompt("Incorrect password — try again:")
+
+        def prompt(error: str | None = None) -> None:
+            show_input(
+                self.panel, title="Password Required",
+                prompt=error or f"Password for {archive_name}:", password=True,
+                on_accept=accept, on_cancel=self.panel.render, select_all=False,
+                region=self._active_pane_region())
+            self.panel.render()
+
+        prompt()
+
+    def _open_viewer(self, entry) -> None:
+        """Open ``entry`` in the built-in text viewer and redraw."""
+        show_text_viewer(self.panel, entry, state_manager=self.state_manager)
+        self.panel.render()
+
     def view_file(self) -> None:
         """Open the focused file in the built-in text viewer (directories are
-        skipped). Binary files show a placeholder rather than garbage."""
+        skipped). Binary files show a placeholder rather than garbage. A file
+        inside a password-protected zip prompts for the password first."""
         pane = self.active_pane()
         files = pane["files"]
         if not files:
@@ -2718,8 +2769,7 @@ class TfmApp:
                 return
         except Exception:
             pass
-        show_text_viewer(self.panel, entry, state_manager=self.state_manager)
-        self.panel.render()
+        self._ensure_archive_password(entry, lambda: self._open_viewer(entry))
 
     def diff_files(self) -> None:
         """Compare exactly two selected files side by side. Files may be selected
@@ -2990,16 +3040,24 @@ class TfmApp:
                 tf.add(str(s), arcname=s.name)  # tarfile recurses into directories
             return len(tf.getmembers())
 
-    def _extract_archive(self, archive_path, dest_dir, fmt: str) -> int:
+    def _extract_archive(self, archive_path, dest_dir, fmt: str, pwd: bytes | None = None) -> int:
         """Extract ``archive_path`` into ``dest_dir`` (created if absent). Returns
         the number of entries. Tar extraction uses the ``data`` filter where
-        available (Python 3.12+) to reject unsafe member paths."""
+        available (Python 3.12+) to reject unsafe member paths.
+
+        ``pwd`` (bytes) is the password for an encrypted zip; it is verified up
+        front (:func:`tfm_archive.verify_zip_password`) so a missing/wrong
+        password raises *before* any file is written, rather than leaving a
+        half-extracted directory behind. A missing/wrong password raises
+        ``RuntimeError``; AES encryption raises ``NotImplementedError``."""
         import tarfile
         import zipfile
+        from tfm_archive import verify_zip_password
         dest_dir.mkdir(parents=True, exist_ok=True)
         if fmt == "zip":
             with zipfile.ZipFile(str(archive_path)) as zf:
-                zf.extractall(str(dest_dir))
+                verify_zip_password(zf, pwd)  # no-op unless the zip is encrypted
+                zf.extractall(str(dest_dir), pwd=pwd)
                 return len(zf.namelist())
         with tarfile.open(str(archive_path)) as tf:
             members = tf.getmembers()
@@ -3106,15 +3164,68 @@ class TfmApp:
             return True
         target = dest_dir / self._archive_basename(entry.name)
 
-        def go() -> None:
-            try:
-                count = self._extract_archive(entry, target, fmt)
-            except Exception as exc:
+        def finish(exc: Exception | None, count: int) -> None:
+            if exc is not None:
                 self.log_info(f"Extraction failed: {exc}")
             else:
                 self.log_info(f"Extracted {entry.name} → {target.name}/ ({count} entries)")
             self.flm.refresh_files(self.pm.get_inactive_pane())
             self.panel.render()
+
+        def do_extract(pwd: bytes | None) -> None:
+            """Run the extraction with an optional zip password. A wrong/missing
+            password surfaces as ``RuntimeError`` (verified before any file is
+            written), which re-opens the password prompt with an error."""
+            try:
+                count = self._extract_archive(entry, target, fmt, pwd=pwd)
+            except RuntimeError:
+                # Encrypted zip: the password was missing or wrong. Re-prompt
+                # (nothing was written, thanks to the up-front verify).
+                prompt_password(error="Incorrect password — try again:")
+                return
+            except NotImplementedError:
+                # Defensive: AES is normally caught up front in go(); if a zip
+                # slips through, report it clearly rather than as a raw traceback.
+                self.log_info(
+                    f"Cannot extract {entry.name}: AES-encrypted zips are not supported")
+                self.flm.refresh_files(self.pm.get_inactive_pane())
+                self.panel.render()
+                return
+            except Exception as exc:  # noqa: BLE001 — reported to the user
+                finish(exc, 0)
+                return
+            if pwd is not None:
+                # Remember the working password so browsing this same zip later
+                # doesn't prompt again this session.
+                from tfm_archive import set_archive_password
+                set_archive_password(entry, pwd)
+            finish(None, count)
+
+        def prompt_password(error: str | None = None) -> None:
+            show_input(
+                self.panel, title="Extract Archive",
+                prompt=error or f"Password for {entry.name}:", password=True,
+                on_accept=lambda p: do_extract(p.encode("utf-8")) if p else self.panel.render(),
+                on_cancel=self.panel.render, select_all=False,
+                region=self._active_pane_region())
+            self.panel.render()
+
+        def go() -> None:
+            # A password-protected zip needs a password before extraction. AES is
+            # detected up front and refused with a clear message (Python's zipfile
+            # can only decrypt legacy ZipCrypto). Other formats extract directly.
+            if fmt == "zip":
+                from tfm_archive import zip_encryption_status_path
+                status = zip_encryption_status_path(str(entry))
+                if status == "aes":
+                    self.log_info(
+                        f"Cannot extract {entry.name}: AES-encrypted zips are not supported")
+                    self.panel.render()
+                    return
+                if status == "zipcrypto":
+                    prompt_password()
+                    return
+            do_extract(None)
 
         exists = target.exists()
         if exists or getattr(self.config, "CONFIRM_EXTRACT_ARCHIVE", True):

@@ -64,6 +64,7 @@ class InputDialog(FocusContainer, Widget):
         validate: Callable[[str], str | None] | None = None,
         select_all: bool = True,
         completer: Completer | None = None,
+        password: bool = False,
     ):
         self.title = title
         self.prompt = prompt
@@ -76,7 +77,10 @@ class InputDialog(FocusContainer, Widget):
         self._panel: Any = None
         self._error = ""
 
-        self.edit = TextEdit(text=text)
+        # ``password`` masks the field with a bullet glyph and disables clipboard
+        # copy/cut of its contents (PuiKit ``TextEdit(mask=...)``), for prompts
+        # like an encrypted-archive password.
+        self.edit = TextEdit(text=text, mask="•" if password else None)
         # Caret at the end. With ``select_all`` the whole value is also selected,
         # so the first keystroke replaces it (rename); without it the caret just
         # sits at the end, ready to append (jump-to-path's trailing separator).
@@ -357,6 +361,7 @@ def show_input(
     region: tuple[float, float] | None = None,
     anchor: str = "center",
     z: int = 70,
+    password: bool = False,
 ) -> InputDialog:
     """Push a modal :class:`InputDialog` over ``panel`` and return it.
 
@@ -373,11 +378,16 @@ def show_input(
     :class:`tfm_completion.FilepathCompleter`) to enable TAB completion: TAB then
     inserts the longest common prefix and, when several matches remain, opens a
     candidate list (a separate overlay layer below/above the field) that narrows
-    as you type and is navigable with the arrow keys."""
+    as you type and is navigable with the arrow keys.
+
+    Pass ``password=True`` for a masked field (typed characters show as bullets
+    and copy/cut of the value is disabled) — used for encrypted-archive
+    passwords."""
     dialog = InputDialog(
         title=title, prompt=prompt, text=text,
         on_accept=on_accept, on_cancel=on_cancel, on_change=on_change,
         validate=validate, select_all=select_all, completer=completer,
+        password=password,
     )
     dialog._z = z
     sw, sh = panel.backend.size_units
