@@ -27,7 +27,12 @@ A scrollable, collapsible tree over **already-parsed** Python data (the registry
 does the `json.loads`). Construction wraps the value into a `_Node` tree
 (object / array / scalar); a top-level container shows its entries at depth 0
 (no synthetic root row), a bare scalar shows one leaf. Navigation, flattening
-(`_visible()`), and scroll mirror `TreeView`; the two things a plain tree lacks:
+(`_visible()`), scroll, **and the disclosure marker** mirror `TreeView`: on a
+vector backend a branch's mark is a stroked `ctx.draw_chevron` in a reserved slot,
+on a character grid it's the inline `▸`/`▾` glyph. The slot is a whole
+`_MARK_SLOT = 2` columns — the same width as the inline glyph — so the key/value
+text starts at the same integer column on both backends. The two things a plain
+tree lacks:
 
 - **Per-type coloring.** `_value_segs` builds `(text, color)` segments — the key
   (object key vs. array index), the `: ` separator, and either the scalar
