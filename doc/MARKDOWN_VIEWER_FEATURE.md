@@ -72,5 +72,6 @@ already wraps prose to the pane).
   the native (macOS / Windows) backends — on the terminal, headings and emphasis
   render as bold/italic; on a graphical backend they render as proportional text
   at their true sizes, with real tables and images.
-- More rendered viewers (for example JSON and CSV) are planned and will use the
-  same **M** toggle when the file type supports them.
+- Other file types have rendered views too, reached with the same **M** toggle:
+  JSON / JSON Lines and CSV / TSV — see [JSON and CSV
+  Viewers](JSON_CSV_VIEWERS_FEATURE.md).

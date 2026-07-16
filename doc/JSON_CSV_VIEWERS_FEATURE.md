@@ -1,0 +1,67 @@
+# JSON and CSV Viewers
+
+TFM's built-in file viewer can render **JSON / JSON Lines** files as a
+collapsible tree and **CSV / TSV** files as an aligned table, in addition to the
+usual raw, line-numbered text view. They work exactly like the [Markdown
+viewer](MARKDOWN_VIEWER_FEATURE.md): press **V** to open a file, then **M** to
+toggle between the raw text and the rich view.
+
+## JSON / JSON Lines (`*.json`, `*.jsonl`, `*.ndjson`)
+
+The rich view is a **collapsible tree**. Objects and arrays are branches you can
+expand and collapse; scalars are leaves. Each row shows its key (an object key or
+an array index) and the value, colored by type — strings, numbers, and
+`true` / `false` / `null` each get their own color, following the active theme.
+A collapsed branch shows its size (`{3}` for a 3-key object, `[5]` for a 5-item
+array), so you can see the shape of a document without expanding everything.
+
+A `.jsonl` / `.ndjson` file (one JSON value per line) is shown as an array of its
+records.
+
+| Key | Action |
+|-----|--------|
+| ↑ / ↓ | Move up / down a row |
+| → | Expand a branch (or step into it) |
+| ← | Collapse a branch (or jump to its parent) |
+| Enter / Space | Toggle the selected branch |
+| PgUp / PgDn, Home / End | Scroll by a page / jump to the top or bottom |
+| Mouse wheel / click | Scroll / select a row (click the ▸ ▾ marker to toggle) |
+| **⌘C / Ctrl+C** | Copy the selected node's value as JSON |
+| **F** | Incremental search |
+
+## CSV / TSV (`*.csv`, `*.tsv`)
+
+The rich view is an **aligned table**. The header row stays frozen at the top
+while the body scrolls, columns are sized to their content (numeric columns
+right-align), and the grid scrolls both vertically and horizontally so wide
+tables stay readable. A `.tsv` file is split on tabs, a `.csv` file on commas.
+
+| Key | Action |
+|-----|--------|
+| ↑ / ↓ / ← / → | Move the current cell |
+| PgUp / PgDn | Scroll a page |
+| Home / End | First / last column |
+| Mouse wheel | Scroll (vertical, and horizontal on a trackpad) |
+| Click + drag | Select a rectangular block of cells |
+| **⌘C / Ctrl+C** | Copy the selected cells as TSV |
+| **⌘A / Ctrl+A** | Select the whole table |
+| **F** | Incremental search |
+
+## Shared behavior
+
+- **The M toggle and per-type memory.** The rich view is reached with **M**, the
+  same key the Markdown viewer uses. TFM remembers the view you last chose *per
+  file type* and reopens that type the same way next time — toggle one `.json`
+  file to the tree and every `.json` opens as a tree afterward, this session and
+  after a restart. The header's top-right shows the current view's name (*JSON* /
+  *Table*); the footer shows the toggle key.
+- **Search.** Press **F** in either rich view to search. In the JSON tree,
+  matches auto-expand their branches so they're reachable; in the table, rows
+  containing the pattern are the match set. **↑** / **↓** step between matches,
+  **Enter** keeps the position, **Esc** cancels, and matching is
+  case-insensitive.
+- **Malformed files fall back to raw.** If a `.json` doesn't parse (or a file
+  otherwise can't be rendered), **M** simply leaves you in the raw text view —
+  which still shows the file with syntax highlighting — rather than failing.
+- Both views follow the active theme and work on the terminal and the native
+  (macOS / Windows) backends.

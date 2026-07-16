@@ -905,7 +905,14 @@ class TextViewer(Widget):
             logger.warning(f"Cannot render {self.path.name}: unreadable as text")
             return False
         style = Style(fg=self._text_fg or (212, 212, 212), bg=self._bg)
-        self._rich_widget = self._rich.build(source, style=style)
+        # A renderer may reject malformed input (an unparseable .json / .csv). Keep
+        # the viewer in raw text mode on failure rather than letting the toggle
+        # crash — raw still renders the file fine (pygments-highlighted).
+        try:
+            self._rich_widget = self._rich.build(source, style=style)
+        except Exception as e:
+            logger.warning(f"Cannot render {self.path.name} as {self._rich.name}: {e}")
+            return False
         return True
 
     def _view_mode_state_key(self) -> str | None:

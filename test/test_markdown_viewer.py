@@ -72,7 +72,7 @@ def test_registry_maps_markdown_extensions():
 
 
 def test_registry_no_renderer_for_plain_types():
-    for name in ("a.txt", "b.py", "c.json", "plain"):
+    for name in ("a.txt", "b.py", "c.log", "plain"):
         assert rich_renderer_for(Path(name)) is None
 
 
