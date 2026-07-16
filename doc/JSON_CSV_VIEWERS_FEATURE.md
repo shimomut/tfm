@@ -55,10 +55,12 @@ tables stay readable. A `.tsv` file is split on tabs, a `.csv` file on commas.
   file to the tree and every `.json` opens as a tree afterward, this session and
   after a restart. The header's top-right shows the current view's name (*JSON* /
   *Table*); the footer shows the toggle key.
-- **Search.** Press **F** in either rich view to search. In the JSON tree,
-  matches auto-expand their branches so they're reachable; in the table, rows
-  containing the pattern are the match set. **↑** / **↓** step between matches,
-  **Enter** keeps the position, **Esc** cancels, and matching is
+- **Search.** Press **F** in either rich view to search. As you type, the
+  selection moves to the match — the current row in the JSON tree, the current
+  cell's row in the table — just like the main file manager's search. In the JSON
+  tree, matches auto-expand their branches so they're reachable. **↑** / **↓**
+  step between matches, **Enter** commits the selection on the current match, and
+  **Esc** cancels and restores the selection you started from. Matching is
   case-insensitive.
 - **Malformed files fall back to raw.** If a `.json` doesn't parse (or a file
   otherwise can't be rendered), **M** simply leaves you in the raw text view —
