@@ -31,7 +31,9 @@ TextViewer (tfm_text_viewer.py)         ← modal, full-window
   plain, so callers never branch.
 - `MarkdownView(..., selectable=True)` — enables drag-select / word / line /
   select-all / copy; exposes `selection_text()` and `selection_html()` and copies
-  via `set_clipboard_rich`.
+  via `set_clipboard_rich`. Selection covers prose, headings, lists, fenced code
+  **and tables** (cell-level, including partial text within a cell); a table copies
+  as tab-separated columns (plain) and a real `<table>` (HTML).
 
 TFM wiring: `src/tfm_viewer_registry.py` `_build_markdown` constructs the
 file-viewer's `MarkdownView` with `selectable=True`. Help / message-box
@@ -81,7 +83,8 @@ translated.
 
 ## Notes
 
-- Table cells and images are not selectable (they carry no `spans` on the row).
+- Images are not selectable (they carry no `spans` on the row); tables are
+  (cell-level — see the PuiKit doc above).
 - Terminal copy is plain text only (rich HTML is a desktop pasteboard feature);
   reaching the system clipboard on a terminal still depends on OSC 52.
 - User-facing behavior: `doc/TEXT_SELECTION_FEATURE.md`.

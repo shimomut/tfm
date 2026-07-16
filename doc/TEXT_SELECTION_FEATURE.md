@@ -44,14 +44,18 @@ selection.
 - `inline code`
 - Links (the link text stays clickable, pointing at the same URL)
 - Heading levels (`#`, `##`, … become real headings on paste)
+- **Tables** — a selection that crosses a table copies as a real table. Paste into
+  a document and you get a formatted table; paste into a spreadsheet or a plain
+  editor and you get tab-separated columns. You can select whole tables or just
+  part of a cell.
 
-Selecting part way through a paragraph copies exactly what you see, formatting
-and all.
+Selecting part way through a paragraph (or a table cell) copies exactly what you
+see, formatting and all.
 
 ## Notes & limits
 
-- Selection in the Markdown viewer covers prose, headings, lists and fenced
-  code. Table cells and images are not part of a text selection.
+- Selection in the Markdown viewer covers prose, headings, lists, fenced code and
+  tables. Images are not part of a text selection.
 - On a terminal, whether the copy reaches your **system** clipboard depends on
   the terminal supporting the OSC 52 clipboard escape (most modern terminals do;
   the copy also always works for pasting back inside TFM). Rich HTML is a
