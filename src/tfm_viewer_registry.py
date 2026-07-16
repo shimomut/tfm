@@ -68,7 +68,10 @@ def _build_markdown(source: str, *, style: Style) -> Widget:
     free of any widget-import ordering concerns."""
     from puikit.widgets import MarkdownView
 
-    return MarkdownView(source, style=style)
+    # ``selectable`` turns on mouse text-selection + Cmd/Ctrl+C copy (plain text
+    # plus rich HTML) in the file viewer; help / message popups build their own
+    # MarkdownView without it, so those stay inert.
+    return MarkdownView(source, style=style, selectable=True)
 
 
 register(RichRenderer("Markdown", _build_markdown), ".md", ".markdown")

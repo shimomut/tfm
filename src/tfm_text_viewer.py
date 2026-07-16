@@ -27,7 +27,8 @@ from puikit.backend import Style, TextAttribute
 from puikit.event import Event, EventType
 from puikit.font import Font
 from puikit.panel import Rect
-from puikit.text import elide
+from puikit.text import elide, word_bounds
+from puikit.widgets._input import MultiClickTracker
 from puikit.widgets.base import Widget
 
 from tfm_config import (get_keys_for_action, is_action_for_event,
@@ -322,6 +323,111 @@ def draw_hscrollbar(ctx, x: float, y: float, w: float, left: float,
     ctx.draw_scrollbar(x, y, w, pos, ratio, orientation="horizontal", surface=surface)
 
 
+def _word_span(pos, lines):
+    """The (start, end) positions of the word under ``pos`` — the maximal run of
+    one character class on that source line (:func:`puikit.text.word_bounds`),
+    the unit a double-click grabs. Character space (monospace), matching the
+    viewer's ``len(line)`` column math."""
+    line, col = pos
+    chars = list(lines[line]) if 0 <= line < len(lines) else []
+    start, end = word_bounds(chars, col)
+    return (line, start), (line, end)
+
+
+def _line_span(pos, lines):
+    """The (start, end) positions spanning the whole source line under ``pos``."""
+    line = pos[0]
+    n = len(lines[line]) if 0 <= line < len(lines) else 0
+    return (line, 0), (line, n)
+
+
+class _RawTextSelection:
+    """Read-only text selection for the raw text view, over source lines as
+    ``(line, col)`` character positions (monospace, so a column is a character).
+
+    The read-only counterpart to PuiKit's ``SelectableText`` mixin, kept here
+    because the viewer scrolls (vertical + horizontal) and draws its own gutter,
+    so selection can't ride the mixin's uniform-pitch-from-y=0 model. A press
+    seeds the anchor and escalates caret -> word -> line by repeat count; a drag
+    extends, growing by whole words/lines after a double/triple click. Copy is
+    plain text (the raw source), so no rich representation is produced here."""
+
+    def __init__(self):
+        self.anchor: tuple[int, int] | None = None  # fixed end
+        self.cursor: tuple[int, int] | None = None  # moving end (drag)
+        self._granularity = 1                       # 1 caret / 2 word / 3 line
+        self._base: tuple[tuple[int, int], tuple[int, int]] | None = None
+        self._clicks: MultiClickTracker = MultiClickTracker()
+        self.pressed = False
+
+    def range(self) -> tuple[tuple[int, int], tuple[int, int]] | None:
+        a, b = self.anchor, self.cursor
+        if a is None or b is None or a == b:
+            return None
+        return (a, b) if a <= b else (b, a)
+
+    def clear(self) -> None:
+        self.anchor = self.cursor = self._base = None
+        self.pressed = False
+
+    def press(self, pos, lines, shift: bool) -> None:
+        self.pressed = True
+        count = self._clicks.press(pos)
+        self._granularity = (count - 1) % 3 + 1
+        if self._granularity == 2:
+            self._base = _word_span(pos, lines)
+            self.anchor, self.cursor = self._base
+        elif self._granularity == 3:
+            self._base = _line_span(pos, lines)
+            self.anchor, self.cursor = self._base
+        elif shift and self.anchor is not None:
+            self._base = None
+            self.cursor = pos  # shift+press extends from the existing anchor
+        else:
+            self._base = None
+            self.anchor = pos  # a plain press starts a fresh selection here
+            self.cursor = pos
+
+    def drag(self, pos, lines) -> None:
+        if not self.pressed:
+            return
+        self._clicks.note_drag()
+        if self.anchor is None:
+            self.anchor = pos
+        if self._base is None:
+            self.cursor = pos
+            return
+        b0, b1 = self._base
+        p0, p1 = _word_span(pos, lines) if self._granularity == 2 else _line_span(pos, lines)
+        self.anchor = min(b0, p0)
+        self.cursor = max(b1, p1)
+
+    def release(self) -> None:
+        self.pressed = False
+
+    def select_all(self, lines) -> None:
+        if not lines:
+            return
+        self.anchor = (0, 0)
+        self.cursor = (len(lines) - 1, len(lines[-1]))
+        self._base = None
+        self._granularity = 1
+
+    def text(self, lines) -> str:
+        """The selected text, source lines joined by newlines (empty when nothing
+        is selected)."""
+        r = self.range()
+        if r is None:
+            return ""
+        (l0, c0), (l1, c1) = r
+        if l0 == l1:
+            return lines[l0][c0:c1]
+        parts = [lines[l0][c0:]]
+        parts += [lines[l] for l in range(l0 + 1, l1)]
+        parts.append(lines[l1][:c1])
+        return "\n".join(parts)
+
+
 class _ScrollBody(Widget):
     """A clip region whose draw delegates to a callback. Lets a viewer render its
     scrolling rows at a *fractional* vertical offset (smooth GUI scroll): the
@@ -392,6 +498,13 @@ class TextViewer(Widget):
         self._gutter = 2
         self._content_x = 2
         self._bg = self._text_fg = self._muted = None
+        # Read-only text selection over source lines (raw mode; rich mode's
+        # embedded MarkdownView owns its own). ``_body_rect`` is the scrolling
+        # body's layer-local (x, y, w, h), captured each draw so a mouse event
+        # (which arrives in layer coords) maps to a (line, col) — and, in rich
+        # mode, translates into the embedded widget's coordinate space.
+        self._sel = _RawTextSelection()
+        self._body_rect: tuple[float, float, float, float] | None = None
 
     # --- layout helpers ------------------------------------------------------
 
@@ -598,6 +711,8 @@ class TextViewer(Widget):
 
         # Scrolling rows live in a clipped child, inset by the l/r pad and sitting
         # below the header; a fractional self.top renders partial top/bottom rows.
+        # Its layer-local rect is kept so a mouse event maps to a (line, col).
+        self._body_rect = (pad_x, head_h, iw, body_h)
         ctx.draw_child(self._body, pad_x, head_h, iw, body_h)
 
         # Vertical scrollbar, at the content's right edge (inset by the l/r pad).
@@ -639,6 +754,9 @@ class TextViewer(Widget):
         scrolls itself. Only the footer chrome (toggle-back hint) is TFM's."""
         fy = hu - 1.0 - pad_y                     # footer text row (surface below)
         body_h = max(1.0, fy - head_h)
+        # The embedded renderer's rect, so a mouse event forwarded to it (for its
+        # own text selection / link clicks) translates into its coordinate space.
+        self._body_rect = (pad_x, head_h, iw, body_h)
         ctx.draw_child(self._rich_widget, pad_x, head_h, iw, body_h)
         self._footer_rect = (0.0, fy, wu, hu - fy)
         view_k = keys_label_for_action("toggle_view_mode", "M")
@@ -709,9 +827,38 @@ class TextViewer(Widget):
             col = seg_end
             if col >= window_end:
                 break
-        # Overlay search highlights for this column window.
+        # Overlay search highlights, then the text selection, for this window.
         if self.pattern:
             self._draw_matches(ctx, y, line_idx, col0_int, xfrac, window_end, content_x, text_fg)
+        self._draw_selection(ctx, y, line_idx, col0_int, xfrac, window_end, content_x, text_fg)
+
+    def _draw_selection(self, ctx, y, line_idx, col0_int, xfrac, window_end, content_x, text_fg) -> None:
+        """Overlay the selection highlight on this display row's visible column
+        window: the selected span of ``line_idx`` clipped to [col0_int,
+        window_end), repainted over the theme's text-selection background (like
+        :meth:`_draw_matches`, so a styled token flattens to a legible fg under
+        the tint). The modal viewer is the active layer, so the active-selection
+        color is used unconditionally."""
+        r = self._sel.range()
+        if r is None:
+            return
+        (l0, c0), (l1, c1) = r
+        if not l0 <= line_idx <= l1:
+            return
+        line = self.lines[line_idx]
+        # An intermediate line of a multi-line selection is selected end to end;
+        # the first/last line only from/through the caret column.
+        sel_start = c0 if line_idx == l0 else 0
+        sel_end = c1 if line_idx == l1 else len(line)
+        vis_start = max(sel_start, col0_int)
+        vis_end = min(sel_end, window_end)
+        if vis_end <= vis_start:
+            return
+        theme = ctx.theme
+        sel_bg = theme.text_selection_bg if theme is not None else (38, 79, 120)
+        sub = line[vis_start:vis_end]
+        ctx.draw_text(content_x + (vis_start - col0_int) - xfrac, y, sub,
+                      Style(fg=text_fg, bg=sel_bg, font=MONO))
 
     def _draw_matches(self, ctx, y, line_idx, col0_int, xfrac, window_end, content_x, text_fg) -> None:
         plain = self.lines[line_idx].lower()
@@ -816,8 +963,18 @@ class TextViewer(Widget):
                 self.left -= float(ux)
             self._clamp()
             return True
+        # Mouse press / drag / release / click drive text selection. In rich mode
+        # they are forwarded to the embedded renderer (its own selection + link
+        # clicks); in raw mode this viewer owns the (line, col) selection.
+        if event.type in (EventType.MOUSE_DOWN, EventType.MOUSE_UP,
+                          EventType.MOUSE_DRAG, EventType.MOUSE_CLICK):
+            if self.mode == "rich" and self._rich_widget is not None:
+                self._forward_mouse_to_rich(event)
+            else:
+                self._selection_mouse(event)
+            return True
         if event.type is not EventType.KEY:
-            return True  # modal: swallow non-key events
+            return True  # modal: swallow other non-key events
         key = event.key
         # Config-driven keys (quit / help / search / wrap) resolve through
         # KEY_BINDINGS by name, so they honour the user's rebinds; each action is
@@ -847,6 +1004,14 @@ class TextViewer(Widget):
         if self.mode == "rich" and self._rich_widget is not None:
             self._rich_widget.handle_event(event)
             return True
+        # From here on it is raw text mode. Cmd/Ctrl+C copies the selected text
+        # (plain, the raw source); Cmd/Ctrl+A selects the whole document.
+        if event.modifiers & {"ctrl", "cmd"} and key in ("c", "a"):
+            if key == "c":
+                self._copy_selection()
+            else:
+                self._sel.select_all(self.lines)
+            return True
         if self._wrap_pressed(event):
             self.wrap = not self.wrap
             self.left = 0.0
@@ -869,6 +1034,73 @@ class TextViewer(Widget):
             self.left = max(0.0, self.left - 4)
         self._clamp()
         return True
+
+    # --- text selection (raw mode) / mouse forwarding (rich mode) -------------
+
+    def _in_body(self, ex: float, ey: float) -> bool:
+        """Whether layer-local ``(ex, ey)`` falls within the scrolling body — so a
+        press that lands on the header / footer / a scrollbar starts no selection."""
+        if self._body_rect is None:
+            return False
+        bx, by, bw, bh = self._body_rect
+        return bx <= ex < bx + bw and by <= ey < by + bh
+
+    def _pos_at(self, ex: float, ey: float) -> tuple[int, int]:
+        """Layer-local ``(ex, ey)`` to a ``(line, col)`` selection position, via
+        the body rect and the current vertical (``top``) / horizontal (``left``)
+        scroll. Columns are characters (monospace); the x is rounded to the
+        nearest character boundary and clamped to the line."""
+        if self._body_rect is None or not self.lines:
+            return (0, 0)
+        bx0, by0, _, _ = self._body_rect
+        by = max(0.0, ey - by0)
+        disp = int(self.top + by)
+        disp = max(0, min(disp, max(0, self._total_rows() - 1)))
+        if self.wrap and self._row_map:
+            line_idx, chunk = self._row_map[disp]
+            col_off = float(chunk * self._content_w)
+        else:
+            line_idx = disp
+            col_off = self.left
+        line_idx = max(0, min(line_idx, len(self.lines) - 1))
+        line = self.lines[line_idx]
+        char_index = col_off + (ex - bx0 - self._content_x)
+        col = max(0, min(int(char_index + 0.5), len(line)))
+        return (line_idx, col)
+
+    def _selection_mouse(self, event: Event) -> None:
+        """Raw-mode selection from a press / drag / release (a click is inert —
+        there are no links in raw text). A press outside the body clears the
+        selection; inside, it seeds/extends per the multi-click gesture."""
+        ex, ey = event.x, event.y
+        if event.type is EventType.MOUSE_CLICK:
+            return
+        if event.type is EventType.MOUSE_UP:
+            self._sel.release()
+            return
+        if ex is None or ey is None:
+            return
+        if event.type is EventType.MOUSE_DOWN:
+            if self._in_body(ex, ey):
+                self._sel.press(self._pos_at(ex, ey), self.lines, "shift" in event.modifiers)
+            else:
+                self._sel.clear()
+        elif event.type is EventType.MOUSE_DRAG:
+            self._sel.drag(self._pos_at(ex, ey), self.lines)
+
+    def _forward_mouse_to_rich(self, event: Event) -> None:
+        """Forward a mouse event to the embedded rich widget in its own coords, so
+        its text selection and link clicks work through this modal viewer."""
+        if self._body_rect is None or self._rich_widget is None:
+            return
+        bx0, by0, _, _ = self._body_rect
+        self._rich_widget.handle_event(event.translated(-bx0, -by0))
+
+    def _copy_selection(self) -> None:
+        """Put the raw-mode selection on the clipboard as plain text."""
+        text = self._sel.text(self.lines)
+        if text and self._panel is not None:
+            self._panel.set_clipboard(text)
 
     def _wrap_pressed(self, event: Event) -> bool:
         """Whether ``event`` toggles line wrap — the ``toggle_wrap`` binding, with a
