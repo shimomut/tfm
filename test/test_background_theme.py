@@ -1,8 +1,8 @@
 """A theme's background (animation / wallpaper) resolves and rides in extras.
 
 Themes may carry a background behind the UI of two content kinds — an ``animation``
-(the cube) or a ``wallpaper`` image — else the plain theme color (solid). TFM
-resolves the theme's choice into a puikit ``Background3D`` / ``Wallpaper`` descriptor
+(a shader scene) or a ``wallpaper`` image — else the plain theme color (solid). TFM
+resolves the theme's choice into a puikit ``Shader`` / ``Wallpaper`` descriptor
 and pushes it on theme switch. The content keys are ``animation`` / ``wallpaper``
 because the ``background`` key is the base *color*; guarding that collision is the
 key regression here. Pure resolver + a theme-builder check — no app, no window.
@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.join(_HERE, "..", "src"))
 sys.path.insert(0, os.path.join(_HERE, ".."))
 
 import tfm  # noqa: E402
-from puikit.background import Background3D, Shader, Wallpaper  # noqa: E402
+from puikit.background import Shader, Wallpaper  # noqa: E402
 from tfm_background_shaders import SHADER_KINDS  # noqa: E402
 
 
@@ -35,26 +35,21 @@ class ResolveBackground(unittest.TestCase):
         self.assertIsNone(_resolve())
 
     def test_animation_type_string(self):
-        bg = _resolve(animation="cube")
-        self.assertIsInstance(bg, Background3D)
-        self.assertEqual((bg.kind, bg.speed), ("cube", 0.6))  # tuned default
-        self.assertEqual(bg.color, _COLOR)        # theme fg filled in
+        bg = _resolve(animation="rain")
+        self.assertIsInstance(bg, Shader)
+        self.assertEqual(bg.speed, 0.6)           # tuned default
+        self.assertEqual(bg.ink, _COLOR)          # theme fg fills the ink uniform
         self.assertEqual(bg.backdrop, _BACKDROP)  # theme bg filled in
 
     def test_animation_true_is_the_tuned_default(self):
-        # An unnamed animation gets TFM's default scene — one of its own, not the
-        # toolkit's reference cube. Every TFM scene is a shader, so this resolves
-        # through that branch.
+        # An unnamed animation gets TFM's default scene.
         self.assertIn(tfm._ANIM_DEFAULT_KIND, SHADER_KINDS)
         self.assertIsInstance(_resolve(animation=True), Shader)
 
     def test_animation_params_dict(self):
-        # The Background3D branch, which is what puikit's own reference scenes still
-        # resolve through; the Shader branch has its own params-dict test in
-        # test_background_shaders.py.
-        bg = _resolve(animation={"type": "cube", "speed": 1.5})
-        self.assertIsInstance(bg, Background3D)
-        self.assertEqual((bg.kind, bg.speed), ("cube", 1.5))
+        bg = _resolve(animation={"type": "rain", "speed": 1.5})
+        self.assertIsInstance(bg, Shader)
+        self.assertEqual(bg.speed, 1.5)
 
     def test_wallpaper_string_and_dict(self):
         self.assertEqual(_resolve(wallpaper="~/p.png").image, "~/p.png")
@@ -63,7 +58,7 @@ class ResolveBackground(unittest.TestCase):
         self.assertEqual((bg.image, bg.fit, bg.backdrop), ("~/p.png", "center", _BACKDROP))
 
     def test_passthrough_descriptors(self):
-        made = Background3D(kind="cube")
+        made = Shader(source="fragment float4 puikit_bg_fragment() { return 0; }")
         self.assertIs(_resolve(animation=made), made)
         wp = Wallpaper(image="x")
         self.assertIs(_resolve(wallpaper=wp), wp)
@@ -71,12 +66,11 @@ class ResolveBackground(unittest.TestCase):
     def test_bad_input_degrades_gracefully(self):
         # A wallpaper dict with no image resolves to solid (None), not a crash.
         self.assertIsNone(_resolve(wallpaper={"fit": "fill"}))
-        # Any truthy animation value yields the default scene (an unknown *type*
-        # simply renders nothing at the backend rather than failing here).
+        # A truthy animation with no type yields the default scene.
         self.assertIsInstance(_resolve(animation=True), Shader)
-        # An unregistered name is passed through on the Background3D branch, where
-        # the backend looks it up per frame and skips the miss.
-        self.assertEqual(_resolve(animation="snow").kind, "snow")
+        # A name that is not one of TFM's scenes degrades to solid: a scene *is* a
+        # shader now, so there is nothing else for it to resolve to.
+        self.assertIsNone(_resolve(animation="snow"))
 
 
 class ThemeCarriesBackground(unittest.TestCase):
@@ -86,8 +80,8 @@ class ThemeCarriesBackground(unittest.TestCase):
                     **extra)
 
     def test_animation_in_extras(self):
-        t = tfm._theme(**self._base(animation="cube"))
-        self.assertIsInstance(t.extras.get("background"), Background3D)
+        t = tfm._theme(**self._base(animation="rain"))
+        self.assertIsInstance(t.extras.get("background"), Shader)
 
     def test_no_background_has_none(self):
         self.assertIsNone(tfm._theme(**self._base()).extras.get("background"))
@@ -97,13 +91,13 @@ class ThemeCarriesBackground(unittest.TestCase):
         # the content. Both must survive — the color must not be eaten by the
         # content key, nor the content dropped.
         cfg = types.SimpleNamespace(THEMES={"Phosphor": {
-            "background": (4, 15, 7), "animation": "cube", "opacity": 1.0,
+            "background": (4, 15, 7), "animation": "rain", "opacity": 1.0,
             "foreground": (51, 245, 121), "muted": (33, 138, 74),
             "accent": (60, 235, 122), "surface": (11, 38, 20), "selection": (24, 105, 54)}})
         themes = dict(tfm._build_theme_list(cfg))
         t = themes["Phosphor"]
         self.assertEqual(t.surfaces.get("content"), (4, 15, 7))          # color kept
-        self.assertIsInstance(t.extras.get("background"), Background3D)   # content kept
+        self.assertIsInstance(t.extras.get("background"), Shader)          # content kept
 
     def test_config_wallpaper_key(self):
         cfg = types.SimpleNamespace(THEMES={"Pic": {

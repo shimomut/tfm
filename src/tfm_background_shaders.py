@@ -36,7 +36,7 @@ way to answer that without visiting everything. The recurring device is a *grid*
 object's identity comes from hashing its cell index, so a pixel can compute which
 cells could possibly reach it and consult only those. The wave visits particle cells
 across depth layers, the rain its own column and two neighbours, the starfield cells
-along a depth ray, the constellation a 3x3 block of nodes. Where a scene needs
+along a depth ray, the constellation a 5x5 block of nodes. Where a scene needs
 per-object randomness it hashes the cell index rather than calling anything
 time-varying, so an object keeps a fixed identity across frames and all motion comes
 from ``time``.
@@ -1059,9 +1059,9 @@ float4 puikit_bg_fragment(float4 pos : SV_Position) : SV_Target {
 
 #: Every scene TFM offers, by the name a theme's ``animation`` key uses, paired with
 #: the puikit ``Shader`` fields that belong to the scene rather than to the theme.
-#: ``_resolve_background`` in ``tfm.py`` checks this registry first; a name that is
-#: not here falls through to a ``Background3D``, which is how puikit's own reference
-#: scenes (``'cube'``, ``'wireframe'``) stay reachable from a theme.
+#: ``_resolve_background`` in ``tfm.py`` resolves a theme's ``animation`` name here
+#: and nowhere else: a name absent from this dict yields no background at all, so a
+#: typo in a theme costs the scene rather than startup.
 #:
 #: ``resolution_scale`` is per scene because only the scene knows how much sharpness
 #: it can give up. The wave is diffuse grain — indistinguishable at half resolution

@@ -44,7 +44,7 @@ for _modules_dir in (_here / "src", _here / "tfm_modules"):
         break
 
 from puikit import EventType, Font, Item, Panel, PostEffect, Style, TextAttribute, Theme, VSplit, derive_theme, mix  # noqa: E402
-from puikit.background import Background3D, Shader, Wallpaper  # noqa: E402
+from puikit.background import Shader, Wallpaper  # noqa: E402
 from puikit.posteffect import PRESETS as _POST_EFFECT_PRESETS  # noqa: E402
 from puikit.backends import create_backend  # noqa: E402
 from puikit.menu import Menu, MenuItem, SEPARATOR  # noqa: E402
@@ -178,24 +178,23 @@ def _resolve_background(animation, wallpaper, *, color, backdrop):
     * ``wallpaper`` — an image path string, or a params dict
       (``{'image': 'path', 'fit': ..., 'opacity': ...}``).
 
-    A name that is not one of TFM's scenes falls through to a ``Background3D``, which
-    is how puikit's own reference scenes (``'cube'``, ``'wireframe'``) stay reachable;
-    a name registered nowhere resolves fine there too and simply draws nothing, since
-    the backend looks it up per frame and skips a miss.
+    A name that is not one of TFM's scenes resolves to ``None`` — a plain solid
+    background — so a config typo costs the scene, not startup. (There is nowhere
+    else for it to go: a scene *is* a shader, and puikit no longer has a second
+    background kind to fall through to.)
 
-    Either may also be a pre-built ``Background3D`` / ``Wallpaper``, used as-is. A
-    malformed value resolves to ``None`` so a config typo degrades to "solid"
-    rather than blocking startup."""
+    Either may also be a pre-built ``Shader`` / ``Wallpaper``, used as-is. A
+    malformed value resolves to ``None`` for the same reason."""
     try:
         if wallpaper:
-            if isinstance(wallpaper, (Background3D, Wallpaper)):
+            if isinstance(wallpaper, (Shader, Wallpaper)):
                 return wallpaper
             spec = wallpaper if isinstance(wallpaper, dict) else {"image": wallpaper}
             params = {k: spec[k] for k in _WALLPAPER_PARAMS if k in spec}
             params.setdefault("backdrop", backdrop)
             return Wallpaper(image=spec.get("image") or spec["wallpaper"], **params)
         if animation:
-            if isinstance(animation, (Background3D, Wallpaper)):
+            if isinstance(animation, (Shader, Wallpaper)):
                 return animation
             params = dict(_ANIM_DEFAULTS)
             if isinstance(animation, dict):
@@ -203,16 +202,15 @@ def _resolve_background(animation, wallpaper, *, color, backdrop):
                 params.update({k: animation[k] for k in _ANIM_PARAMS if k in animation})
             else:  # a type string, or True for the tuned default
                 atype = animation if isinstance(animation, str) else _ANIM_DEFAULT_KIND
+            if atype not in SHADER_KINDS:
+                return None
             params.setdefault("color", color)
             params.setdefault("backdrop", backdrop)
-            if atype in SHADER_KINDS:
-                # A GPU scene: same ``animation`` namespace, different descriptor.
-                # ``color`` is the theme foreground, which a shader receives as its
-                # ``ink`` uniform — same intent, the name the GPU contract uses.
-                return Shader(speed=params["speed"], opacity=params["opacity"],
-                              ink=params["color"], backdrop=params["backdrop"],
-                              **SHADER_KINDS[atype])
-            return Background3D(kind=atype, **params)
+            # ``color`` is the theme foreground, which a shader receives as its
+            # ``ink`` uniform — same intent, the name the GPU contract uses.
+            return Shader(speed=params["speed"], opacity=params["opacity"],
+                          ink=params["color"], backdrop=params["backdrop"],
+                          **SHADER_KINDS[atype])
     except (TypeError, KeyError):
         return None
     return None
@@ -2216,7 +2214,7 @@ class TfmApp:
         you switch away, exactly like ``_apply_post_effect``. The descriptor was
         built per theme in ``_theme`` with its color (theme foreground) and backdrop
         (theme background) baked in, so an animation stays on-palette and reads on
-        light themes too. A backend without the ``background_3d`` capability (a
+        light themes too. A backend without the ``background_shader`` capability (a
         terminal) inherits the base no-op, so this never branches on the backend."""
         self.backend.set_background(theme.extras.get("background"))
 

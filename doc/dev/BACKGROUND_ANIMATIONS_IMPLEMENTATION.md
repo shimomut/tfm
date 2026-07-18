@@ -129,12 +129,9 @@ theme-apply time — there is a test that constructs every entry. From there:
 4. `TfmApp._apply_background` pushes it on every theme switch, so switching away
    clears it.
 
-A name **not** in `SHADER_KINDS` falls through to a `Background3D`, which is how
-puikit's own reference scenes (`cube`, `wireframe`) stay reachable from a theme. A
-name registered nowhere resolves fine there too and simply draws nothing — the
-backend's lookup misses and the frame is blank, so a config typo degrades to a plain
-background rather than blocking startup. TFM's names must not collide with puikit's,
-since `SHADER_KINDS` is checked first and would shadow them silently; there is a test.
+A name **not** in `SHADER_KINDS` resolves to `None` — a plain solid background. There
+is nowhere else for it to go: a scene *is* a shader, and puikit no longer carries a
+second background kind. So a config typo costs the scene, not startup.
 
 A backend without the `background_shader` capability (curses, or a desktop backend
 with no usable shader path) inherits a no-op, so none of this branches on the backend.

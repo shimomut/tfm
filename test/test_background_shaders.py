@@ -13,7 +13,7 @@ import unittest
 
 import pytest
 
-from puikit.background import SHADER_ENTRY, Background3D, Shader
+from puikit.background import SHADER_ENTRY, Shader
 from puikit.backends._metal import HAVE_METAL, MetalBackground
 
 try:
@@ -56,13 +56,6 @@ class Registry(unittest.TestCase):
         for kind, params in SHADER_KINDS.items():
             self.assertIn("source", params, kind)
             Shader(**params)
-
-    def test_names_do_not_collide_with_puikits_own_scenes(self):
-        # TFM's scenes and puikit's reference ones share the theme's ``animation``
-        # namespace, and ``_resolve_background`` checks SHADER_KINDS first — so a
-        # name in both would shadow puikit's silently.
-        from puikit.background import ANIMATIONS
-        self.assertEqual(set(SHADER_KINDS) & set(ANIMATIONS), set())
 
     def test_sources_define_the_entry_point(self):
         for kind, params in SHADER_KINDS.items():
@@ -123,10 +116,10 @@ class ThemeResolution(unittest.TestCase):
         self.assertEqual(bg.ink, _INK)         # theme fg arrives as the ink uniform
         self.assertEqual(bg.backdrop, _BACKDROP)
 
-    def test_a_non_tfm_name_still_resolves_to_an_animation(self):
-        # puikit's own reference scenes are not TFM's, so they fall through to the
-        # Background3D branch and stay reachable from a theme.
-        self.assertIsInstance(self._resolve("cube"), Background3D)
+    def test_a_non_tfm_name_degrades_to_solid(self):
+        # A scene *is* a shader, so a name absent from SHADER_KINDS has nowhere to
+        # resolve to and yields no background rather than an error.
+        self.assertIsNone(self._resolve("cube"))
 
     def test_tuned_defaults_apply_to_shaders_too(self):
         bg = self._resolve("wave")
@@ -144,10 +137,9 @@ class ThemeResolution(unittest.TestCase):
         bg = self._resolve({"type": "wave", "speed": 2.0})
         self.assertEqual(bg.resolution_scale, SHADER_KINDS["wave"]["resolution_scale"])
 
-    def test_an_unknown_name_still_degrades_to_an_animation(self):
-        # Unknown names must not crash startup; they resolve to a Background3D
-        # whose kind simply is not registered, and the backend draws nothing.
-        self.assertIsInstance(self._resolve("no-such-scene"), Background3D)
+    def test_an_unknown_name_does_not_crash_startup(self):
+        # A config typo must cost the scene, not the app.
+        self.assertIsNone(self._resolve("no-such-scene"))
 
 
 @metal_only
