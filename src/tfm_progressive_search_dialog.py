@@ -43,7 +43,7 @@ from puikit.widgets.base import Widget
 from puikit.widgets.list import ListView
 from puikit.widgets.text_edit import TextEdit
 
-from tfm_dialog_geometry import draw_title_bar, pane_anchored_box
+from tfm_dialog_geometry import animate_open, draw_title_bar, pane_anchored_box
 
 #: Navigation keys the *list* owns even while the query field holds focus.
 _LIST_KEYS = frozenset({"up", "down", "pageup", "pagedown"})
@@ -425,5 +425,5 @@ def show_progressive_search(
         hints["x"] = x
     dialog._panel = panel
     panel.push_layer(dialog, z=z, hints=hints)
-    panel.animate(dialog, hints={"transition": "fade", "duration_ms": 150})
+    animate_open(panel, dialog)
     return dialog

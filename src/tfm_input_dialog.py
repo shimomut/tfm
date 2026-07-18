@@ -34,7 +34,7 @@ from puikit.panel import Rect
 from puikit.widgets.base import Widget
 from puikit.widgets.text_edit import TextEdit
 
-from tfm_dialog_geometry import draw_title_bar, pane_anchored_box
+from tfm_dialog_geometry import animate_open, draw_title_bar, pane_anchored_box
 from tfm_completion import Completer, CompletionController
 from tfm_candidate_list import CandidateListOverlay, overlay_geometry
 
@@ -409,5 +409,5 @@ def show_input(
         hints["x"] = x
     dialog._panel = panel
     panel.push_layer(dialog, z=z, hints=hints)
-    panel.animate(dialog, hints={"transition": "fade", "duration_ms": 150})
+    animate_open(panel, dialog)
     return dialog

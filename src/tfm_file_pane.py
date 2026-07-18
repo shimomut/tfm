@@ -77,6 +77,32 @@ LINK_FG_DEFAULT = (86, 194, 214)
 #: monochrome theme recolors the cue into its own hue instead of an off-palette red.
 CURSOR_ACTIVE = (231, 76, 76)
 CURSOR_INACTIVE = (140, 92, 94)
+#: Corner brackets framing the **active** pane's file list — the tactical-HUD
+#: cue, opted into per theme via ``extras['pane_frame']`` (Sci-Fi is the only
+#: built-in that does). Pure configuration: a theme names it and the frame
+#: appears, so a visual-only change like this never needs app code — the point
+#: the Sci-Fi work set out to prove.
+#:
+#: Accepted values:
+#:   ``True``                       — brackets in the theme accent, default arm
+#:   ``{"color": (r, g, b),         — an explicit color (defaults to the accent)
+#:     "arm": 2, "thickness": 1.0}``  and leg length / stroke weight
+#:
+#: It marks the *focused* pane, so it is the louder half of a focus pair whose
+#: quiet half is ``PANE_INACTIVE_DIM`` below — never both at once on one pane.
+#: GUI only: the frame lives in the pane's sub-cell margin, which a character
+#: grid does not have (see the draw site for why a grid is left alone). The dim
+#: below is not so limited — a color change costs no space, so it applies
+#: everywhere.
+PANE_FRAME_ARM = 2.0
+PANE_FRAME_THICKNESS = 1.0
+#: How far the **inactive** pane's rows are washed toward the pane background
+#: (0 = untouched, 1 = invisible), when a theme opts into ``extras['pane_dim']``.
+#: The focused pane is left at full strength and the unfocused one recedes — the
+#: louder cue always marks the focused state. Kept low: this must read as "that
+#: pane is resting", not as "that pane is disabled", and the unfocused pane's
+#: filenames still have to be readable, since the user is often comparing the two.
+PANE_INACTIVE_DIM = 0.30
 #: Selection fill = the pane background blended toward the accent by this ratio
 #: (a tint that reads as "selected" without being the loud accent itself): a
 #: firmer blend on the active pane, subtler on the inactive one.
@@ -113,6 +139,13 @@ DRAG_THRESHOLD = 1.5
 def _mix(a, b, t):
     """Linear RGB blend a→b by ``t`` (0..1)."""
     return tuple(round(a[i] + (b[i] - a[i]) * t) for i in range(3))
+
+
+def _dim_ink(color, bg, amount: float):
+    """``color`` washed toward ``bg`` by ``amount`` — the unfocused pane's ink.
+    A zero amount returns the color untouched, so the focused pane (and every
+    theme that does not opt in) goes through the exact same code path unchanged."""
+    return color if amount <= 0.0 else _mix(color, bg, amount)
 
 
 class FilePane(Widget):
@@ -217,6 +250,35 @@ class FilePane(Widget):
         cur = theme.extras.get("cursor") or {}
         key = "active" if self.active else "inactive"
         return cur.get(key) or (CURSOR_ACTIVE if self.active else CURSOR_INACTIVE)
+
+    def _inactive_dim(self, theme) -> float:
+        """How far to wash this pane's ink toward its background, ``0``..``1``.
+
+        Always ``0`` for the focused pane — the cue marks the *resting* one, so
+        the focused pane is never the one that changed. A theme opts in with
+        ``extras['pane_dim']``: ``True`` for the default strength, or a float to
+        set its own."""
+        if self.active:
+            return 0.0
+        spec = theme.extras.get("pane_dim")
+        if not spec:
+            return 0.0
+        return PANE_INACTIVE_DIM if spec is True else max(0.0, min(1.0, float(spec)))
+
+    def _pane_frame(self, theme):
+        """``(color, arm, thickness)`` for the active pane's corner brackets, or
+        ``None`` when this pane should draw none — it is not the focused one, or
+        the theme did not opt into ``extras['pane_frame']``."""
+        if not self.active:
+            return None
+        spec = theme.extras.get("pane_frame")
+        if not spec:
+            return None
+        if spec is True:
+            spec = {}
+        return (spec.get("color") or theme.accent,
+                float(spec.get("arm", PANE_FRAME_ARM)),
+                float(spec.get("thickness", PANE_FRAME_THICKNESS)))
 
     def _date_width(self) -> int:
         """Character width of the date column, from the first dated entry.
@@ -424,6 +486,28 @@ class FilePane(Widget):
             pos = self.offset / denom if denom > 0 else 0.0
             ctx.draw_scrollbar(ctx.size_units[0] - 1, my, view_h, max(0.0, min(1.0, pos)), ratio)
 
+        # The focused pane's corner brackets, drawn last so they sit over the rows
+        # and the scrollbar rather than under a row fill. Spans the pane's whole
+        # slot (not the content inset) so the frame reads as belonging to the pane.
+        #
+        # Vector backends only, and not because of the backend — because of the
+        # space. A hairline frame lives in the margin the GUI pane already has
+        # (INNER_MARGIN / CONTENT_PAD_CELLS) and costs zero layout, whereas a grid
+        # has no sub-cell room: its margins are zero and every row of this widget
+        # is a file row, so the brackets would land *on* the first and last
+        # filenames and eat their leading characters. Reserving a frame gutter
+        # instead would spend two whole columns and a row at each end to decorate
+        # a pane whose focus a terminal already shows — the vivid ``[`` ``]``
+        # cursor cue on the active pane versus the muted one on the resting pane
+        # (see ``_draw_cursor``). Same reasoning as the framework's own
+        # ``divider="subtle"``: spend the sub-unit where it is free, spend nothing
+        # where it is not.
+        frame = None if grid else self._pane_frame(theme)
+        if frame is not None:
+            color, arm, thickness = frame
+            ctx.draw_corner_brackets(ctx.size_units[0], ctx.size_units[1],
+                                     Style(fg=color), arm=arm, thickness=thickness)
+
     def _draw_row(self, ctx, y, entry, is_cursor, selected, is_match, grid,
                   content_left, name_w, ext_x, ext_w, size_right, show_date,
                   date_right, content_right, band_left, band_right,
@@ -498,8 +582,16 @@ class FilePane(Widget):
         # (floor-only: unchanged wherever it already reads).
         eff_bg = row_bg if row_bg is not None else base
         is_link = info.get("is_link", False)
-        name_fg = ctx.ink(self._type_fg(theme, is_dir, is_link), on=eff_bg, target=LC_BODY)
-        col_fg = ctx.ink(theme.muted_text, on=eff_bg, target=LC_LARGE)
+        # An unfocused pane's ink is washed toward the pane background *before* the
+        # legibility pass, never after: ``ctx.ink`` is floor-only, so it lifts any
+        # color the wash pushed under the readable threshold back over it. That
+        # makes the dim self-limiting — a theme cannot configure its unfocused pane
+        # into illegibility, which matters because the user is usually comparing
+        # the two panes and still has to read the resting one.
+        dim = self._inactive_dim(theme)
+        name_fg = ctx.ink(_dim_ink(self._type_fg(theme, is_dir, is_link), base, dim),
+                          on=eff_bg, target=LC_BODY)
+        col_fg = ctx.ink(_dim_ink(theme.muted_text, base, dim), on=eff_bg, target=LC_LARGE)
         # A vector backend composites, so glyphs on any *filled* row (selected /
         # matched / cursor) draw over a transparent bg and land directly on the fill
         # already painted — no per-run bg repaint (which would also break the cursor

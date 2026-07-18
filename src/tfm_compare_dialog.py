@@ -33,7 +33,7 @@ from puikit.widgets import Checkbox
 from puikit.widgets.base import Widget
 
 from tfm_compare_selection import CompareCriteria
-from tfm_dialog_geometry import draw_title_bar, pane_anchored_box
+from tfm_dialog_geometry import animate_open, draw_title_bar, pane_anchored_box
 
 # (label, relation options). The Checkbox is the on/off; the options are the real
 # relations (no "any" — that is the box being unchecked). Values are CompareCriteria's.
@@ -247,7 +247,7 @@ class CompareSelectDialog(FocusContainer, Widget):
             hints["w"] = w
             hints["x"] = x
         panel.push_layer(self, z=z, hints=hints)
-        panel.animate(self, hints={"transition": "fade", "duration_ms": 150})
+        animate_open(panel, self)
 
     def _finish(self, criteria: Optional[CompareCriteria]) -> None:
         panel = self._panel

@@ -18,6 +18,49 @@ from typing import Any
 from puikit.backend import Style, TextAttribute
 
 
+#: How every TFM modal enters. Defined once here — the module that already owns
+#: the shared modal chrome — so the app has a single opening gesture rather than
+#: nine call sites drifting apart.
+#:
+#: A ``scale`` that also fades ("materialize"): the box grows from 92% to full
+#: size around its own center while fading in. 92% rather than something deeper
+#: because a modal is *already* the focus — the motion is there to say "this
+#: arrived", not to make the user watch it travel.
+#:
+#: ``ease_out_expo`` is what makes it read as engineered rather than floaty:
+#: ~90% of the growth happens in the first third of the duration and then it
+#: glides in, so the dialog snaps to attention and settles. This is the curve the
+#: Sci-Fi theme's tactical-HUD look is built on, but it suits every theme, so it
+#: is the app-wide default rather than a per-theme one.
+#:
+#: On a terminal none of this is composited: the Panel's 2-frame policy renders
+#: the same intent as one inset frame then the full box, and deliberately ignores
+#: the curve (an eased midpoint would collapse the intermediate frame onto the
+#: target). The app states the intent once and never branches.
+_OPEN_TRANSITION = {
+    "transition": "scale",
+    "from_scale": 0.92,
+    "fade": True,
+    "easing": "ease_out_expo",
+}
+
+#: Viewers (text, diff, directory-diff) open a little faster than pickers: they
+#: are full-screen and usually opened deliberately, so a shorter beat keeps them
+#: from feeling like they lag behind the keystroke.
+OPEN_MS_DIALOG = 180
+OPEN_MS_VIEWER = 140
+
+
+def animate_open(panel: Any, widget: Any, duration_ms: int = OPEN_MS_DIALOG) -> bool:
+    """Play the standard TFM modal entrance for ``widget`` on ``panel``.
+
+    Returns whether a transition was actually scheduled — ``False`` on a still
+    backend or under reduced motion, where the widget is simply already in its
+    final state on the next render.
+    """
+    return panel.animate(widget, hints={**_OPEN_TRANSITION, "duration_ms": duration_ms})
+
+
 def pane_anchored_box(
     desired_w: float,
     screen_w: float,

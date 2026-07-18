@@ -47,6 +47,7 @@ from puikit.widgets.base import Widget
 from tfm_path import Path
 from tfm_str_format import format_size
 from tfm_text_viewer import MONO, _ScrollBody, _header_bg, draw_status_bar, viewer_pad
+from tfm_dialog_geometry import OPEN_MS_VIEWER, animate_open
 from tfm_diff_viewer import show_diff_viewer
 from tfm_text_dialog import keys_markdown, show_markdown
 from tfm_config import KeyBindings, find_action_for_event, keys_label_for_action
@@ -1598,5 +1599,5 @@ def show_directory_diff_viewer(panel: Any, left_path: Path, right_path: Path,
     panel.push_layer(viewer, z=z, hints={"x": 0, "y": 0, "w": sw, "h": sh, "cover": True},
                      reflow=lambda sw, sh: Rect(0, 0, sw, sh))
     panel.request_animation_ticks(viewer._tick)
-    panel.animate(viewer, hints={"transition": "fade", "duration_ms": 120})
+    animate_open(panel, viewer, OPEN_MS_VIEWER)
     return viewer

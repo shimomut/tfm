@@ -388,6 +388,16 @@ class Config:
     # Progress animation settings
     PROGRESS_ANIMATION_PATTERN = 'spinner'  # 'spinner', 'dots', 'progress', 'bounce', 'pulse', 'wave', 'clock', 'arrow'
     PROGRESS_ANIMATION_SPEED = 0.2  # Animation frame update interval in seconds
+
+    # Motion settings
+    # Suppress decorative motion app-wide: dialogs appear at once instead of
+    # scaling in, and an animated theme background (Sci-Fi's starfield) coasts to
+    # a stop and holds a still frame. Everything lands in its FINAL state, never
+    # frozen mid-animation, so nothing is hidden by turning this on. Set it if
+    # motion is uncomfortable, or over a slow SSH link where every animated frame
+    # is a screen repaint. Functional updates (progress, file-list reloads,
+    # search results) are unaffected.
+    REDUCED_MOTION = False
     
     # File display settings
     SEPARATE_EXTENSIONS = True  # Show file extensions separately from basenames

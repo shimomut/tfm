@@ -628,6 +628,10 @@ class ConfigManager:
         if config.DEFAULT_SORT_MODE not in ['name', 'ext', 'size', 'date']:
             errors.append("DEFAULT_SORT_MODE must be 'name', 'ext', 'size', or 'date'")
 
+        # Validate motion settings
+        if not isinstance(config.REDUCED_MOTION, bool):
+            errors.append("REDUCED_MOTION must be a boolean")
+
         # Validate file monitoring settings
         if not isinstance(config.FILE_MONITORING_ENABLED, bool):
             errors.append("FILE_MONITORING_ENABLED must be a boolean")

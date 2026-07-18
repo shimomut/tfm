@@ -219,7 +219,8 @@ def _resolve_background(animation, wallpaper, *, color, backdrop):
 def _theme(bg, fg, muted, accent, surface, selection, *, accent2=None,
            status=None, footer=None, directory=None, isearch_match=None,
            syntax=None, file_types=None, cursor=None, selection_fill=None,
-           post_effect=None, animation=None, wallpaper=None, opacity=1.0) -> Theme:
+           post_effect=None, animation=None, wallpaper=None, opacity=1.0,
+           pane_frame=None, pane_dim=None, text_effect=None) -> Theme:
     ac2 = accent if accent2 is None else accent2
     p = {"bg": bg, "fg": fg, "muted": muted, "accent": accent, "accent2": ac2,
          "surface": surface}
@@ -244,6 +245,18 @@ def _theme(bg, fg, muted, accent, surface, selection, *, accent2=None,
         extras["file_types"] = ft
     if cursor is not None:
         extras["cursor"] = dict(cursor)
+    # Pane focus chrome (see tfm_file_pane): corner brackets framing the focused
+    # pane, and how far the resting pane's ink recedes. Both are opt-in — a theme
+    # that names neither renders exactly as it did before they existed.
+    if pane_frame is not None:
+        extras["pane_frame"] = dict(pane_frame) if isinstance(pane_frame, dict) else pane_frame
+    if pane_dim is not None:
+        extras["pane_dim"] = pane_dim
+    # How text arrives (puikit.textfx): a kind name or a params dict. PuiKit
+    # coerces and validates it, so a bad value here disables the effect rather
+    # than raising — themes are data, often hand-written in a user's config.py.
+    if text_effect is not None:
+        extras["text_effect"] = text_effect
     if isearch_match is not None:
         extras["isearch_match"] = isearch_match(p) if callable(isearch_match) else isearch_match
     # A pinned file-pane selection fill: used verbatim as the selected-row bg
@@ -357,7 +370,35 @@ _THEME_SPECS: list[tuple[str, dict]] = [
                             "operator": (176, 186, 255), "builtin": (140, 212, 255)},
                     post_effect={"bloom": 0.45, "vignette": 0.26, "glow": 0.22},
                     animation="starfield",  # stars streaming past (GUI backend)
-                    opacity=0.6)),          # chrome at 60% so the field reads through
+                    opacity=0.6,            # chrome at 60% so the field reads through
+                    # The focus pair that completes the tactical-HUD look, and the
+                    # proof that a purely visual change needs no app code: cyan
+                    # corner brackets mark the focused pane, and the resting pane's
+                    # ink recedes toward the navy. Both are plain theme data —
+                    # every other theme leaves them unset and renders exactly as
+                    # before. The bracket color is the accent by default; named
+                    # explicitly here because the HUD wants the brighter cyan.
+                    pane_frame={"color": (130, 205, 255), "arm": 2},
+                    pane_dim=True,
+                    # Text *arrives* rather than appearing: a pane's listing, a
+                    # dialog's labels and a viewer's first screen decode into
+                    # place when they show up. Theme data, so it costs no app code
+                    # and no other theme is affected — and PuiKit applies it inside
+                    # draw_text, so no TFM widget knows it exists.
+                    #
+                    # Short and lightly staggered on purpose. This fires on every
+                    # directory change, so anything longer would sit between the
+                    # user and their file list; max_strings keeps a 200-row pane
+                    # from cascading for seconds.
+                    # ``typewriter`` — a clean left-to-right reveal with nothing
+                    # in the tail. ``decode`` (the tail churning as junk glyphs
+                    # until the head passes over it) is the louder alternative and
+                    # stays available; swap the kind here or in config.py to get
+                    # it. Plain reading of a filename wins for the default: the
+                    # pane's job is to be read, and a decoding tail competes with
+                    # the text that has already resolved.
+                    text_effect={"kind": "typewriter", "duration_ms": 260,
+                                 "stagger_ms": 12, "max_strings": 40})),
     # Segment LCD: a positive/reflective digital display — a sage-green base with
     # near-black "segments" (just two colors: the green + black). A light-polarity
     # mono theme; because the text is genuine black (maximally dark), the app's
@@ -406,6 +447,11 @@ _THEME_OVERRIDE_MAP = {
     "status": "status", "footer": "footer", "directory": "directory",
     "isearch_match": "isearch_match", "syntax": "syntax", "file_types": "file_types",
     "cursor": "cursor", "selection_fill": "selection_fill", "post_effect": "post_effect",
+    # Pane focus chrome: corner brackets on the focused pane, ink wash on the
+    # resting one. Both pure data — a theme (or a user's config) turns them on
+    # without a line of app code.
+    "pane_frame": "pane_frame", "pane_dim": "pane_dim",
+    "text_effect": "text_effect",
     # NB: config ``background`` is the base *color* (→ bg, above). The content behind
     # the UI is a separate choice — ``animation`` (a type / params) or ``wallpaper``
     # (an image path / params) — so it never collides with the color key.
@@ -794,6 +840,11 @@ class TfmApp:
         # ``_apply_theme``); default to the first theme (Dark+) on a fresh profile
         # or if that theme no longer exists.
         self.themes = _build_theme_list(self.config)
+        # Motion preference, before any theme is applied: a reduced-motion launch
+        # must never play the opening beat even once, and the background the theme
+        # is about to set has to come up already stopped rather than animate and
+        # then coast down.
+        self.panel.set_reduced_motion(bool(getattr(self.config, "REDUCED_MOTION", False)))
         start = self.state_manager.get_state("theme")
         self._theme_index = next(
             (i for i, (name, _t) in enumerate(self.themes) if name == start), 0)
@@ -1196,10 +1247,30 @@ class TfmApp:
             self.flm.apply_listing(pane, result)
             pane["loading"] = False
             pane["_loading_shown"] = False
+            self._animate_pane_text(pane_name)
             if on_ready:
                 on_ready(pane)
             applied = True
         return applied
+
+    def _animate_pane_text(self, pane_name: str) -> None:
+        """Replay the theme's arriving-text effect over a pane whose listing was
+        just replaced.
+
+        The pane widget stays on screen across a directory change, so PuiKit's
+        automatic "animate on appear" trigger correctly does not fire — that
+        trigger deliberately ignores content changing in place, or scrolling a
+        listing would re-decode every row on every keypress. A wholesale swap is
+        the case only the app can recognize, so it says so here. One call for the
+        pane, not one per row, and a no-op unless a theme opted in.
+
+        Silent no-op before the views exist: the first listings are requested in
+        ``__init__`` and can land before the FilePanes are constructed. Nothing is
+        lost — a pane that has never been drawn animates on its first draw
+        anyway, through the appear trigger this method exists to supplement."""
+        view = getattr(self, f"{pane_name}_view", None)
+        if view is not None:
+            self.panel.animate_text(view)
 
     def _listings_pending(self) -> bool:
         """True while any pane's async listing is still in flight (worker running
@@ -3830,13 +3901,22 @@ class TfmApp:
     @staticmethod
     def _about_text() -> str:
         """The About box body: name, version, and project URL (mirrors the legacy
-        About dialog's content, minus its cosmetic Matrix-rain background)."""
+        About dialog's content; its cosmetic Matrix-rain background is answered
+        now by the theme's arriving-text effect, not a background animation)."""
         from tfm_const import VERSION, GITHUB_URL
         return (f"TFM on PuiKit — Terminal File Manager\n"
                 f"Version {VERSION}\n\n"
                 f"{GITHUB_URL}")
 
     def show_about(self) -> None:
+        """The About box.
+
+        Deliberately a plain call: under a theme carrying a ``text_effect``
+        (Sci-Fi) the body decodes into place because the box *appeared*, and
+        under every other theme it opens plainly. That is the whole point of the
+        text-animation system — the effect is theme data, so no call site in TFM
+        asks for it or knows it exists.
+        """
         show_message_box(self.panel, self._about_text(),
                          title="About TFM", icon="info", buttons=("OK",))
         self.panel.render()

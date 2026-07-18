@@ -29,7 +29,7 @@ from puikit.panel import Rect
 from puikit.widgets.base import Widget
 from puikit.widgets.list import ListView
 
-from tfm_dialog_geometry import draw_title_bar
+from tfm_dialog_geometry import animate_open, draw_title_bar
 
 #: Characters we refuse in a result name (matches the ttk dialog's check).
 _INVALID_CHARS = set('/\\:*?"<>|')
@@ -317,5 +317,5 @@ def show_batch_rename(
     h = max(14.0, min(sh * 0.85, float(len(files) + 10)))
     dialog._panel = panel
     panel.push_layer(dialog, z=z, hints={"shadow": True, "w": w, "h": h})
-    panel.animate(dialog, hints={"transition": "fade", "duration_ms": 150})
+    animate_open(panel, dialog)
     return dialog

@@ -54,6 +54,12 @@ class CompareDialogApp(unittest.TestCase):
         self.b.open()
         self.app = tfm.TfmApp(self.b, self.left, self.right,
                               left_provided=True, right_provided=True)
+        # These tests assert on the dialog's *content*, and the app restores
+        # whichever theme was last used — which on a developer's machine may be
+        # one carrying an arriving-text effect (see puikit.textfx), so a
+        # freshly-drawn dialog's first frame is mid-animation rather than final.
+        # Force the effect off: it is not what this file is about.
+        self.app.panel.set_text_effect(False)
         self.app._settle_listings()
 
     def tearDown(self):

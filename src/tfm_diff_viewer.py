@@ -30,6 +30,7 @@ from puikit.widgets.base import Widget
 
 from tfm_config import is_action_for_event, keys_label_for_action
 from tfm_file_pane import CONTENT_PAD_CELLS  # same l/r content inset as the main panes
+from tfm_dialog_geometry import OPEN_MS_VIEWER, animate_open
 from tfm_isearch_bar import ViewerISearch
 from tfm_text_dialog import keys_markdown, show_markdown
 from tfm_text_viewer import (MONO, _ScrollBody, _content_bg, _header_bg, _highlight,
@@ -590,5 +591,5 @@ def show_diff_viewer(panel: Any, path1, path2, z: int = 80) -> DiffViewer:
     viewer._child_z = z + 10  # help overlay stacks above the viewer's own layer
     panel.push_layer(viewer, z=z, hints={"x": 0, "y": 0, "w": sw, "h": sh, "cover": True},
                      reflow=lambda sw, sh: Rect(0, 0, sw, sh))
-    panel.animate(viewer, hints={"transition": "fade", "duration_ms": 120})
+    animate_open(panel, viewer, OPEN_MS_VIEWER)
     return viewer

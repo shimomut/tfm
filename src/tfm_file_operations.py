@@ -31,7 +31,7 @@ from puikit.focus import FocusContainer, move_focus
 from puikit.widgets import Button, Checkbox, MarkdownView, show_message_box
 from puikit.widgets.base import Widget
 
-from tfm_dialog_geometry import draw_title_bar
+from tfm_dialog_geometry import OPEN_MS_VIEWER, animate_open, draw_title_bar
 from tfm_path import Path
 from tfm_progress_manager import OperationType, ProgressManager
 from tfm_task import Cancelled, Task, TaskManager
@@ -637,7 +637,7 @@ class ConflictDialog(FocusContainer, Widget):
         w = float(max(48, min(72, int(sw) - 4)))
         h = 9.0  # title + message (may wrap 2 rows) + checkbox + button row
         panel.push_layer(self, z=z, hints={"shadow": True, "w": w, "h": h})
-        panel.animate(self, hints={"transition": "fade", "duration_ms": 120})
+        animate_open(panel, self, OPEN_MS_VIEWER)
 
     def _resolve(self, action: str) -> None:
         apply_all = self._checkbox.checked

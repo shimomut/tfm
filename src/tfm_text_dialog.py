@@ -31,7 +31,7 @@ from puikit.widgets.base import Widget
 from puikit.widgets.list import ListView
 from puikit.widgets.markdown_view import MarkdownView
 
-from tfm_dialog_geometry import draw_title_bar
+from tfm_dialog_geometry import animate_open, draw_title_bar
 
 #: Keys the body widget consumes for scrolling while the dialog is open. (Backend
 #: key names are unsuffixed: "pageup"/"pagedown", matching ListView / MarkdownView.)
@@ -257,4 +257,4 @@ def _push(panel: Any, dialog: _ScrollModal, *, rows: int, z: int) -> None:
     h = max(10.0, min(sh * 0.8, float(rows + 7)))
     dialog._panel = panel
     panel.push_layer(dialog, z=z, hints={"shadow": True, "w": w, "h": h})
-    panel.animate(dialog, hints={"transition": "fade", "duration_ms": 150})
+    animate_open(panel, dialog)

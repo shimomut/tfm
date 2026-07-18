@@ -33,6 +33,7 @@ from puikit.event import Event, EventType
 from puikit.widgets import BusyIndicator, ProgressBar, show_message_box
 from puikit.widgets.base import Widget
 
+from tfm_dialog_geometry import OPEN_MS_VIEWER, animate_open
 from tfm_progress_manager import ProgressManager
 from tfm_str_format import format_size
 
@@ -272,7 +273,7 @@ class ProgressDialog(Widget):
         w = float(max(44, min(70, int(sw) - 4)))
         h = 8.0  # title + current item + primary bar/label + secondary bar/label
         panel.push_layer(self, z=z, hints={"shadow": True, "w": w, "h": h})
-        panel.animate(self, hints={"transition": "fade", "duration_ms": 120})
+        animate_open(panel, self, OPEN_MS_VIEWER)
 
     def close(self) -> None:
         panel = self._panel
