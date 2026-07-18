@@ -128,6 +128,18 @@ class Config:
     #   #     'post_effect': 'crt'       # preset: glow + bloom + scanlines + vignette + roll
     #   #     'post_effect': {'bloom': 0.3, 'vignette': 0.15, 'glow': 0.22,
     #   #                     'scanline': 0.15, 'roll': 0.1}  # custom (override any)
+    #   # --- animated 3D background (GUI backend only) ---
+    #   #   A slowly spinning wireframe cube behind the panes, colored from this
+    #   #   theme (foreground line, background backdrop) so it stays on-palette and
+    #   #   readable on light themes too. On/off with the theme, like post_effect;
+    #   #   a terminal has no pixels and ignores it.
+    #   #     'background_3d': True                       # the tuned default cube
+    #   #     'background_3d': {'speed': 1.0, 'opacity': 0.8}  # custom
+    #   # --- surface reveal (GUI backend only) ---
+    #   #   How translucent the UI's pane/row backgrounds become (0..1) so the
+    #   #   wallpaper behind them shows through. A single per-theme value, separate
+    #   #   from 'background_3d' so it applies to any wallpaper. 0 = opaque UI.
+    #   #     'reveal': 0.4
     #
     # Example:
     #
@@ -149,6 +161,8 @@ class Config:
         # backend the 'post_effect' below adds a real CRT glow over the green.
         'Phosphor': {
             'post_effect': 'crt',            # CRT glow/bloom/scanlines (GUI backend)
+            'background_3d': True,            # spinning wireframe cube (GUI backend)
+            'reveal': 0.4,                   # panes dissolve so the cube reads through
             'background': (4, 15, 7),        # dark CRT green-black
             'foreground': (51, 245, 121),    # phosphor green
             'muted':      (33, 138, 74),     # dim green (secondary text / dividers)

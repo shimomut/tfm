@@ -141,16 +141,18 @@ def _resolve_post_effect(value) -> "PostEffect | None":
 
 
 #: TFM's cube tuning when a theme just switches the 3D background on
-#: (``background_3d: True``): a slow, subtle spin that reads through the panes.
-#: ``color`` (theme foreground) and ``backdrop`` (theme background) are filled per
-#: theme by ``_resolve_background_3d`` so the cube stays on-palette and legible.
-_BG3D_DEFAULTS = dict(kind="wireframe", speed=0.6, opacity=0.6, reveal=0.4)
+#: (``background_3d: True``): a slow, subtle spin. ``color`` (theme foreground) and
+#: ``backdrop`` (theme background) are filled per theme by ``_resolve_background_3d``
+#: so the cube stays on-palette and legible. How translucent the UI becomes so the
+#: cube reads *through* the panes is a separate theme value (``reveal``), pushed to
+#: the backend via ``set_surface_reveal`` — see ``_apply_surface_reveal``.
+_BG3D_DEFAULTS = dict(kind="wireframe", speed=0.6, opacity=0.6)
 
 
 def _resolve_background_3d(value, *, color, backdrop) -> "Background3D | None":
     """Turn a theme's ``background_3d`` recommendation into a ``Background3D`` (or
     ``None``), mirroring ``_resolve_post_effect``. Accepts ``True`` (the tuned
-    default cube), a params dict (``{'speed': 1.0, 'reveal': 0.6, ...}`` merged
+    default cube), a params dict (``{'speed': 1.0, 'opacity': 0.8, ...}`` merged
     onto the default), an already-built ``Background3D`` (used as-is), or a falsy
     value for "no background". The edge ``color`` (theme foreground) and
     ``backdrop`` (theme background) are filled from the active theme unless the
@@ -177,7 +179,7 @@ def _resolve_background_3d(value, *, color, backdrop) -> "Background3D | None":
 def _theme(bg, fg, muted, accent, surface, selection, *, accent2=None,
            status=None, footer=None, directory=None, isearch_match=None,
            syntax=None, file_types=None, cursor=None, selection_fill=None,
-           post_effect=None, background_3d=None) -> Theme:
+           post_effect=None, background_3d=None, reveal=0.0) -> Theme:
     ac2 = accent if accent2 is None else accent2
     p = {"bg": bg, "fg": fg, "muted": muted, "accent": accent, "accent2": ac2,
          "surface": surface}
@@ -212,16 +214,21 @@ def _theme(bg, fg, muted, accent, surface, selection, *, accent2=None,
         extras["selection_fill"] = selection_fill(p) if callable(selection_fill) else selection_fill
     if syntax is not None:
         extras["syntax"] = dict(syntax)
-    # A theme may *recommend* a post-processing effect (a CRT/phosphor look) and/or
-    # an animated 3D background (a spinning wireframe cube): both ride in extras and
-    # TfmApp pushes them to the backend on theme switch, so a pixel backend (macOS
-    # GUI) auto-adjusts while a terminal ignores them.
+    # A theme may *recommend* a post-processing effect (a CRT/phosphor look), an
+    # animated 3D background (a spinning wireframe cube), and/or a ``reveal`` (how
+    # translucent the UI becomes so a wallpaper shows through it): all ride in extras
+    # and TfmApp pushes them to the backend on theme switch, so a pixel backend
+    # (macOS GUI) auto-adjusts while a terminal ignores them. ``reveal`` is kept
+    # separate from ``background_3d`` on purpose — it is a single per-theme value,
+    # reusable across wallpaper kinds (a future static image, not just this cube).
     effect = _resolve_post_effect(post_effect)
     if effect is not None:
         extras["post_effect"] = effect
     scene = _resolve_background_3d(background_3d, color=fg, backdrop=bg)
     if scene is not None:
         extras["background_3d"] = scene
+    if reveal:
+        extras["reveal"] = min(1.0, max(0.0, float(reveal)))
     kw: dict = {}
     if surfaces:
         kw["surfaces"] = surfaces
@@ -309,7 +316,8 @@ _THEME_SPECS: list[tuple[str, dict]] = [
                             "comment": (98, 128, 164), "number": (255, 158, 54),
                             "operator": (176, 186, 255), "builtin": (140, 212, 255)},
                     post_effect={"bloom": 0.45, "vignette": 0.26, "glow": 0.22},
-                    background_3d=True)),  # spinning wireframe cube (GUI backend)
+                    background_3d=True,   # spinning wireframe cube (GUI backend)
+                    reveal=0.4)),         # panes dissolve so the cube reads through
     # Segment LCD: a positive/reflective digital display — a sage-green base with
     # near-black "segments" (just two colors: the green + black). A light-polarity
     # mono theme; because the text is genuine black (maximally dark), the app's
@@ -358,7 +366,7 @@ _THEME_OVERRIDE_MAP = {
     "status": "status", "footer": "footer", "directory": "directory",
     "isearch_match": "isearch_match", "syntax": "syntax", "file_types": "file_types",
     "cursor": "cursor", "selection_fill": "selection_fill", "post_effect": "post_effect",
-    "background_3d": "background_3d",
+    "background_3d": "background_3d", "reveal": "reveal",
 }
 
 #: Sub-dict theme keys that deep-merge (the user recolors only the entries they
@@ -751,6 +759,7 @@ class TfmApp:
         # backend stores it and re-attaches it once its window opens).
         self._apply_post_effect(self.themes[self._theme_index][1])
         self._apply_background_3d(self.themes[self._theme_index][1])
+        self._apply_surface_reveal(self.themes[self._theme_index][1])
         self.left_view = FilePane(
             self.pm.left_pane,
             config=self.config,
@@ -2136,6 +2145,7 @@ class TfmApp:
         self.panel.theme = theme
         self._apply_post_effect(theme)
         self._apply_background_3d(theme)
+        self._apply_surface_reveal(theme)
         self.state_manager.set_state("theme", name)  # remember across restarts
         self.log_info(f"Theme: {name}")
 
@@ -2158,6 +2168,15 @@ class TfmApp:
         ``background_3d`` capability (a terminal) inherits the base no-op, so this
         never branches on the backend."""
         self.backend.set_background_3d(theme.extras.get("background_3d"))
+
+    def _apply_surface_reveal(self, theme: Theme) -> None:
+        """Push the theme's ``reveal`` — how translucent the UI's surface fills
+        become so a wallpaper (the 3D cube today, a static image later) shows
+        *through* them — to the backend, ``0`` (opaque, the default) when the theme
+        names none. Deliberately separate from ``_apply_background_3d``: it is one
+        per-theme knob reused across wallpaper kinds, not a property of the cube. A
+        backend that can't composite (a terminal) inherits the base no-op."""
+        self.backend.set_surface_reveal(theme.extras.get("reveal", 0.0))
 
     def _cycle_theme(self) -> None:
         """Advance to the next palette (the ``toggle_color_scheme`` / T action)."""
