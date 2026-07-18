@@ -14,11 +14,15 @@ import pytest
 
 from puikit.background import SHADER_ENTRY, Background3D, Shader
 from puikit.backends._metal import HAVE_METAL, MetalBackground
+from puikit.backends._d3d_shader import (
+    HAVE_D3D_SHADER, SHADER_ENTRY as HLSL_ENTRY, D3DShaderBackground,
+)
 
 import tfm
 from tfm_background_shaders import SHADER_KINDS
 
 metal_only = pytest.mark.skipif(not HAVE_METAL, reason="Metal unavailable")
+d3d_only = pytest.mark.skipif(not HAVE_D3D_SHADER, reason="D3D shader support unavailable")
 
 _INK, _BACKDROP = (200, 224, 245), (16, 30, 50)
 
@@ -48,6 +52,14 @@ class Registry(unittest.TestCase):
     def test_sources_define_the_entry_point(self):
         for kind, params in SHADER_KINDS.items():
             self.assertIn(SHADER_ENTRY, params["source"], kind)
+
+    def test_every_scene_ships_an_hlsl_translation(self):
+        # A shader is the one backend-specific part of a background: macOS compiles
+        # ``source`` (MSL), Windows compiles ``source_hlsl`` (HLSL). A scene missing
+        # the HLSL twin would silently draw nothing on Windows.
+        for kind, params in SHADER_KINDS.items():
+            self.assertIn("source_hlsl", params, kind)
+            self.assertIn(HLSL_ENTRY, params["source_hlsl"], kind)
 
 
 class ThemeResolution(unittest.TestCase):
@@ -143,6 +155,45 @@ class Compilation(unittest.TestCase):
         top_left = (px[2], px[1], px[0])   # BGRA -> RGB; empty sky above the wave
         self.assertTrue(all(abs(a - b) <= 2 for a, b in zip(top_left, _BACKDROP)),
                         top_left)
+
+
+@d3d_only
+class CompilationD3D(unittest.TestCase):
+    """Every shipped shader must also build with the real HLSL (Direct3D 11)
+    compiler — the Windows twin of the Metal Compilation tests."""
+
+    def test_every_shader_compiles(self):
+        renderer = D3DShaderBackground()
+        for kind in SHADER_KINDS:
+            ok = renderer.set_shader(_shader(kind))
+            self.assertTrue(ok, f"{kind} failed to compile:\n{renderer.error}")
+        renderer.close()
+
+    def test_every_shader_draws_something(self):
+        renderer = D3DShaderBackground()
+        for kind in SHADER_KINDS:
+            self.assertTrue(renderer.set_shader(_shader(kind)), renderer.error)
+            px = renderer.render_pixels(160, 100, 3.0)
+            distinct = {bytes(px[i:i + 4]) for i in range(0, len(px), 4)}
+            self.assertGreater(len(distinct), 8, f"{kind} drew a flat frame")
+        renderer.close()
+
+    def test_wave_animates(self):
+        renderer = D3DShaderBackground()
+        self.assertTrue(renderer.set_shader(_shader("wave")), renderer.error)
+        a = renderer.render_pixels(160, 100, 0.0)
+        b = renderer.render_pixels(160, 100, 3.0)
+        self.assertNotEqual(bytes(a), bytes(b))
+        renderer.close()
+
+    def test_wave_respects_the_backdrop(self):
+        renderer = D3DShaderBackground()
+        self.assertTrue(renderer.set_shader(_shader("wave")), renderer.error)
+        px = renderer.render_pixels(120, 80, 2.0)
+        top_left = (px[2], px[1], px[0])   # BGRA -> RGB; empty sky above the wave
+        self.assertTrue(all(abs(a - b) <= 2 for a, b in zip(top_left, _BACKDROP)),
+                        top_left)
+        renderer.close()
 
 
 if __name__ == "__main__":

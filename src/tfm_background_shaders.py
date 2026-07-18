@@ -155,6 +155,99 @@ fragment float4 puikit_bg_fragment(float4 pos [[position]],
 }
 """
 
+#: The HLSL translation of :data:`WAVE` for puikit's Direct3D 11 (Windows) backend.
+#:
+#: A shader is the one genuinely backend-specific part of a background: Metal Shading
+#: Language and HLSL are different languages, so a cross-platform scene ships the
+#: same math in both and each backend compiles the dialect it speaks (macOS reads
+#: ``source``, Windows reads ``source_hlsl`` — see puikit ``Shader``). This is a
+#: line-for-line port of the wave above; only the dialect differs (``fract``→``frac``,
+#: ``mix``→``lerp``, the ``constant`` qualifiers become ``static const``, and the
+#: uniforms are read from the ``BackgroundUniforms`` cbuffer as globals rather than a
+#: ``[[buffer(0)]]`` parameter). Keep the two in sync when tuning the scene.
+WAVE_HLSL = """
+// --- tunables (see the MSL WAVE for the rationale of each) -------------------
+static const int   LAYERS  = 12;
+static const float Z_NEAR  = 1.5;
+static const float Z_FAR   = 5.2;
+static const float CAM_H   = 0.62;
+static const float HORIZON = 0.36;
+static const float FOCAL   = 0.85;
+static const float PPU     = 44.0;
+static const float DOT     = 0.0034;
+static const float SPRAY   = 0.34;
+static const float GAIN    = 1.5;
+
+float hash11(float n) {
+    n = frac(n * 0.1031);
+    n *= n + 33.33;
+    n *= n + n;
+    return frac(n);
+}
+float2 hash21(float2 p) {
+    float3 v = frac(float3(p.xyx) * float3(0.1031, 0.1030, 0.0973));
+    v += dot(v, v.yzx + 33.33);
+    return frac((v.xx + v.yz) * v.zy);
+}
+float surface(float x, float z, float t) {
+    return 0.32 * sin(1.30 * x + 0.55 * z + 0.55 * t)
+         + 0.18 * sin(-0.85 * x + 1.30 * z + 0.41 * t)
+         + 0.10 * sin(2.40 * x - 0.90 * z + 0.72 * t);
+}
+
+float4 puikit_bg_fragment(float4 pos : SV_Position) : SV_Target {
+    float2 uv = pos.xy / resolution;
+    float aspect = resolution.x / resolution.y;
+    float px = (uv.x - 0.5) * aspect;
+    float t = time;
+
+    float density = 0.0;
+    float crest = 0.0;
+
+    for (int i = 0; i < LAYERS; ++i) {
+        float fi = (float(i) + 0.5) / float(LAYERS);
+        float z = 1.0 / lerp(1.0 / Z_NEAR, 1.0 / Z_FAR, fi);
+        float layerFade = 1.0 - 0.55 * fi;
+
+        float wx = px * z / FOCAL;
+        float cell = floor(wx * PPU);
+
+        for (int c = -1; c <= 1; ++c) {
+            float id = cell + float(c);
+            float2 rnd = hash21(float2(id, float(i)));
+            float pwx = (id + 0.5 + (rnd.x - 0.5) * 0.9) / PPU;
+
+            float loft = rnd.y * rnd.y * rnd.y;
+            float h = surface(pwx, z, t);
+            float py = h + loft * SPRAY;
+
+            float sx = FOCAL * pwx / z;
+            float sy = HORIZON + FOCAL * (CAM_H - py) / z;
+
+            float2 d = float2(px - sx, uv.y - sy);
+            float r = DOT * (1.0 + 2.2 / z);
+            float q = max(0.0, 1.0 - dot(d, d) / (r * r));
+            float splat = q * q;
+
+            float bright = layerFade * (1.0 - 0.7 * loft) * (0.55 + 0.45 * hash11(id + float(i) * 37.0));
+            density += splat * bright;
+            crest = max(crest, splat * (0.5 + 0.5 * h / 0.6));
+        }
+    }
+
+    density = 1.0 - exp(-density * GAIN);
+
+    float3 violet = ink.rgb * float3(1.00, 0.42, 1.30);
+    float3 cyan   = ink.rgb * float3(0.34, 1.10, 1.18);
+    float sweep = 0.5 + 0.5 * sin(uv.x * 3.1 + t * 0.25);
+    float3 tint = lerp(violet, cyan, sweep);
+    float3 rgb = lerp(tint, float3(1.0, 1.0, 1.0), clamp(crest * 1.9, 0.0, 1.0) * 0.7);
+
+    rgb = lerp(backdrop.rgb, rgb, clamp(density, 0.0, 1.0) * opacity);
+    return float4(rgb, 1.0);
+}
+"""
+
 #: Shader scenes TFM offers, by the name a theme's ``animation`` key uses, each
 #: with the puikit ``Shader`` fields that belong to the scene rather than to the
 #: theme. Kept separate from ``tfm_background_animations.ANIMATION_KINDS`` because
@@ -167,5 +260,5 @@ fragment float4 puikit_bg_fragment(float4 pos [[position]],
 #: resolution and four times cheaper there, which is what keeps it affordable on a
 #: Retina display.
 SHADER_KINDS: dict[str, dict] = {
-    "wave": {"source": WAVE, "resolution_scale": 0.5},
+    "wave": {"source": WAVE, "source_hlsl": WAVE_HLSL, "resolution_scale": 0.5},
 }
