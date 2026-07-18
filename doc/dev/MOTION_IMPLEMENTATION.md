@@ -141,11 +141,124 @@ could not be theme-driven:
 | Low cost per widget | **Zero.** Widgets are unchanged; opting *out* is one attribute, `animates_text = False`. |
 | Low cost per animation | A pure `(text, progress, frame, params) -> str` in `TEXT_EFFECTS`. No dataclass, no Panel branch, no backend change. |
 
-Four kinds ship: `typewriter` (plain left-to-right reveal, the Sci-Fi default),
-`decode` (tail churning as junk until the head passes over it), `wipe` (tail held
-open by a fill glyph), `flicker` (interference that calms). Adding a fifth is one
-function and one dict entry — `test_adding_a_kind_is_one_function` states that as
-a test.
+Five kinds ship: `typewriter` (plain left-to-right reveal, the Sci-Fi default),
+`scatter` (characters landing in random order), `decode` (tail churning as junk
+until the head passes over it), `wipe` (tail held open by a fill glyph),
+`flicker` (interference that calms). Adding a sixth is one function and one dict
+entry — `test_adding_a_kind_is_one_function` states that as a test.
+
+The three *reveal* kinds (`typewriter`, `scatter`, `decode`) share one renderer,
+`_render_reveal`, and differ only in a `threshold(i, n, salt)` function saying
+when each character resolves. Two options ride on it:
+
+- **`flash`** — a character shows as a solid block for an instant as it lands.
+  This is as close to "flash a rectangle" as a kind can get, and the limit is the
+  contract, not the idea: a kind returns a *string*, and `draw_text` applies one
+  style per run, so a per-character colored or inverted rectangle would need
+  per-character styling the rendering API cannot express. A block glyph fills its
+  cell exactly and needs none, so it renders identically on every backend.
+  Thresholds are compressed into `[0, 1-flash]` so the last character finishes
+  its flash instead of being cut off at progress 1.
+- **`hidden`** — the stand-in for an un-revealed character: blanks, or
+  `"scramble"` for churning junk (which is all `decode` is).
+
+`scatter`'s order is salted by a **deterministic** hash of the string
+(`_text_salt`, not `hash()`, which Python randomizes per process). Content-derived
+so two different strings scatter differently — otherwise a pane of equal-length
+rows would reveal in identical order and read as a marching pattern.
+
+Trailing blanks are trimmed from a reveal, so a blank-tailed kind returns a bare
+prefix and paints nothing over cells it does not own, while *interior* gaps keep
+their spacing — which is what holds a scattered reveal's columns still.
+
+### Who chooses what
+
+Authority is split, and the split is what keeps a widget preference from
+overriding the user:
+
+| Decision | Owner |
+|---|---|
+| *Whether* text animates at all | the **theme** — nothing else can turn it on |
+| The pacing (`duration_ms`, `stagger_ms`, `max_strings`) | the **theme** |
+| The *flavor* for one widget's subtree | the **widget**, via a `text_effect` class attribute |
+| Opting out entirely | the **widget**, via `animates_text = False` |
+
+`textfx.merge` layers a widget's variant over the theme's effect, so
+`{"kind": "scatter"}` changes only the kind and inherits the timing. A widget
+preference is inert under a theme that opts out, and reduced motion still wins
+over everything.
+
+TFM's `TextViewer` uses this: `{"kind": "scatter", "flash": 0.10}`. Typing suits
+a *line*, where the eye follows one reveal left to right; a full screen has no
+single place to follow, so a left-to-right reveal reads as a slow wipe while
+landing everywhere at once fills the page in the same time.
+
+The variant is **inherited down the subtree** (`DrawContext._text_variant`,
+propagated by `draw_child`), and that was a bug before it was a feature: the
+viewer draws its header itself but delegates the body to a `_ScrollBody` child,
+so the first version scattered the header while the body kept typing. A child
+with its own `text_effect` still wins over an inherited one.
+
+### Grid vs proportional
+
+A placeholder glyph only occupies the same space as the character it replaces
+when the run is **column-aligned**. On a proportional face a blank is far
+narrower than a `W` and a block has its own advance, so a gap held open with one
+displaces every resolved glyph after it — over a base unit of drift on realistic
+UI-font advances.
+
+The fix is to stop deriving position from the *drawn string* at all. On a
+proportional run a kind emits **one glyph per source character** — the character,
+a substitution, or `textfx.HIDDEN` — so the result stays index-aligned, and
+`DrawContext._draw_measured` places each visible piece at the x its character
+will finally occupy, measured from the real text. Hidden positions are simply not
+drawn: a gap needs no placeholder because nothing after it depends on the drawn
+string's width. Runs of untouched characters draw together; each substitution
+draws alone, since its own advance would otherwise shift the rest of its run.
+
+Prefix widths are memoized in `Panel._prefix_cache` and released when nothing is
+animating. Measuring a *growing prefix* is how kerning is honored (see
+`puikit.text.elide`), so it costs O(n) backend calls per string — and a reveal
+redraws the same string every frame for its whole duration.
+
+**Two earlier attempts failed, and both are worth remembering:**
+
+1. *Width-matched placeholders.* Correct on a grid, wrong on a proportional face
+   for the reason above.
+2. *Trimming to the contiguous resolved prefix.* Fixed the positions and
+   destroyed the animation: a scattered reveal's contiguous prefix stays empty
+   until nearly the end, so the text sat invisible behind the flash block and
+   then appeared all at once. **Reported as a bug from actually using it** — the
+   position tests all passed, because they checked that nothing moved without
+   checking that anything was visible. `test_text_keeps_arriving_throughout` is
+   the assertion that was missing.
+
+A third option — degrading the *order* to left-to-right — was rejected: it makes
+the animation correct at the cost of not being the animation that was asked for.
+
+Grid runs are untouched by all of this: a terminal, a log view, a code viewer's
+body and a pane's size/date columns all keep the padded single-draw path.
+
+### Text inputs never animate
+
+A widget with `wants_text_input` is showing *editable* content: a value under a
+caret that the user may be mid-way through typing. Scrambling or withholding it
+is wrong in a way no theme should be able to ask for, so text input implies
+`animates_text = False` — and any future input widget inherits that without
+knowing this system exists. An explicit `animates_text = True` still wins.
+
+### Pacing is per-widget, because a screenful is not a list of rows
+
+`max_strings` counts **strings**, not lines, and the ratio varies by an order of
+magnitude: TFM's file pane draws ~1.1 strings per row, while its text viewer
+draws ~8.7 (a line number plus a span per syntax token). The theme's 40-string
+cap therefore covers a whole pane but only about five lines of a viewer — which
+is what "only the first few lines animate" looks like.
+
+So `TextViewer` overrides the pacing in its variant: `stagger_ms: 0` (a screenful
+materializes together rather than cascading for seconds) and `max_strings: 0`
+(with no cascade there is nothing to bound). It still takes `duration_ms` from
+the theme.
 
 ### The trigger policy is the load-bearing decision
 

@@ -125,6 +125,29 @@ class ThemeOptIn(unittest.TestCase):
                 continue
             self.assertIsNone(theme.extras.get("text_effect"), name)
 
+    def test_text_viewer_prefers_scatter_with_flash(self):
+        from puikit import textfx
+        from tfm_text_viewer import TextViewer
+        variant = TextViewer.text_effect
+        merged = textfx.merge(textfx.coerce(SCIFI.extras["text_effect"]), variant)
+        self.assertEqual(merged.kind, "scatter")
+        self.assertGreater(merged.params.get("flash", 0), 0)
+        base = textfx.coerce(SCIFI.extras["text_effect"])
+        # Duration still comes from the theme...
+        self.assertEqual(merged.duration_ms, base.duration_ms)
+        # ...but a screenful is not a list of rows, so the viewer drops the
+        # pane's cascade and its cap. A viewer draws ~9 strings per line (a line
+        # number plus a span per syntax token), so the pane's 40-string cap
+        # covered about five lines and the rest of the screen just appeared.
+        self.assertEqual(merged.stagger_ms, 0)
+        self.assertEqual(merged.max_strings, 0)
+        self.assertTrue(base.max_strings, "the pane itself should still be capped")
+
+    def test_viewer_variant_is_inert_without_a_theme_effect(self):
+        # A widget preference must never animate what a theme left off.
+        from puikit import textfx
+        self.assertIsNone(textfx.coerce(DARK.extras.get("text_effect")))
+
     def test_theme_builder_passes_text_effect_through(self):
         t = tfm._theme(bg=(0, 0, 0), fg=(255, 255, 255), muted=(128, 128, 128),
                        accent=(0, 122, 204), surface=(20, 20, 20),

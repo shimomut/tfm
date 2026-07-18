@@ -447,6 +447,31 @@ class TextViewer(Widget):
 
     focusable = True
 
+    #: How this viewer's text arrives, when the active theme animates text at all
+    #: (see puikit.textfx). ``scatter`` + ``flash``: characters land in random
+    #: order, each striking its final column as a solid block for an instant
+    #: before settling — a screenful materializing rather than being typed.
+    #:
+    #: Typing suits a *line* — a pane row, a status message — because the eye
+    #: follows one reveal left to right. A full screen of text has no single
+    #: place to follow, so a left-to-right reveal reads as a slow wipe; landing
+    #: everywhere at once fills the page in the same time and gives the eye
+    #: somewhere to settle immediately.
+    #:
+    #: Whether text animates at all stays with the theme: this is inert under
+    #: every theme that does not opt in, and inherits the theme's duration.
+    #:
+    #: The pacing is overridden though, because a screenful is not a list of
+    #: rows. The theme's ``stagger_ms``/``max_strings`` pace a *pane*, where one
+    #: row is about one string and a small cascade reads well. A viewer draws
+    #: roughly nine strings per line (a line number plus a span per syntax
+    #: token), so the pane's 40-string cap covers about five lines and the rest
+    #: of the screen just appears — which is what "only the first few lines
+    #: animate" looks like. With no stagger there is no cascade to bound, so the
+    #: cap has no purpose either: the whole screen materializes on one clock.
+    text_effect = {"kind": "scatter", "flash": 0.10,
+                   "stagger_ms": 0, "max_strings": 0}
+
     def __init__(self, path, *, syntax: dict | None = None, state_manager=None):
         self.path = path
         self.lines, self.is_error = _read_lines(path)

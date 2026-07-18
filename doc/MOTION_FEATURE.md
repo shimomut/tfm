@@ -36,12 +36,12 @@ over log lines you have already read leaves them alone.
 
 ### Choosing a different one
 
-Four styles ship. Any theme can name one in your `config.py`:
+Five styles ship. Any theme can name one in your `config.py`:
 
 ```python
 THEMES = {
     'Dracula': {
-        'text_effect': 'decode',   # or 'typewriter', 'wipe', 'flicker'
+        'text_effect': 'scatter',   # or 'typewriter', 'decode', 'wipe', 'flicker'
         # ...or tune it:
         # 'text_effect': {'kind': 'typewriter', 'duration_ms': 300,
         #                 'stagger_ms': 12, 'max_strings': 40},
@@ -50,6 +50,9 @@ THEMES = {
 ```
 
 - `typewriter` — characters appear left to right, nothing in the tail (the Sci-Fi default)
+- `scatter` — characters land in **random order**, each straight into its final
+  spot; nothing ever shifts sideways. Reads as a message materializing rather
+  than being typed
 - `decode` — the un-revealed tail churns as junk glyphs until the reveal passes over it
 - `wipe` — the tail is held open by a block glyph until it resolves
 - `flicker` — the text is present but interferes, then settles
@@ -58,6 +61,41 @@ THEMES = {
 caps how many rows animate before the rest simply appear (so a long listing
 does not cascade for seconds). A misspelled name turns the effect off rather
 than breaking anything.
+
+### Options
+
+Two knobs work with `typewriter`, `scatter` and `decode`:
+
+```python
+'text_effect': {
+    'kind': 'typewriter',
+    'flash': 0.08,        # each character flashes as a solid block as it lands
+    'hidden': 'scramble', # not-yet-revealed characters churn instead of staying blank
+},
+```
+
+- **`flash`** — a character shows as a filled block for an instant at the moment
+  it resolves, then settles into its glyph. On `typewriter` this reads as a
+  typing cursor; on `scatter`, as characters striking into place. The value is a
+  fraction of the whole duration, so roughly `1 / len(text)` flashes for about
+  one character's worth of time — `0.06`–`0.12` suits most strings.
+- **`hidden`** — what an un-revealed character shows. Blank by default; set it to
+  `'scramble'` for churning junk (which is what makes `decode` look the way it
+  does, and can be applied to `scatter` for a noisier materialize).
+
+Text you are **editing** never animates — an input field always shows its real
+value, whatever the theme asks for.
+
+### Not everything uses the same one
+
+The **text viewer** uses `scatter` with `flash` regardless of which style the
+theme names, because a full screen of text has no single place for the eye to
+follow — a left-to-right reveal reads as a slow wipe, while landing everywhere at
+once fills the page in the same time.
+
+It still obeys the theme on everything that matters: if your theme has no text
+effect the viewer opens plainly like everything else, and it takes its timing
+from the theme rather than setting its own.
 
 ---
 
