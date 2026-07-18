@@ -495,15 +495,21 @@ class FilePane(Widget):
         # but is passed through ctx.ink against the *actual* background behind the
         # glyphs — the pane base, or the selection/match tint where one is painted —
         # so the name stays legible even on a row tinted toward a nearby hue
-        # (floor-only: unchanged wherever it already reads). The cursor row's glyphs
-        # draw over a *transparent* background so they land directly on the fill +
-        # outline below without a per-run fill repainting (and breaking) the stroke —
-        # but they still contrast against that fill (eff_bg), not None.
+        # (floor-only: unchanged wherever it already reads).
         eff_bg = row_bg if row_bg is not None else base
         is_link = info.get("is_link", False)
         name_fg = ctx.ink(self._type_fg(theme, is_dir, is_link), on=eff_bg, target=LC_BODY)
         col_fg = ctx.ink(theme.muted_text, on=eff_bg, target=LC_LARGE)
-        text_bg = TRANSPARENT if gui_cursor else row_bg
+        # A vector backend composites, so glyphs on any *filled* row (selected /
+        # matched / cursor) draw over a transparent bg and land directly on the fill
+        # already painted — no per-run bg repaint (which would also break the cursor
+        # stroke). That repaint is what read as a darker/thicker band behind the text
+        # under a translucent 3D-background reveal: the row fill is dimmed toward the
+        # scene, but an opaque per-run bg is not, so the text cells bloomed proud of
+        # the row. The glyphs still contrast against that fill (via eff_bg above), not
+        # None. A grid backend can't composite, so it keeps the fill color as the text
+        # bg (each cell has one bg) and the selection still reads.
+        text_bg = TRANSPARENT if (not grid and fill_bg is not None) else row_bg
 
         ctx.draw_text(content_left, y, name_text, Style(fg=name_fg, bg=text_bg))
         if ext_text:
