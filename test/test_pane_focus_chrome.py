@@ -117,7 +117,7 @@ class ThemeOptIn(unittest.TestCase):
         # Short and capped: this fires on every directory change, so a long or
         # uncapped cascade would sit between the user and their file list.
         self.assertLessEqual(effect.duration_ms, 400)
-        self.assertTrue(effect.max_strings)
+        self.assertTrue(effect.max_rows)
 
     def test_no_other_builtin_theme_animates_text(self):
         for name, theme in tfm.THEMES:
@@ -136,12 +136,10 @@ class ThemeOptIn(unittest.TestCase):
         # Duration still comes from the theme...
         self.assertEqual(merged.duration_ms, base.duration_ms)
         # ...but a screenful is not a list of rows, so the viewer drops the
-        # pane's cascade and its cap. A viewer draws ~9 strings per line (a line
-        # number plus a span per syntax token), so the pane's 40-string cap
-        # covered about five lines and the rest of the screen just appeared.
+        # pane's cascade and its row cap: the whole page materializes at once.
         self.assertEqual(merged.stagger_ms, 0)
-        self.assertEqual(merged.max_strings, 0)
-        self.assertTrue(base.max_strings, "the pane itself should still be capped")
+        self.assertEqual(merged.max_rows, 0)
+        self.assertTrue(base.max_rows, "the pane itself should still be capped")
 
     def test_viewer_variant_is_inert_without_a_theme_effect(self):
         # A widget preference must never animate what a theme left off.

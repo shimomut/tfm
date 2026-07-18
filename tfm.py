@@ -386,10 +386,6 @@ _THEME_SPECS: list[tuple[str, dict]] = [
                     # and no other theme is affected — and PuiKit applies it inside
                     # draw_text, so no TFM widget knows it exists.
                     #
-                    # Short and lightly staggered on purpose. This fires on every
-                    # directory change, so anything longer would sit between the
-                    # user and their file list; max_strings keeps a 200-row pane
-                    # from cascading for seconds.
                     # ``typewriter`` — a clean left-to-right reveal with nothing
                     # in the tail. ``decode`` (the tail churning as junk glyphs
                     # until the head passes over it) is the louder alternative and
@@ -397,8 +393,15 @@ _THEME_SPECS: list[tuple[str, dict]] = [
                     # it. Plain reading of a filename wins for the default: the
                     # pane's job is to be read, and a decoding tail competes with
                     # the text that has already resolved.
+                    #
+                    # Short and lightly staggered on purpose: this fires on every
+                    # directory change, so anything longer would sit between the
+                    # user and their file list. ``stagger_ms`` steps per ROW, so
+                    # the cascade tracks the window height rather than how many
+                    # strings a widget spends per row, and ``max_rows`` is only a
+                    # backstop for a very tall window (120 x 8ms ≈ 1s).
                     text_effect={"kind": "typewriter", "duration_ms": 260,
-                                 "stagger_ms": 12, "max_strings": 40})),
+                                 "stagger_ms": 8, "max_rows": 120})),
     # Segment LCD: a positive/reflective digital display — a sage-green base with
     # near-black "segments" (just two colors: the green + black). A light-polarity
     # mono theme; because the text is genuine black (maximally dark), the app's

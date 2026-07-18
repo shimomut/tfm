@@ -462,15 +462,11 @@ class TextViewer(Widget):
     #: every theme that does not opt in, and inherits the theme's duration.
     #:
     #: The pacing is overridden though, because a screenful is not a list of
-    #: rows. The theme's ``stagger_ms``/``max_strings`` pace a *pane*, where one
-    #: row is about one string and a small cascade reads well. A viewer draws
-    #: roughly nine strings per line (a line number plus a span per syntax
-    #: token), so the pane's 40-string cap covers about five lines and the rest
-    #: of the screen just appears — which is what "only the first few lines
-    #: animate" looks like. With no stagger there is no cascade to bound, so the
-    #: cap has no purpose either: the whole screen materializes on one clock.
+    #: rows: the whole page materializes on one clock rather than cascading down
+    #: it. With no stagger there is no cascade to bound, so the row cap has no
+    #: purpose here either and every visible line takes part.
     text_effect = {"kind": "scatter", "flash": 0.10,
-                   "stagger_ms": 0, "max_strings": 0}
+                   "stagger_ms": 0, "max_rows": 0}
 
     def __init__(self, path, *, syntax: dict | None = None, state_manager=None):
         self.path = path

@@ -179,7 +179,7 @@ overriding the user:
 | Decision | Owner |
 |---|---|
 | *Whether* text animates at all | the **theme** — nothing else can turn it on |
-| The pacing (`duration_ms`, `stagger_ms`, `max_strings`) | the **theme** |
+| The pacing (`duration_ms`, `stagger_ms`, `max_rows`) | the **theme**, though a widget may override it |
 | The *flavor* for one widget's subtree | the **widget**, via a `text_effect` class attribute |
 | Opting out entirely | the **widget**, via `animates_text = False` |
 
@@ -247,18 +247,30 @@ is wrong in a way no theme should be able to ask for, so text input implies
 `animates_text = False` — and any future input widget inherits that without
 knowing this system exists. An explicit `animates_text = True` still wins.
 
-### Pacing is per-widget, because a screenful is not a list of rows
+### Pacing is counted in rows, not strings
 
-`max_strings` counts **strings**, not lines, and the ratio varies by an order of
-magnitude: TFM's file pane draws ~1.1 strings per row, while its text viewer
-draws ~8.7 (a line number plus a span per syntax token). The theme's 40-string
-cap therefore covers a whole pane but only about five lines of a viewer — which
-is what "only the first few lines animate" looks like.
+`stagger_ms` steps per **row** and `max_rows` caps rows, both keyed on the
+`y` a widget draws at. Strings sharing a row are one visual unit: they step
+together and cost one row against the cap.
 
-So `TextViewer` overrides the pacing in its variant: `stagger_ms: 0` (a screenful
-materializes together rather than cascading for seconds) and `max_strings: 0`
-(with no cascade there is nothing to bound). It still takes `duration_ms` from
-the theme.
+Counting strings instead was wrong twice, in opposite directions, because the
+strings-per-row ratio varies by an order of magnitude between widgets — TFM's
+file pane draws about **1.0** strings per row, its syntax-highlighted text viewer
+about **8.7**:
+
+- a 40-*string* cap covered only ~5 lines of the viewer, so the rest of the page
+  simply appeared;
+- the same cap cut a 60-row file pane off at row 39 — the reported "latter half
+  doesn't animate".
+
+With rows as the unit the number means what a reader expects ("the first N rows
+animate, each one step later") and holds for any widget. TFM's Sci-Fi theme now
+paces at `stagger_ms: 8` with `max_rows: 120` — a backstop for a very tall
+window (~1s), not a coverage limit.
+
+A widget may still override the pacing. `TextViewer` sets `stagger_ms: 0` and
+`max_rows: 0`: a screenful materializes on one clock rather than cascading down
+the page, and with no cascade there is nothing to bound.
 
 ### The trigger policy is the load-bearing decision
 
@@ -299,10 +311,10 @@ share one key and reveal together, and a re-wrap on resize does not renumber it.
 
 - **State is per widget, not per string** — `{id(widget): start_time}`. A
   200-string pane is one entry.
-- **`stagger_ms` and `max_strings`** live on the effect. The cap matters: without
-  it a long stagger over a full pane would cascade for seconds. TFM's Sci-Fi
-  values (260 ms, 12 ms stagger, 40 strings) are tuned around this firing on
-  *every directory change*.
+- **`stagger_ms` and `max_rows`** live on the effect and are counted in rows —
+  see "Pacing is counted in rows, not strings" above. TFM's Sci-Fi values
+  (260 ms, 8 ms stagger, 120 rows) are tuned around this firing on *every
+  directory change*.
 - **Noise is decorrelated per string.** The junk hash is keyed by character
   index, so equal-length rows scrambled to byte-identical junk and a pane read as
   a repeating pattern rather than as data. The string's position within the

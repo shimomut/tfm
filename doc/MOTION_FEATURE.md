@@ -44,7 +44,7 @@ THEMES = {
         'text_effect': 'scatter',   # or 'typewriter', 'decode', 'wipe', 'flicker'
         # ...or tune it:
         # 'text_effect': {'kind': 'typewriter', 'duration_ms': 300,
-        #                 'stagger_ms': 12, 'max_strings': 40},
+        #                 'stagger_ms': 8, 'max_rows': 120},
     },
 }
 ```
@@ -57,10 +57,10 @@ THEMES = {
 - `wipe` — the tail is held open by a block glyph until it resolves
 - `flicker` — the text is present but interferes, then settles
 
-`duration_ms` is per string; `stagger_ms` cascades a pane's rows; `max_strings`
-caps how many rows animate before the rest simply appear (so a long listing
-does not cascade for seconds). A misspelled name turns the effect off rather
-than breaking anything.
+`duration_ms` is how long one string takes; `stagger_ms` is the delay added per
+**row**, so a listing cascades down the pane; `max_rows` caps how many rows
+animate before the rest simply appear, so a very tall window does not cascade for
+seconds. A misspelled name turns the effect off rather than breaking anything.
 
 ### Options
 
