@@ -588,7 +588,7 @@ def show_diff_viewer(panel: Any, path1, path2, z: int = 80) -> DiffViewer:
     sw, sh = panel.backend.size_units
     viewer._panel = panel
     viewer._child_z = z + 10  # help overlay stacks above the viewer's own layer
-    panel.push_layer(viewer, z=z, hints={"x": 0, "y": 0, "w": sw, "h": sh},
+    panel.push_layer(viewer, z=z, hints={"x": 0, "y": 0, "w": sw, "h": sh, "cover": True},
                      reflow=lambda sw, sh: Rect(0, 0, sw, sh))
     panel.animate(viewer, hints={"transition": "fade", "duration_ms": 120})
     return viewer

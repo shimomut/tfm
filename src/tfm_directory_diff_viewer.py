@@ -1595,7 +1595,7 @@ def show_directory_diff_viewer(panel: Any, left_path: Path, right_path: Path,
     viewer._child_z = z + 10
     sw, sh = panel.backend.size_units
     viewer._panel = panel
-    panel.push_layer(viewer, z=z, hints={"x": 0, "y": 0, "w": sw, "h": sh},
+    panel.push_layer(viewer, z=z, hints={"x": 0, "y": 0, "w": sw, "h": sh, "cover": True},
                      reflow=lambda sw, sh: Rect(0, 0, sw, sh))
     panel.request_animation_ticks(viewer._tick)
     panel.animate(viewer, hints={"transition": "fade", "duration_ms": 120})
