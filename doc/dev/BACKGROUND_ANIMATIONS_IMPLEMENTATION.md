@@ -206,6 +206,42 @@ did originally.
   camera swings a near corner behind the eye; such a point projects to `None` and
   its segment is dropped.
 
+## Idle parking (applies to both kinds)
+
+An animated background is the only thing in TFM that keeps an idle app redrawing
+indefinitely, so PuiKit stops it when nobody is watching. Lives in
+`MacOSBackend`, so neither TFM nor any scene has to opt in.
+
+- `_bg_target` asks for full rate while the window holds focus **and** input was
+  recent (`_BG_IDLE_TIMEOUT`, 15s); otherwise zero. Same shape as
+  `_roll_user_active` for the CRT roll.
+- `_background_tick` eases `_bg_rate` toward that target — `_BG_RAMP_DOWN` (40s)
+  falling, `_BG_RAMP_UP` (15s) rising — and runs it through `_smoothstep`, so the
+  *change in speed* is gradual at both ends. Measured: at most **0.17%** change in
+  speed per frame, which is below the threshold at which the eye reads the ramp
+  itself as motion. Stopping dead would be as noticeable as the animation.
+- Those spans are long deliberately, and they trade against the battery goal: the
+  background keeps running for the ramp's length after you stop, so it is ~55s
+  from last input to parked. Parking is deferred, not skipped — the steady-state
+  saving is unchanged, only how quickly it is reached.
+- At zero the tick returns `False`, unregistering itself. That lets
+  `_ensure_animation_timer` drop the frame timer back to the 10Hz idle rate,
+  which is where the actual power saving comes from. The last frame stays on
+  screen (a shader's layer keeps its drawable; a segment scene its last paint).
+- `_dispatch` calls `_ensure_background_ticker` on every input, alongside the
+  roll ticker's re-arm.
+
+**The clock is the subtle part.** `_bg_clock` counts *animated* time — it advances
+by `dt × eased_rate`, never wall clock. So a background parked for ten minutes
+resumes exactly where it stopped rather than teleporting ten minutes into the
+scene. Both renderers read `_bg_clock`; neither uses wall clock. `dt` is also
+clamped to 0.25s so a stalled main thread resumes by continuing rather than
+lurching.
+
+`_smoothstep` and `_approach` are module-level pure functions specifically so the
+ramp is exactly testable, and `tests/test_background_idle.py` drives the whole
+park/resume lifecycle against a fake clock — no window, no waiting.
+
 ## The shader path
 
 ### Writing one

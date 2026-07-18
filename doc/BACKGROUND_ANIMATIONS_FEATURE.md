@@ -78,6 +78,24 @@ becomes visible through them.
 Text, outlines and dialog boxes always stay opaque, so lowering `opacity` does not
 make the interface unreadable.
 
+### It stops when you're not using it
+
+An animation that ran forever would keep your machine busy — and drain the
+battery — while you were reading something else. So it doesn't:
+
+- After about 15 seconds without input, or as soon as TFM loses focus, the
+  animation **very gradually slows to a stop**, taking a further 40 seconds or so
+  to wind down. The slowing is deliberately too gentle to notice — an abrupt halt
+  would catch the eye as much as the movement does.
+- The scene stays on screen, frozen, rather than disappearing.
+- The moment you press a key or move the mouse, it **eases back up to speed**.
+- It resumes from exactly where it stopped. Leave TFM alone for an hour and the
+  wave picks up where you left it, instead of jumping to wherever it "would have"
+  been.
+
+There is nothing to configure and no interruption to what you're doing — while
+parked, TFM uses no more power than it would with a plain background.
+
 ### Tuning speed and strength
 
 Give `animation` a dict instead of a name to adjust it:
