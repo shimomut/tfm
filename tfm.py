@@ -140,10 +140,44 @@ def _resolve_post_effect(value) -> "PostEffect | None":
     return None
 
 
+#: TFM's cube tuning when a theme just switches the 3D background on
+#: (``background_3d: True``): a slow, subtle spin that reads through the panes.
+#: ``color`` (theme foreground) and ``backdrop`` (theme background) are filled per
+#: theme by ``_resolve_background_3d`` so the cube stays on-palette and legible.
+_BG3D_DEFAULTS = dict(kind="wireframe", speed=0.6, opacity=0.6, reveal=0.4)
+
+
+def _resolve_background_3d(value, *, color, backdrop) -> "Background3D | None":
+    """Turn a theme's ``background_3d`` recommendation into a ``Background3D`` (or
+    ``None``), mirroring ``_resolve_post_effect``. Accepts ``True`` (the tuned
+    default cube), a params dict (``{'speed': 1.0, 'reveal': 0.6, ...}`` merged
+    onto the default), an already-built ``Background3D`` (used as-is), or a falsy
+    value for "no background". The edge ``color`` (theme foreground) and
+    ``backdrop`` (theme background) are filled from the active theme unless the
+    caller's params name their own, so the cube stays on-palette and visible on
+    light themes. A malformed dict resolves to ``None`` so a config typo degrades
+    to "off" rather than blocking startup."""
+    if not value:
+        return None
+    if isinstance(value, Background3D):
+        return value
+    params = dict(_BG3D_DEFAULTS)
+    if isinstance(value, dict):
+        params.update(value)
+    elif value is not True:
+        return None
+    params.setdefault("color", color)
+    params.setdefault("backdrop", backdrop)
+    try:
+        return Background3D(**params)
+    except TypeError:
+        return None
+
+
 def _theme(bg, fg, muted, accent, surface, selection, *, accent2=None,
            status=None, footer=None, directory=None, isearch_match=None,
            syntax=None, file_types=None, cursor=None, selection_fill=None,
-           post_effect=None) -> Theme:
+           post_effect=None, background_3d=None) -> Theme:
     ac2 = accent if accent2 is None else accent2
     p = {"bg": bg, "fg": fg, "muted": muted, "accent": accent, "accent2": ac2,
          "surface": surface}
@@ -178,12 +212,16 @@ def _theme(bg, fg, muted, accent, surface, selection, *, accent2=None,
         extras["selection_fill"] = selection_fill(p) if callable(selection_fill) else selection_fill
     if syntax is not None:
         extras["syntax"] = dict(syntax)
-    # A theme may *recommend* a post-processing effect (a CRT/phosphor look): it
-    # rides in extras and TfmApp pushes it to the backend on theme switch, so a
-    # pixel backend (macOS GUI) auto-adjusts while a terminal ignores it.
+    # A theme may *recommend* a post-processing effect (a CRT/phosphor look) and/or
+    # an animated 3D background (a spinning wireframe cube): both ride in extras and
+    # TfmApp pushes them to the backend on theme switch, so a pixel backend (macOS
+    # GUI) auto-adjusts while a terminal ignores them.
     effect = _resolve_post_effect(post_effect)
     if effect is not None:
         extras["post_effect"] = effect
+    scene = _resolve_background_3d(background_3d, color=fg, backdrop=bg)
+    if scene is not None:
+        extras["background_3d"] = scene
     kw: dict = {}
     if surfaces:
         kw["surfaces"] = surfaces
@@ -270,7 +308,8 @@ _THEME_SPECS: list[tuple[str, dict]] = [
                     syntax={"keyword": (96, 186, 255), "string": (255, 182, 98),
                             "comment": (98, 128, 164), "number": (255, 158, 54),
                             "operator": (176, 186, 255), "builtin": (140, 212, 255)},
-                    post_effect={"bloom": 0.45, "vignette": 0.26, "glow": 0.22})),
+                    post_effect={"bloom": 0.45, "vignette": 0.26, "glow": 0.22},
+                    background_3d=True)),  # spinning wireframe cube (GUI backend)
     # Segment LCD: a positive/reflective digital display — a sage-green base with
     # near-black "segments" (just two colors: the green + black). A light-polarity
     # mono theme; because the text is genuine black (maximally dark), the app's
@@ -319,6 +358,7 @@ _THEME_OVERRIDE_MAP = {
     "status": "status", "footer": "footer", "directory": "directory",
     "isearch_match": "isearch_match", "syntax": "syntax", "file_types": "file_types",
     "cursor": "cursor", "selection_fill": "selection_fill", "post_effect": "post_effect",
+    "background_3d": "background_3d",
 }
 
 #: Sub-dict theme keys that deep-merge (the user recolors only the entries they
@@ -2108,28 +2148,16 @@ class TfmApp:
         self.backend.set_post_effect(theme.extras.get("post_effect"))
 
     def _apply_background_3d(self, theme: Theme) -> None:
-        """Opt-in animated 3D background (a slowly spinning wireframe cube),
-        enabled by setting the ``TFM_BG3D`` environment variable — a feasibility
-        toggle, off by default. The edge color is derived from the theme's
-        foreground so it stays on-palette, and it re-applies on theme switch. A
-        backend without the ``background_3d`` capability (a terminal) inherits the
-        base no-op, so this never branches on the backend.
-
-        ``reveal`` dissolves the pane *surface* fills toward translucent so the
-        cube reads *through* the panes (framed dialogs and text stay opaque, so
-        the UI stays legible). ``backdrop`` is the theme background: the dissolved
-        surfaces fall back to it rather than the backend's neutral dark clear, so
-        the cube stays visible on *light* themes too (a dark ``theme.text`` line
-        reads against the light backdrop instead of vanishing into near-black) and
-        the panes don't muddy toward dark where dissolved. Tune the constants
-        below to taste."""
-        if not os.environ.get("TFM_BG3D"):
-            self.backend.set_background_3d(None)
-            return
-        self.backend.set_background_3d(
-            Background3D(color=theme.text, speed=0.6, opacity=0.6, reveal=0.4,
-                         backdrop=theme.surfaces.get("content"))
-        )
+        """Push the theme's recommended animated 3D background (a slowly spinning
+        wireframe cube) to the backend, or ``None`` to clear it — so a theme that
+        opts in (``background_3d``, only Sci-Fi and Phosphor today) turns the cube
+        on and switching away turns it off, exactly like ``_apply_post_effect``.
+        The ``Background3D`` was built per theme in ``_theme`` with its edge color
+        (theme foreground) and backdrop (theme background) baked in, so the cube
+        stays on-palette and reads on light themes too. A backend without the
+        ``background_3d`` capability (a terminal) inherits the base no-op, so this
+        never branches on the backend."""
+        self.backend.set_background_3d(theme.extras.get("background_3d"))
 
     def _cycle_theme(self) -> None:
         """Advance to the next palette (the ``toggle_color_scheme`` / T action)."""
