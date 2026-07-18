@@ -14,14 +14,17 @@ from tfm_state_manager import TFMStateManager
 from tfm_path import Path
 
 
-def test_remote_path_cleanup_optimization():
+def test_remote_path_cleanup_optimization(tmp_path):
     """Test that remote paths are skipped during cleanup for performance."""
-    
+
     print("Testing remote path cleanup optimization...")
-    
-    # Initialize state manager
-    state_manager = TFMStateManager()
-    
+
+    # Own database: the bare TFMStateManager() opens the real shared ~/.tfm/state.db,
+    # so cleanup would also walk whatever history another test (or a real TFM
+    # session) left there and the assertion on which paths were checked would
+    # depend on run order.
+    state_manager = TFMStateManager(db_path=str(tmp_path / "state.db"))
+
     # Create test history with mix of local and remote paths
     test_history = [
         [time.time(), "/tmp/existing_local", "file1.txt"],
@@ -85,13 +88,13 @@ def test_remote_path_cleanup_optimization():
         print("✓ Local existing paths were preserved")
 
 
-def test_performance_improvement():
+def test_performance_improvement(tmp_path):
     """Test that remote path cleanup is significantly faster."""
-    
+
     print("\nTesting performance improvement...")
-    
-    state_manager = TFMStateManager()
-    
+
+    state_manager = TFMStateManager(db_path=str(tmp_path / "state.db"))
+
     # Create history with many remote paths
     large_history = []
     for i in range(20):  # Reduced for faster testing

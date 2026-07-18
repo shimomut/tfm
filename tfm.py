@@ -66,6 +66,10 @@ _FILTER_HISTORY_MAX = 100
 _HISTORY_MAX = 100
 
 from tfm_backend_detector import is_desktop_mode  # noqa: E402
+# Imported for its import-time side effect: publishing TFM's background animations
+# (starfield, rain, constellation, grid) into puikit's registry, so a theme's
+# ``animation`` key can name them. See src/tfm_background_animations.py.
+import tfm_background_animations  # noqa: E402,F401
 from tfm_config import KeyBindings, config_manager, get_config, get_favorite_directories  # noqa: E402
 from tfm_file_list_manager import FileListManager  # noqa: E402
 from tfm_file_monitor_manager import FileMonitorManager  # noqa: E402
@@ -140,12 +144,19 @@ def _resolve_post_effect(value) -> "PostEffect | None":
     return None
 
 
-#: TFM's cube tuning for the animation background: a slow, subtle spin. ``color``
-#: (theme foreground) and ``backdrop`` (theme background) are filled per theme by
-#: ``_resolve_background`` so the cube stays on-palette and legible. How opaque the
-#: UI is (so the background reads *through* the panes where < 1) is a separate theme
-#: value (``opacity``), pushed via ``set_surface_opacity`` — see ``_apply_surface_opacity``.
+#: TFM's tuning for an animation background: slow and subdued, since it sits behind
+#: a working file manager. ``color`` (theme foreground) and ``backdrop`` (theme
+#: background) are filled per theme by ``_resolve_background`` so a scene stays
+#: on-palette and legible. How opaque the UI is (so the background reads *through*
+#: the panes where < 1) is a separate theme value (``opacity``), pushed via
+#: ``set_surface_opacity`` — see ``_apply_surface_opacity``.
 _ANIM_DEFAULTS = dict(speed=0.6, opacity=0.6)
+
+#: The animation used when a theme asks for one without naming a type
+#: (``animation: True``). The scenes themselves live in
+#: ``tfm_background_animations``; puikit's own ``'cube'`` remains valid but is a
+#: toolkit reference scene rather than a production look.
+_ANIM_DEFAULT_KIND = "starfield"
 
 #: Per-kind param keys carried from the theme spec onto the puikit descriptor.
 _ANIM_PARAMS = ("speed", "opacity", "color")
@@ -158,10 +169,13 @@ def _resolve_background(animation, wallpaper, *, color, backdrop):
     ``_resolve_post_effect``. A theme names at most one, both separate from the base
     ``background`` *color*:
 
-    * ``animation`` — the animation *type* string (``'cube'``, and later ``'snow'``
-      ...), ``True`` (the tuned default cube), or a params dict
-      (``{'type': 'cube', 'speed': ..., ...}`` merged onto the tuned default). The
-      edge ``color`` (theme fg) and ``backdrop`` (theme bg) are filled from the theme.
+    * ``animation`` — the animation *type* string (``'starfield'``, ``'rain'``,
+      ``'constellation'``, ``'grid'``; see ``tfm_background_animations``), ``True``
+      (the tuned default, ``_ANIM_DEFAULT_KIND``), or a params dict
+      (``{'type': 'rain', 'speed': ..., ...}`` merged onto the tuned default). The
+      line ``color`` (theme fg) and ``backdrop`` (theme bg) are filled from the theme.
+      An unregistered type name resolves fine here and simply draws nothing — the
+      backend looks it up per frame and skips a miss.
     * ``wallpaper`` — an image path string, or a params dict
       (``{'image': 'path', 'fit': ..., 'opacity': ...}``).
 
@@ -181,10 +195,10 @@ def _resolve_background(animation, wallpaper, *, color, backdrop):
                 return animation
             params = dict(_ANIM_DEFAULTS)
             if isinstance(animation, dict):
-                atype = animation.get("type", "cube")
+                atype = animation.get("type", _ANIM_DEFAULT_KIND)
                 params.update({k: animation[k] for k in _ANIM_PARAMS if k in animation})
-            else:  # a type string, or True for the default cube
-                atype = animation if isinstance(animation, str) else "cube"
+            else:  # a type string, or True for the tuned default
+                atype = animation if isinstance(animation, str) else _ANIM_DEFAULT_KIND
             params.setdefault("color", color)
             params.setdefault("backdrop", backdrop)
             return Background3D(kind=atype, **params)
@@ -333,8 +347,8 @@ _THEME_SPECS: list[tuple[str, dict]] = [
                             "comment": (98, 128, 164), "number": (255, 158, 54),
                             "operator": (176, 186, 255), "builtin": (140, 212, 255)},
                     post_effect={"bloom": 0.45, "vignette": 0.26, "glow": 0.22},
-                    animation="cube",     # spinning cube (GUI backend)
-                    opacity=0.6)),        # chrome at 60% opacity so the cube reads through
+                    animation="starfield",  # stars streaming past (GUI backend)
+                    opacity=0.6)),          # chrome at 60% so the field reads through
     # Segment LCD: a positive/reflective digital display — a sage-green base with
     # near-black "segments" (just two colors: the green + black). A light-polarity
     # mono theme; because the text is genuine black (maximally dark), the app's
@@ -2185,8 +2199,9 @@ class TfmApp:
 
     def _apply_background(self, theme: Theme) -> None:
         """Push the theme's recommended background behind the UI to the backend, or
-        ``None`` to clear it — a cube animation or a wallpaper image (only Sci-Fi and
-        Phosphor opt in today), turned on when the theme becomes active and off when
+        ``None`` to clear it — an animated scene (see ``tfm_background_animations``)
+        or a wallpaper image (only Sci-Fi opts in among the built-in themes, and the
+        sample Phosphor in ``_config.py``), turned on when the theme becomes active and off when
         you switch away, exactly like ``_apply_post_effect``. The descriptor was
         built per theme in ``_theme`` with its color (theme foreground) and backdrop
         (theme background) baked in, so an animation stays on-palette and reads on

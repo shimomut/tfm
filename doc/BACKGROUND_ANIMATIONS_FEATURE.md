@@ -1,0 +1,93 @@
+# Background Animations Feature
+
+## Overview
+
+A theme can draw a slow animated scene *behind* the file panes. The animation is
+rendered under the whole UI and shows through wherever the interface is not fully
+opaque, so it reads as a living wallpaper rather than as decoration on top of your
+files.
+
+Animations are drawn in **your theme's own colours** — the line colour comes from
+the theme foreground and the backdrop from the theme background — so a scene stays
+on-palette whichever theme (or custom palette) you use.
+
+> **GUI backend only.** Animations need real pixels. They are rendered by the
+> desktop backend (`tfm.py --backend gui` on macOS/Windows). In a terminal there
+> are no sub-cell pixels to draw into, so the setting is silently ignored and you
+> simply get the theme's plain background colour.
+
+## Available animations
+
+| Name | What it looks like |
+|------|--------------------|
+| `starfield` | Stars streaming toward you out of a vanishing point, drawn as motion streaks that lengthen and brighten as they approach. |
+| `rain` | Falling streaks with fading tails, each column at its own speed — the classic phosphor-terminal rain. |
+| `constellation` | Slowly drifting points that link to their near neighbours, the links fading in and out as points pass. |
+| `grid` | Flying down a wireframe corridor — floor, ceiling and both walls gridded, converging on a vanishing point that wanders as the camera slowly drifts and turns. |
+
+The UI toolkit's own `cube` (a spinning wireframe) also works. It exists as a
+reference scene for the rendering path rather than as a finished look.
+
+## Turning one on
+
+Animations are chosen per theme. Among the built-in themes, **Sci-Fi** ships with
+the starfield; select it from **View → Theme** or cycle themes with `T`.
+
+To use one in your own theme, add an `animation` key to a theme in the `THEMES`
+dict in `~/.tfm/config.py`:
+
+```python
+THEMES = {
+    'Deep Space': {
+        'base': 'Dark+',
+        'animation': 'starfield',
+        'opacity': 0.6,          # let the scene show through the panes
+    },
+}
+```
+
+### `opacity` — letting the animation show through
+
+An animation is drawn *behind* the UI, so with a fully opaque interface you would
+only see it in whatever gaps the layout leaves. The theme's `opacity` value (0–1)
+controls how opaque the pane and row backgrounds are; lower it and the scene
+becomes visible through them.
+
+- `1.0` — fully opaque UI (default). The animation is essentially hidden.
+- `0.6` — a good starting point: the scene reads clearly, text stays crisp.
+- `0.3` — very translucent; atmospheric, but check legibility with your palette.
+
+Text, outlines and dialog boxes always stay opaque, so lowering `opacity` does not
+make the interface unreadable.
+
+### Tuning speed and strength
+
+Give `animation` a dict instead of a name to adjust it:
+
+```python
+'animation': {'type': 'rain', 'speed': 1.0, 'opacity': 0.8},
+```
+
+| Key | Meaning |
+|-----|---------|
+| `type` | Which animation (see the table above). |
+| `speed` | Motion-rate multiplier. `1.0` is the tuned look; TFM's default is `0.6`. `0` freezes the scene. |
+| `opacity` | How strongly the scene's *lines* are drawn, 0–1. Not to be confused with the theme-level `opacity`, which is about the UI on top of it. |
+| `color` | Line colour, if you want something other than the theme foreground. |
+
+All animations are deliberately slow and understated — they sit behind a working
+file manager, so they are tuned to stay in the background rather than compete with
+filenames for attention. Raising `speed` much above `1.0` works, but is likely to
+be distracting during real use.
+
+## Using an image instead
+
+The background can be a static image rather than an animation — see the
+`wallpaper` key in the theme documentation. A theme has one background: naming
+both `wallpaper` and `animation` uses the wallpaper.
+
+## See also
+
+- [Color Schemes](COLOR_SCHEMES_FEATURE.md) — themes, palettes and screen effects
+- [Configuration](CONFIGURATION_FEATURE.md) — where `~/.tfm/config.py` lives and how themes are defined
+- [Developer notes](dev/BACKGROUND_ANIMATIONS_IMPLEMENTATION.md) — how a scene is defined and how to add one

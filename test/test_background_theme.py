@@ -40,12 +40,17 @@ class ResolveBackground(unittest.TestCase):
         self.assertEqual(bg.color, _COLOR)        # theme fg filled in
         self.assertEqual(bg.backdrop, _BACKDROP)  # theme bg filled in
 
-    def test_animation_true_is_default_cube(self):
-        self.assertEqual(_resolve(animation=True).kind, "cube")
+    def test_animation_true_is_the_tuned_default(self):
+        # An unnamed animation gets TFM's default scene — one of its own
+        # production animations, not the toolkit's reference cube.
+        from puikit.background import ANIMATIONS
+        kind = _resolve(animation=True).kind
+        self.assertEqual(kind, tfm._ANIM_DEFAULT_KIND)
+        self.assertIn(kind, ANIMATIONS)
 
     def test_animation_params_dict(self):
-        bg = _resolve(animation={"type": "cube", "speed": 1.5})
-        self.assertEqual((bg.kind, bg.speed), ("cube", 1.5))
+        bg = _resolve(animation={"type": "rain", "speed": 1.5})
+        self.assertEqual((bg.kind, bg.speed), ("rain", 1.5))
 
     def test_wallpaper_string_and_dict(self):
         self.assertEqual(_resolve(wallpaper="~/p.png").image, "~/p.png")
@@ -62,7 +67,7 @@ class ResolveBackground(unittest.TestCase):
     def test_bad_input_degrades_gracefully(self):
         # A wallpaper dict with no image resolves to solid (None), not a crash.
         self.assertIsNone(_resolve(wallpaper={"fit": "fill"}))
-        # Any truthy animation value yields the default cube (an unknown *type*
+        # Any truthy animation value yields the default scene (an unknown *type*
         # simply renders nothing at the backend rather than failing here).
         self.assertIsInstance(_resolve(animation=True), Background3D)
         self.assertEqual(_resolve(animation="snow").kind, "snow")  # passed through

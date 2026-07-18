@@ -132,10 +132,18 @@ class Config:
     #   #   One background of two kinds (else the plain theme color). On/off with the
     #   #   theme, like post_effect; a terminal has no pixels and ignores it. NOTE the
     #   #   'background' key above is the base *color* — these choose the content:
-    #   #   * animation — a spinning wireframe cube (the 'cube' type), colored from
-    #   #     this theme (foreground line, background backdrop) so it stays on-palette:
-    #   #       'animation': 'cube'                          # the tuned default cube
-    #   #       'animation': {'type': 'cube', 'speed': 1.0, 'opacity': 0.8}  # custom
+    #   #   * animation — a slow moving scene drawn in this theme's own colors
+    #   #     (foreground line, background backdrop) so it stays on-palette:
+    #   #       'starfield'     stars streaming toward you, fading in with depth
+    #   #       'rain'          falling streaks with fading tails
+    #   #       'constellation' drifting nodes linked to their near neighbours
+    #   #       'grid'          flying through a wireframe corridor, the camera
+    #   #                       slowly drifting and turning as it goes
+    #   #     Written as a bare type, or a dict to retune speed / line opacity:
+    #   #       'animation': 'starfield'                     # the tuned default
+    #   #       'animation': {'type': 'rain', 'speed': 1.0, 'opacity': 0.8}
+    #   #     ('cube', a spinning wireframe, also works — it is the UI toolkit's
+    #   #      own reference scene rather than one of TFM's.)
     #   #   * wallpaper — a single image scaled to fill the window:
     #   #       'wallpaper': '~/Pictures/bg.png'
     #   #       'wallpaper': {'image': '~/bg.png', 'fit': 'fit', 'opacity': 0.8}
@@ -166,8 +174,8 @@ class Config:
         # backend the 'post_effect' below adds a real CRT glow over the green.
         'Phosphor': {
             'post_effect': 'crt',            # CRT glow/bloom/scanlines (GUI backend)
-            'animation': 'cube',             # spinning wireframe cube (GUI backend)
-            'opacity': 0.6,                  # chrome opacity; < 1 lets the cube show through
+            'animation': 'rain',             # falling phosphor streaks (GUI backend)
+            'opacity': 0.6,                  # chrome opacity; < 1 lets the rain show through
             'background': (4, 15, 7),        # dark CRT green-black
             'foreground': (51, 245, 121),    # phosphor green
             'muted':      (33, 138, 74),     # dim green (secondary text / dividers)
