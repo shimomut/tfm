@@ -8,15 +8,28 @@ where Metal is unavailable.
 Run with: PYTHONPATH=.:src pytest test/test_background_shaders.py -v
 """
 
+import re
 import unittest
 
 import pytest
 
 from puikit.background import SHADER_ENTRY, Background3D, Shader
 from puikit.backends._metal import HAVE_METAL, MetalBackground
-from puikit.backends._d3d_shader import (
-    HAVE_D3D_SHADER, SHADER_ENTRY as HLSL_ENTRY, D3DShaderBackground,
-)
+
+try:
+    from puikit.backends._d3d_shader import (
+        HAVE_D3D_SHADER, SHADER_ENTRY as HLSL_ENTRY, D3DShaderBackground,
+    )
+except (ImportError, AttributeError):
+    # puikit's D3D module pulls in Windows-only ctypes bindings (``WinDLL``,
+    # ``WINFUNCTYPE``) at module scope, so off Windows it is not importable at all
+    # rather than merely reporting itself unsupported. Same outcome either way —
+    # no D3D here, the @d3d_only tests skip — but without this the whole file fails
+    # to collect and the Metal half stops running too. The HLSL entry-point name is
+    # shared with Metal, so the dialect checks that do not need a GPU still work.
+    HAVE_D3D_SHADER = False
+    HLSL_ENTRY = SHADER_ENTRY
+    D3DShaderBackground = None
 
 import tfm
 from tfm_background_shaders import SHADER_KINDS
@@ -34,7 +47,8 @@ def _shader(kind):
 class Registry(unittest.TestCase):
 
     def test_expected_shaders_are_offered(self):
-        self.assertEqual(set(SHADER_KINDS), {"wave"})
+        self.assertEqual(set(SHADER_KINDS),
+                         {"wave", "rain", "starfield", "grid", "constellation"})
 
     def test_each_entry_is_valid_shader_kwargs(self):
         # The dict is splatted straight into Shader(...), so a stray key would
@@ -43,11 +57,12 @@ class Registry(unittest.TestCase):
             self.assertIn("source", params, kind)
             Shader(**params)
 
-    def test_names_do_not_collide_with_the_segment_scenes(self):
-        # Both kinds share the theme's ``animation`` namespace, so a name in both
-        # would resolve ambiguously depending on which branch is checked first.
-        from tfm_background_animations import ANIMATION_KINDS
-        self.assertEqual(set(SHADER_KINDS) & set(ANIMATION_KINDS), set())
+    def test_names_do_not_collide_with_puikits_own_scenes(self):
+        # TFM's scenes and puikit's reference ones share the theme's ``animation``
+        # namespace, and ``_resolve_background`` checks SHADER_KINDS first — so a
+        # name in both would shadow puikit's silently.
+        from puikit.background import ANIMATIONS
+        self.assertEqual(set(SHADER_KINDS) & set(ANIMATIONS), set())
 
     def test_sources_define_the_entry_point(self):
         for kind, params in SHADER_KINDS.items():
@@ -62,6 +77,40 @@ class Registry(unittest.TestCase):
             self.assertIn(HLSL_ENTRY, params["source_hlsl"], kind)
 
 
+class DialectParity(unittest.TestCase):
+    """Every scene ships the same maths twice, in two languages, and no compiler
+    cross-checks them. Tuning one dialect and forgetting the other is the mistake
+    this arrangement invites, and it surfaces only as "Windows looks different" —
+    long after the change. Comparing the tunables as text catches it here, with no
+    GPU involved, so it runs on any machine."""
+
+    #: ``constant float NAME = 1.0;`` (MSL) and its ``static const`` HLSL twin.
+    _MSL = re.compile(r"constant\s+(?:int|uint|float)\s+(\w+)\s*=\s*([^;]+);")
+    _HLSL = re.compile(r"static\s+const\s+(?:int|uint|float)\s+(\w+)\s*=\s*([^;]+);")
+
+    @staticmethod
+    def _consts(pattern, source):
+        return {name: value.strip() for name, value in pattern.findall(source)}
+
+    def test_every_msl_tunable_has_an_hlsl_twin(self):
+        # MSL is the canonical side. HLSL may add dialect-only helpers (the hash
+        # constants, which MSL inlines), so the check is one-directional.
+        for kind, params in SHADER_KINDS.items():
+            missing = set(self._consts(self._MSL, params["source"])) - set(
+                self._consts(self._HLSL, params["source_hlsl"]))
+            self.assertFalse(missing, f"{kind}: tunables absent from HLSL: {sorted(missing)}")
+
+    def test_shared_tunables_hold_the_same_value(self):
+        for kind, params in SHADER_KINDS.items():
+            msl = self._consts(self._MSL, params["source"])
+            hlsl = self._consts(self._HLSL, params["source_hlsl"])
+            shared = sorted(set(msl) & set(hlsl))
+            self.assertTrue(shared, f"{kind}: no tunables found to compare")
+            for name in shared:
+                self.assertEqual(float(msl[name]), float(hlsl[name]),
+                                 f"{kind}: {name} drifted between MSL and HLSL")
+
+
 class ThemeResolution(unittest.TestCase):
     """A theme names a scene; TFM picks the descriptor its renderer needs."""
 
@@ -74,8 +123,10 @@ class ThemeResolution(unittest.TestCase):
         self.assertEqual(bg.ink, _INK)         # theme fg arrives as the ink uniform
         self.assertEqual(bg.backdrop, _BACKDROP)
 
-    def test_a_segment_name_still_resolves_to_an_animation(self):
-        self.assertIsInstance(self._resolve("starfield"), Background3D)
+    def test_a_non_tfm_name_still_resolves_to_an_animation(self):
+        # puikit's own reference scenes are not TFM's, so they fall through to the
+        # Background3D branch and stay reachable from a theme.
+        self.assertIsInstance(self._resolve("cube"), Background3D)
 
     def test_tuned_defaults_apply_to_shaders_too(self):
         bg = self._resolve("wave")
@@ -118,43 +169,56 @@ class Compilation(unittest.TestCase):
             distinct = {bytes(px[i:i + 4]) for i in range(0, len(px), 4)}
             self.assertGreater(len(distinct), 8, f"{kind} drew a flat frame")
 
-    def test_wave_animates(self):
-        renderer = MetalBackground()
-        self.assertTrue(renderer.set_shader(_shader("wave")), renderer.error)
-        a = MetalBackground.texture_pixels(renderer.render_to_texture(160, 100, 0.0))
-        b = MetalBackground.texture_pixels(renderer.render_to_texture(160, 100, 3.0))
-        self.assertNotEqual(bytes(a), bytes(b))
+    def test_every_shader_animates(self):
+        for kind in SHADER_KINDS:
+            renderer = MetalBackground()
+            self.assertTrue(renderer.set_shader(_shader(kind)), renderer.error)
+            a = MetalBackground.texture_pixels(renderer.render_to_texture(160, 100, 0.0))
+            b = MetalBackground.texture_pixels(renderer.render_to_texture(160, 100, 3.0))
+            self.assertNotEqual(bytes(a), bytes(b), f"{kind} is a still frame")
 
-    def test_wave_is_frozen_at_zero_speed(self):
-        # Same contract the segment scenes honour: speed scales the time uniform.
-        renderer = MetalBackground()
-        frozen = Shader(speed=0.0, ink=_INK, backdrop=_BACKDROP, **SHADER_KINDS["wave"])
-        self.assertTrue(renderer.set_shader(frozen), renderer.error)
-        a = MetalBackground.texture_pixels(renderer.render_to_texture(120, 80, 0.0))
-        b = MetalBackground.texture_pixels(renderer.render_to_texture(120, 80, 9.0))
-        self.assertEqual(bytes(a), bytes(b))
+    def test_every_shader_is_frozen_at_zero_speed(self):
+        # speed scales the time uniform, so 0 must stop the scene dead. A scene that
+        # read a clock of its own instead would keep moving here.
+        for kind in SHADER_KINDS:
+            renderer = MetalBackground()
+            frozen = Shader(speed=0.0, ink=_INK, backdrop=_BACKDROP, **SHADER_KINDS[kind])
+            self.assertTrue(renderer.set_shader(frozen), renderer.error)
+            a = MetalBackground.texture_pixels(renderer.render_to_texture(120, 80, 0.0))
+            b = MetalBackground.texture_pixels(renderer.render_to_texture(120, 80, 9.0))
+            self.assertEqual(bytes(a), bytes(b), f"{kind} moved at speed 0")
 
-    def test_wave_follows_the_theme_ink(self):
-        # The gradient is the ink pushed apart, not fixed colours, so a different
-        # palette must produce a visibly different frame.
-        renderer = MetalBackground()
-        self.assertTrue(renderer.set_shader(
-            Shader(ink=(200, 224, 245), backdrop=_BACKDROP, **SHADER_KINDS["wave"])))
-        blue = MetalBackground.texture_pixels(renderer.render_to_texture(120, 80, 2.0))
-        self.assertTrue(renderer.set_shader(
-            Shader(ink=(51, 245, 121), backdrop=_BACKDROP, **SHADER_KINDS["wave"])))
-        green = MetalBackground.texture_pixels(renderer.render_to_texture(120, 80, 2.0))
-        self.assertNotEqual(bytes(blue), bytes(green))
+    def test_every_shader_follows_the_theme_ink(self):
+        # Scenes are anchored on the theme foreground rather than fixed colours, so
+        # a different palette must produce a visibly different frame.
+        for kind in SHADER_KINDS:
+            renderer = MetalBackground()
+            self.assertTrue(renderer.set_shader(
+                Shader(ink=(200, 224, 245), backdrop=_BACKDROP, **SHADER_KINDS[kind])))
+            blue = MetalBackground.texture_pixels(renderer.render_to_texture(120, 80, 2.0))
+            self.assertTrue(renderer.set_shader(
+                Shader(ink=(51, 245, 121), backdrop=_BACKDROP, **SHADER_KINDS[kind])))
+            green = MetalBackground.texture_pixels(renderer.render_to_texture(120, 80, 2.0))
+            self.assertNotEqual(bytes(blue), bytes(green), f"{kind} ignores the ink")
 
-    def test_wave_respects_the_backdrop(self):
-        # Where the sheet is absent the frame must be the theme background, or a
-        # light theme would show a dark void behind the panes.
-        renderer = MetalBackground()
-        self.assertTrue(renderer.set_shader(_shader("wave")), renderer.error)
-        px = MetalBackground.texture_pixels(renderer.render_to_texture(120, 80, 2.0))
-        top_left = (px[2], px[1], px[0])   # BGRA -> RGB; empty sky above the wave
-        self.assertTrue(all(abs(a - b) <= 2 for a, b in zip(top_left, _BACKDROP)),
-                        top_left)
+    def test_every_shader_stays_a_backdrop(self):
+        # These sit behind a working file manager, so the theme background has to
+        # remain the *dominant* colour of the frame. A scene that covered most of the
+        # window would compete with the filenames on top of it.
+        #
+        # Measured at a realistic window size on purpose: line widths are set in
+        # pixels, so at the 160x100 the tests elsewhere use, the grid's 1.1px rails
+        # are a far larger share of the frame than they ever are in use.
+        for kind in SHADER_KINDS:
+            renderer = MetalBackground()
+            self.assertTrue(renderer.set_shader(_shader(kind)), renderer.error)
+            px = MetalBackground.texture_pixels(renderer.render_to_texture(400, 260, 2.0))
+            near_backdrop = sum(
+                1 for i in range(0, len(px), 4)
+                if all(abs(a - b) <= 3 for a, b in
+                       zip((px[i + 2], px[i + 1], px[i]), _BACKDROP)))
+            self.assertGreater(near_backdrop, (len(px) // 4) * 0.5,
+                               f"{kind} covers more than half the window")
 
 
 @d3d_only
@@ -178,21 +242,26 @@ class CompilationD3D(unittest.TestCase):
             self.assertGreater(len(distinct), 8, f"{kind} drew a flat frame")
         renderer.close()
 
-    def test_wave_animates(self):
+    def test_every_shader_animates(self):
         renderer = D3DShaderBackground()
-        self.assertTrue(renderer.set_shader(_shader("wave")), renderer.error)
-        a = renderer.render_pixels(160, 100, 0.0)
-        b = renderer.render_pixels(160, 100, 3.0)
-        self.assertNotEqual(bytes(a), bytes(b))
+        for kind in SHADER_KINDS:
+            self.assertTrue(renderer.set_shader(_shader(kind)), renderer.error)
+            a = renderer.render_pixels(160, 100, 0.0)
+            b = renderer.render_pixels(160, 100, 3.0)
+            self.assertNotEqual(bytes(a), bytes(b), f"{kind} is a still frame")
         renderer.close()
 
-    def test_wave_respects_the_backdrop(self):
+    def test_every_shader_stays_a_backdrop(self):
         renderer = D3DShaderBackground()
-        self.assertTrue(renderer.set_shader(_shader("wave")), renderer.error)
-        px = renderer.render_pixels(120, 80, 2.0)
-        top_left = (px[2], px[1], px[0])   # BGRA -> RGB; empty sky above the wave
-        self.assertTrue(all(abs(a - b) <= 2 for a, b in zip(top_left, _BACKDROP)),
-                        top_left)
+        for kind in SHADER_KINDS:
+            self.assertTrue(renderer.set_shader(_shader(kind)), renderer.error)
+            px = renderer.render_pixels(400, 260, 2.0)   # see the Metal twin
+            near_backdrop = sum(
+                1 for i in range(0, len(px), 4)
+                if all(abs(a - b) <= 3 for a, b in
+                       zip((px[i + 2], px[i + 1], px[i]), _BACKDROP)))
+            self.assertGreater(near_backdrop, (len(px) // 4) * 0.5,
+                               f"{kind} covers more than half the window")
         renderer.close()
 
 

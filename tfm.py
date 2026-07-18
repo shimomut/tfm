@@ -66,12 +66,8 @@ _FILTER_HISTORY_MAX = 100
 _HISTORY_MAX = 100
 
 from tfm_backend_detector import is_desktop_mode  # noqa: E402
-# Imported for its import-time side effect: publishing TFM's background animations
-# (starfield, rain, constellation, grid) into puikit's registry, so a theme's
-# ``animation`` key can name them. See src/tfm_background_animations.py.
-import tfm_background_animations  # noqa: E402,F401
-# The GPU-drawn scenes share that same ``animation`` namespace but resolve to a
-# puikit ``Shader`` instead — see ``_resolve_background``.
+# Every background scene TFM offers is a fragment shader; a theme's ``animation`` key
+# names one of these and ``_resolve_background`` turns it into a puikit ``Shader``.
 from tfm_background_shaders import SHADER_KINDS  # noqa: E402
 from tfm_config import KeyBindings, config_manager, get_config, get_favorite_directories  # noqa: E402
 from tfm_file_list_manager import FileListManager  # noqa: E402
@@ -156,9 +152,9 @@ def _resolve_post_effect(value) -> "PostEffect | None":
 _ANIM_DEFAULTS = dict(speed=0.6, opacity=0.6)
 
 #: The animation used when a theme asks for one without naming a type
-#: (``animation: True``). The scenes themselves live in
-#: ``tfm_background_animations``; puikit's own ``'cube'`` remains valid but is a
-#: toolkit reference scene rather than a production look.
+#: (``animation: True``). The scenes themselves live in ``tfm_background_shaders``;
+#: puikit's own ``'cube'`` remains valid but is a toolkit reference scene rather than
+#: a production look.
 _ANIM_DEFAULT_KIND = "starfield"
 
 #: Per-kind param keys carried from the theme spec onto the puikit descriptor.
@@ -167,20 +163,25 @@ _WALLPAPER_PARAMS = ("fit", "opacity")
 
 
 def _resolve_background(animation, wallpaper, *, color, backdrop):
-    """Turn a theme's background choice into a puikit descriptor — a ``Background3D``
+    """Turn a theme's background choice into a puikit descriptor — a ``Shader``
     (animation), a ``Wallpaper`` (image), or ``None`` (solid) — mirroring
     ``_resolve_post_effect``. A theme names at most one, both separate from the base
     ``background`` *color*:
 
-    * ``animation`` — the animation *type* string (``'starfield'``, ``'rain'``,
-      ``'constellation'``, ``'grid'``; see ``tfm_background_animations``), ``True``
-      (the tuned default, ``_ANIM_DEFAULT_KIND``), or a params dict
+    * ``animation`` — the scene *type* string (``'starfield'``, ``'rain'``,
+      ``'constellation'``, ``'grid'``, ``'wave'``; see ``tfm_background_shaders``),
+      ``True`` (the tuned default, ``_ANIM_DEFAULT_KIND``), or a params dict
       (``{'type': 'rain', 'speed': ..., ...}`` merged onto the tuned default). The
-      line ``color`` (theme fg) and ``backdrop`` (theme bg) are filled from the theme.
-      An unregistered type name resolves fine here and simply draws nothing — the
-      backend looks it up per frame and skips a miss.
+      line ``color`` (theme fg) and ``backdrop`` (theme bg) are filled from the theme;
+      a shader receives the former as its ``ink`` uniform, the name the GPU contract
+      uses for the same intent.
     * ``wallpaper`` — an image path string, or a params dict
       (``{'image': 'path', 'fit': ..., 'opacity': ...}``).
+
+    A name that is not one of TFM's scenes falls through to a ``Background3D``, which
+    is how puikit's own reference scenes (``'cube'``, ``'wireframe'``) stay reachable;
+    a name registered nowhere resolves fine there too and simply draws nothing, since
+    the backend looks it up per frame and skips a miss.
 
     Either may also be a pre-built ``Background3D`` / ``Wallpaper``, used as-is. A
     malformed value resolves to ``None`` so a config typo degrades to "solid"
@@ -2209,7 +2210,7 @@ class TfmApp:
 
     def _apply_background(self, theme: Theme) -> None:
         """Push the theme's recommended background behind the UI to the backend, or
-        ``None`` to clear it — an animated scene (see ``tfm_background_animations``)
+        ``None`` to clear it — an animated scene (see ``tfm_background_shaders``)
         or a wallpaper image (only Sci-Fi opts in among the built-in themes, and the
         sample Phosphor in ``_config.py``), turned on when the theme becomes active and off when
         you switch away, exactly like ``_apply_post_effect``. The descriptor was

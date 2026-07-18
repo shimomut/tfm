@@ -18,7 +18,8 @@ sys.path.insert(0, os.path.join(_HERE, "..", "src"))
 sys.path.insert(0, os.path.join(_HERE, ".."))
 
 import tfm  # noqa: E402
-from puikit.background import Background3D, Wallpaper  # noqa: E402
+from puikit.background import Background3D, Shader, Wallpaper  # noqa: E402
+from tfm_background_shaders import SHADER_KINDS  # noqa: E402
 
 
 _COLOR = (10, 20, 30)
@@ -41,16 +42,19 @@ class ResolveBackground(unittest.TestCase):
         self.assertEqual(bg.backdrop, _BACKDROP)  # theme bg filled in
 
     def test_animation_true_is_the_tuned_default(self):
-        # An unnamed animation gets TFM's default scene — one of its own
-        # production animations, not the toolkit's reference cube.
-        from puikit.background import ANIMATIONS
-        kind = _resolve(animation=True).kind
-        self.assertEqual(kind, tfm._ANIM_DEFAULT_KIND)
-        self.assertIn(kind, ANIMATIONS)
+        # An unnamed animation gets TFM's default scene — one of its own, not the
+        # toolkit's reference cube. Every TFM scene is a shader, so this resolves
+        # through that branch.
+        self.assertIn(tfm._ANIM_DEFAULT_KIND, SHADER_KINDS)
+        self.assertIsInstance(_resolve(animation=True), Shader)
 
     def test_animation_params_dict(self):
-        bg = _resolve(animation={"type": "rain", "speed": 1.5})
-        self.assertEqual((bg.kind, bg.speed), ("rain", 1.5))
+        # The Background3D branch, which is what puikit's own reference scenes still
+        # resolve through; the Shader branch has its own params-dict test in
+        # test_background_shaders.py.
+        bg = _resolve(animation={"type": "cube", "speed": 1.5})
+        self.assertIsInstance(bg, Background3D)
+        self.assertEqual((bg.kind, bg.speed), ("cube", 1.5))
 
     def test_wallpaper_string_and_dict(self):
         self.assertEqual(_resolve(wallpaper="~/p.png").image, "~/p.png")
@@ -69,8 +73,10 @@ class ResolveBackground(unittest.TestCase):
         self.assertIsNone(_resolve(wallpaper={"fit": "fill"}))
         # Any truthy animation value yields the default scene (an unknown *type*
         # simply renders nothing at the backend rather than failing here).
-        self.assertIsInstance(_resolve(animation=True), Background3D)
-        self.assertEqual(_resolve(animation="snow").kind, "snow")  # passed through
+        self.assertIsInstance(_resolve(animation=True), Shader)
+        # An unregistered name is passed through on the Background3D branch, where
+        # the backend looks it up per frame and skips the miss.
+        self.assertEqual(_resolve(animation="snow").kind, "snow")
 
 
 class ThemeCarriesBackground(unittest.TestCase):

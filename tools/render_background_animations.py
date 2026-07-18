@@ -1,15 +1,19 @@
-"""Rasterize TFM's background animations to PNGs, to check how a scene actually
-looks without launching the app.
+"""Rasterize TFM's background scenes to PNGs, to check how one actually looks
+without launching the app.
 
 The test suite checks invariants, not aesthetics, and TFM's TUI cannot be launched
-non-interactively. This renders a frame the same way the macOS backend does —
-clear to the theme backdrop, group segments by alpha, stroke each bucket in the
-theme foreground at line width 1.5, flipped to a top-left origin — so what comes
-out is what the app shows.
+non-interactively. Every scene is a fragment shader, and ``MetalBackground`` renders
+to an offscreen texture as readily as to a layer — so this compiles the real shader
+with the real Metal compiler and writes exactly what the fragment function puts on
+screen, with no window involved.
 
     PYTHONPATH=.:src python tools/render_background_animations.py
     PYTHONPATH=.:src python tools/render_background_animations.py --time 12 --out /tmp
     PYTHONPATH=.:src python tools/render_background_animations.py --kind starfield --size 1600x1000
+
+Only the Metal (macOS) dialect can be rendered here. A scene's HLSL twin is compiled
+by the Windows backend and has to be checked there; see the dialect-parity test in
+``test/test_background_shaders.py`` for what is caught cross-platform.
 
 Requires PyObjC (already a dependency of puikit's macOS backend); macOS only.
 """
@@ -20,18 +24,14 @@ import sys
 
 try:
     import Quartz
-    from Quartz import CGBitmapContextCreate, CGColorSpaceCreateDeviceRGB
+    from Quartz import CGColorSpaceCreateDeviceRGB
 except ImportError:  # pragma: no cover - developer tool, macOS only
     sys.exit("This tool needs PyObjC (macOS only): pip install pyobjc-framework-Quartz")
 
-from puikit.background import ANIMATIONS, Shader, group_by_alpha
+from puikit.background import Shader
 from puikit.backends._metal import MetalBackground
 
-import tfm_background_animations  # noqa: F401  (import registers the scenes)
 from tfm_background_shaders import SHADER_KINDS
-
-#: Matches _BG3D_LINE_WIDTH in puikit's macOS backend.
-LINE_WIDTH = 1.5
 
 #: Theme colors to render against, so a scene is judged on the palette it ships
 #: with rather than an arbitrary one. (foreground, background) per TFM theme.
@@ -47,22 +47,26 @@ SCENE_THEME = {"starfield": "sci-fi", "rain": "phosphor",
                "wave": "sci-fi"}
 
 
-def render_shader(kind, width, height, t, *, speed, opacity, theme, path):
-    """Render one frame of a GPU shader scene to a PNG; returns (pixels, 1).
+def render(kind, width, height, t, *, speed, opacity, theme, path):
+    """Draw one frame of ``kind`` to a PNG at ``path``; returns the lit-pixel share.
 
-    Uses the same offscreen path the shader tests use, so what lands in the file is
-    exactly what the fragment function produces on screen — no window needed.
+    The share is a rough density read — how much of the frame the scene actually
+    covers. These sit behind a working file manager, so a scene that lights most of
+    the window is a scene that will fight the filenames on top of it.
     """
     fg, bg = THEMES[theme]
     renderer = MetalBackground()
     if not renderer.available:
-        raise SystemExit("Metal unavailable: cannot render shader scenes here")
+        raise SystemExit("Metal unavailable: cannot render scenes here")
     shader = Shader(speed=speed, opacity=opacity, ink=fg, backdrop=bg,
                     **SHADER_KINDS[kind])
     if not renderer.set_shader(shader):
         raise SystemExit(f"shader {kind!r} failed to compile:\n{renderer.error}")
-    texture = renderer.render_to_texture(width, height, t)
-    bgra = MetalBackground.texture_pixels(texture)
+    bgra = MetalBackground.texture_pixels(renderer.render_to_texture(width, height, t))
+
+    lit = sum(1 for i in range(0, len(bgra), 4)
+              if max(abs(bgra[i + 2] - bg[0]), abs(bgra[i + 1] - bg[1]),
+                     abs(bgra[i] - bg[2])) > 3)
 
     provider = Quartz.CGDataProviderCreateWithData(None, bytes(bgra), len(bgra), None)
     image = Quartz.CGImageCreate(
@@ -74,43 +78,7 @@ def render_shader(kind, width, height, t, *, speed, opacity, theme, path):
     Quartz.CGImageDestinationAddImage(dest, image, None)
     if not Quartz.CGImageDestinationFinalize(dest):
         raise RuntimeError(f"could not write {path}")
-    return width * height, 1
-
-
-def render(kind, width, height, t, *, speed, opacity, theme, path):
-    """Draw one frame of ``kind`` to a PNG at ``path``; returns (segments, strokes)."""
-    if kind in SHADER_KINDS:
-        return render_shader(kind, width, height, t, speed=speed, opacity=opacity,
-                             theme=theme, path=path)
-    fg, bg = THEMES[theme]
-    ctx = CGBitmapContextCreate(None, width, height, 8, 0,
-                                CGColorSpaceCreateDeviceRGB(),
-                                Quartz.kCGImageAlphaPremultipliedLast)
-    Quartz.CGContextSetRGBFillColor(ctx, *[c / 255.0 for c in bg], 1.0)
-    Quartz.CGContextFillRect(ctx, Quartz.CGRectMake(0, 0, width, height))
-    Quartz.CGContextSetLineWidth(ctx, LINE_WIDTH)
-    Quartz.CGContextSetLineJoin(ctx, Quartz.kCGLineJoinRound)
-
-    segments = ANIMATIONS[kind](width, height, t, speed=speed)
-    buckets = group_by_alpha(segments)
-    fr, fg_, fb = [c / 255.0 for c in fg]
-    for alpha, group in buckets:
-        Quartz.CGContextSetRGBStrokeColor(ctx, fr, fg_, fb, opacity * alpha)
-        Quartz.CGContextBeginPath(ctx)
-        for s in group:
-            # The backend draws into a flipped (top-left origin) view; CoreGraphics
-            # is bottom-left, so flip y to match what the app actually shows.
-            Quartz.CGContextMoveToPoint(ctx, s[0], height - s[1])
-            Quartz.CGContextAddLineToPoint(ctx, s[2], height - s[3])
-        Quartz.CGContextStrokePath(ctx)
-
-    image = Quartz.CGBitmapContextCreateImage(ctx)
-    url = Quartz.CFURLCreateWithFileSystemPath(None, path, Quartz.kCFURLPOSIXPathStyle, False)
-    dest = Quartz.CGImageDestinationCreateWithURL(url, "public.png", 1, None)
-    Quartz.CGImageDestinationAddImage(dest, image, None)
-    if not Quartz.CGImageDestinationFinalize(dest):
-        raise RuntimeError(f"could not write {path}")
-    return len(segments), len(buckets)
+    return 100.0 * lit / (width * height)
 
 
 def _size(text):
@@ -123,27 +91,25 @@ def _size(text):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--kind", action="append",
-                        choices=sorted(set(ANIMATIONS) | set(SHADER_KINDS)),
+    parser.add_argument("--kind", action="append", choices=sorted(SHADER_KINDS),
                         help="scene to render (repeatable; default: all of TFM's)")
     parser.add_argument("--size", type=_size, default=(900, 600), help="WxH, default 900x600")
     parser.add_argument("--time", type=float, default=6.0, help="scene time in seconds")
     parser.add_argument("--speed", type=float, default=0.6, help="speed multiplier (TFM default 0.6)")
-    parser.add_argument("--opacity", type=float, default=0.6, help="line opacity (TFM default 0.6)")
+    parser.add_argument("--opacity", type=float, default=0.6, help="scene opacity (TFM default 0.6)")
     parser.add_argument("--theme", choices=sorted(THEMES), help="palette (default: per scene)")
     parser.add_argument("--out", default="temp", help="output directory (default: temp/)")
     args = parser.parse_args()
 
-    kinds = args.kind or sorted(set(tfm_background_animations.ANIMATION_KINDS)
-                                | set(SHADER_KINDS))
+    kinds = args.kind or sorted(SHADER_KINDS)
     width, height = args.size
     os.makedirs(args.out, exist_ok=True)
     for kind in kinds:
         path = os.path.join(args.out, f"bg_{kind}.png")
         theme = args.theme or SCENE_THEME.get(kind, "dark")
-        count, strokes = render(kind, width, height, args.time, speed=args.speed,
-                                opacity=args.opacity, theme=theme, path=path)
-        print(f"{kind:14s} {count:5d} segments  {strokes:3d} strokes  {theme:9s} -> {path}")
+        lit = render(kind, width, height, args.time, speed=args.speed,
+                     opacity=args.opacity, theme=theme, path=path)
+        print(f"{kind:14s} {lit:5.1f}% lit  {theme:9s} -> {path}")
 
 
 if __name__ == "__main__":

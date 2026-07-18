@@ -132,16 +132,16 @@ class Config:
     #   #   One background of two kinds (else the plain theme color). On/off with the
     #   #   theme, like post_effect; a terminal has no pixels and ignores it. NOTE the
     #   #   'background' key above is the base *color* — these choose the content:
-    #   #   * animation — a slow moving scene drawn in this theme's own colors
-    #   #     (foreground line, background backdrop) so it stays on-palette:
+    #   #   * animation — a slow moving scene, anchored on this theme's own colors
+    #   #     (foreground for the scene, background for the backdrop) so it stays
+    #   #     on-palette:
     #   #       'starfield'     stars streaming toward you, fading in with depth
     #   #       'rain'          falling streaks with fading tails
     #   #       'constellation' drifting nodes linked to their near neighbours
     #   #       'grid'          flying through a wireframe corridor, the camera
     #   #                       slowly drifting and turning as it goes
-    #   #       'wave'          a dense particle wave, drawn on the GPU (macOS
-    #   #                       desktop only) with its own colour gradient
-    #   #     Written as a bare type, or a dict to retune speed / line opacity:
+    #   #       'wave'          a dense particle wave with its own colour gradient
+    #   #     Written as a bare type, or a dict to retune speed / opacity:
     #   #       'animation': 'starfield'                     # the tuned default
     #   #       'animation': {'type': 'rain', 'speed': 1.0, 'opacity': 0.8}
     #   #     ('cube', a spinning wireframe, also works — it is the UI toolkit's

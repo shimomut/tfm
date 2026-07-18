@@ -24,27 +24,22 @@ on-palette whichever theme (or custom palette) you use.
 | `rain` | Falling streaks with fading tails, each column at its own speed — the classic phosphor-terminal rain. |
 | `constellation` | Slowly drifting points that link to their near neighbours, the links fading in and out as points pass. |
 | `grid` | Flying down a wireframe corridor — floor, ceiling and both walls gridded, converging on a vanishing point that wanders as the camera slowly drifts and turns. |
-| `wave` | A dense field of particles flowing over a rolling wave surface, with a colour gradient sweeping along it. Drawn on the GPU — see the note below. |
+| `wave` | A dense field of particles flowing over a rolling wave surface, with a colour gradient sweeping along it. |
 
 The UI toolkit's own `cube` (a spinning wireframe) also works. It exists as a
 reference scene for the rendering path rather than as a finished look.
 
-### `wave` is drawn differently
+### Where they run
 
-Most animations are drawn line by line on the CPU, which puts a ceiling on how
-much they can draw and means the whole scene is one colour — your theme's
-foreground. `wave` is a **GPU shader** instead: it is computed for every pixel on
-the graphics card, so it can be far denser and can use a real colour gradient
-(the gradient is still derived from your theme's foreground, so it stays in
-family with your palette).
+Every scene is a **GPU shader**, computed for each pixel on the graphics card.
+That is what lets them be dense, use real colour gradients rather than a single
+flat line colour, and cost almost nothing while TFM sits idle — the graphics card
+advances the scene behind the UI without TFM having to redraw the interface.
 
-The practical differences:
-
-- It needs **macOS desktop mode with Metal**. On Windows, in a terminal, or
-  anywhere Metal is unavailable, it draws nothing and you get the plain theme
-  background — the other four animations work everywhere the GUI backend does.
-- It is rendered at half resolution and scaled up. This is invisible for a soft,
-  diffuse scene and keeps it affordable on a Retina display.
+They need **desktop mode** (`tfm.py --backend gui`), on macOS or Windows. In a
+terminal there are no pixels to draw into, so the `animation` key is ignored and
+you get the plain theme background. The same is true on the rare desktop setup
+with no usable GPU shader support.
 
 ## Turning one on
 
@@ -108,8 +103,8 @@ Give `animation` a dict instead of a name to adjust it:
 |-----|---------|
 | `type` | Which animation (see the table above). |
 | `speed` | Motion-rate multiplier. `1.0` is the tuned look; TFM's default is `0.6`. `0` freezes the scene. |
-| `opacity` | How strongly the scene's *lines* are drawn, 0–1. Not to be confused with the theme-level `opacity`, which is about the UI on top of it. |
-| `color` | Line colour, if you want something other than the theme foreground. |
+| `opacity` | How strongly the scene itself is drawn, 0–1. Not to be confused with the theme-level `opacity`, which is about the UI on top of it. |
+| `color` | The colour the scene is built on, if you want something other than the theme foreground. Scenes anchor their own colouring on it rather than using it flat, so a scene with a gradient shifts with it instead of losing the gradient. |
 
 All animations are deliberately slow and understated — they sit behind a working
 file manager, so they are tuned to stay in the background rather than compete with
