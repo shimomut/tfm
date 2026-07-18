@@ -504,8 +504,8 @@ class FilePane(Widget):
         # matched / cursor) draw over a transparent bg and land directly on the fill
         # already painted — no per-run bg repaint (which would also break the cursor
         # stroke). That repaint is what read as a darker/thicker band behind the text
-        # under a translucent 3D-background reveal: the row fill is dimmed toward the
-        # scene, but an opaque per-run bg is not, so the text cells bloomed proud of
+        # under a low surface opacity (a 3D background): the row fill is dimmed toward
+        # the scene, but an opaque per-run bg is not, so the text cells bloomed proud of
         # the row. The glyphs still contrast against that fill (via eff_bg above), not
         # None. A grid backend can't composite, so it keeps the fill color as the text
         # bg (each cell has one bg) and the selection still reads.
