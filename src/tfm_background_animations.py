@@ -26,6 +26,11 @@ fades along its length, a constellation edge fades in as two nodes approach.
 Without it every line in a scene would be equally bright and the result reads
 flat, so all four scenes here lean on it heavily.
 
+A scene that needs *density or colour* rather than structure does not belong here
+at all — per-segment stroking caps out around a few thousand segments and the whole
+scene is drawn in one colour. Those are fragment shaders instead; see
+``tfm_background_shaders``.
+
 Three of the scenes compute screen coordinates straight from ``t``. The fourth,
 the grid tunnel, is genuinely 3D — world points on the walls of a corridor, put
 through a moving camera and projected — which is what lets its vanishing point

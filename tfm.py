@@ -44,7 +44,7 @@ for _modules_dir in (_here / "src", _here / "tfm_modules"):
         break
 
 from puikit import EventType, Font, Item, Panel, PostEffect, Style, TextAttribute, Theme, VSplit, derive_theme, mix  # noqa: E402
-from puikit.background import Background3D, Wallpaper  # noqa: E402
+from puikit.background import Background3D, Shader, Wallpaper  # noqa: E402
 from puikit.posteffect import PRESETS as _POST_EFFECT_PRESETS  # noqa: E402
 from puikit.backends import create_backend  # noqa: E402
 from puikit.menu import Menu, MenuItem, SEPARATOR  # noqa: E402
@@ -70,6 +70,9 @@ from tfm_backend_detector import is_desktop_mode  # noqa: E402
 # (starfield, rain, constellation, grid) into puikit's registry, so a theme's
 # ``animation`` key can name them. See src/tfm_background_animations.py.
 import tfm_background_animations  # noqa: E402,F401
+# The GPU-drawn scenes share that same ``animation`` namespace but resolve to a
+# puikit ``Shader`` instead — see ``_resolve_background``.
+from tfm_background_shaders import SHADER_KINDS  # noqa: E402
 from tfm_config import KeyBindings, config_manager, get_config, get_favorite_directories  # noqa: E402
 from tfm_file_list_manager import FileListManager  # noqa: E402
 from tfm_file_monitor_manager import FileMonitorManager  # noqa: E402
@@ -201,6 +204,13 @@ def _resolve_background(animation, wallpaper, *, color, backdrop):
                 atype = animation if isinstance(animation, str) else _ANIM_DEFAULT_KIND
             params.setdefault("color", color)
             params.setdefault("backdrop", backdrop)
+            if atype in SHADER_KINDS:
+                # A GPU scene: same ``animation`` namespace, different descriptor.
+                # ``color`` is the theme foreground, which a shader receives as its
+                # ``ink`` uniform — same intent, the name the GPU contract uses.
+                return Shader(speed=params["speed"], opacity=params["opacity"],
+                              ink=params["color"], backdrop=params["backdrop"],
+                              **SHADER_KINDS[atype])
             return Background3D(kind=atype, **params)
     except (TypeError, KeyError):
         return None

@@ -24,9 +24,27 @@ on-palette whichever theme (or custom palette) you use.
 | `rain` | Falling streaks with fading tails, each column at its own speed — the classic phosphor-terminal rain. |
 | `constellation` | Slowly drifting points that link to their near neighbours, the links fading in and out as points pass. |
 | `grid` | Flying down a wireframe corridor — floor, ceiling and both walls gridded, converging on a vanishing point that wanders as the camera slowly drifts and turns. |
+| `wave` | A dense field of particles flowing over a rolling wave surface, with a colour gradient sweeping along it. Drawn on the GPU — see the note below. |
 
 The UI toolkit's own `cube` (a spinning wireframe) also works. It exists as a
 reference scene for the rendering path rather than as a finished look.
+
+### `wave` is drawn differently
+
+Most animations are drawn line by line on the CPU, which puts a ceiling on how
+much they can draw and means the whole scene is one colour — your theme's
+foreground. `wave` is a **GPU shader** instead: it is computed for every pixel on
+the graphics card, so it can be far denser and can use a real colour gradient
+(the gradient is still derived from your theme's foreground, so it stays in
+family with your palette).
+
+The practical differences:
+
+- It needs **macOS desktop mode with Metal**. On Windows, in a terminal, or
+  anywhere Metal is unavailable, it draws nothing and you get the plain theme
+  background — the other four animations work everywhere the GUI backend does.
+- It is rendered at half resolution and scaled up. This is invisible for a soft,
+  diffuse scene and keeps it affordable on a Retina display.
 
 ## Turning one on
 

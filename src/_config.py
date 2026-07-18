@@ -139,6 +139,8 @@ class Config:
     #   #       'constellation' drifting nodes linked to their near neighbours
     #   #       'grid'          flying through a wireframe corridor, the camera
     #   #                       slowly drifting and turning as it goes
+    #   #       'wave'          a dense particle wave, drawn on the GPU (macOS
+    #   #                       desktop only) with its own colour gradient
     #   #     Written as a bare type, or a dict to retune speed / line opacity:
     #   #       'animation': 'starfield'                     # the tuned default
     #   #       'animation': {'type': 'rain', 'speed': 1.0, 'opacity': 0.8}

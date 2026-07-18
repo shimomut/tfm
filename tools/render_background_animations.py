@@ -24,9 +24,11 @@ try:
 except ImportError:  # pragma: no cover - developer tool, macOS only
     sys.exit("This tool needs PyObjC (macOS only): pip install pyobjc-framework-Quartz")
 
-from puikit.background import ANIMATIONS, group_by_alpha
+from puikit.background import ANIMATIONS, Shader, group_by_alpha
+from puikit.backends._metal import MetalBackground
 
 import tfm_background_animations  # noqa: F401  (import registers the scenes)
+from tfm_background_shaders import SHADER_KINDS
 
 #: Matches _BG3D_LINE_WIDTH in puikit's macOS backend.
 LINE_WIDTH = 1.5
@@ -41,11 +43,45 @@ THEMES = {
 
 #: Which theme suits each scene, used when --theme is not given.
 SCENE_THEME = {"starfield": "sci-fi", "rain": "phosphor",
-               "constellation": "sci-fi", "grid": "sci-fi"}
+               "constellation": "sci-fi", "grid": "sci-fi",
+               "wave": "sci-fi"}
+
+
+def render_shader(kind, width, height, t, *, speed, opacity, theme, path):
+    """Render one frame of a GPU shader scene to a PNG; returns (pixels, 1).
+
+    Uses the same offscreen path the shader tests use, so what lands in the file is
+    exactly what the fragment function produces on screen — no window needed.
+    """
+    fg, bg = THEMES[theme]
+    renderer = MetalBackground()
+    if not renderer.available:
+        raise SystemExit("Metal unavailable: cannot render shader scenes here")
+    shader = Shader(speed=speed, opacity=opacity, ink=fg, backdrop=bg,
+                    **SHADER_KINDS[kind])
+    if not renderer.set_shader(shader):
+        raise SystemExit(f"shader {kind!r} failed to compile:\n{renderer.error}")
+    texture = renderer.render_to_texture(width, height, t)
+    bgra = MetalBackground.texture_pixels(texture)
+
+    provider = Quartz.CGDataProviderCreateWithData(None, bytes(bgra), len(bgra), None)
+    image = Quartz.CGImageCreate(
+        width, height, 8, 32, width * 4, CGColorSpaceCreateDeviceRGB(),
+        Quartz.kCGBitmapByteOrder32Little | Quartz.kCGImageAlphaPremultipliedFirst,
+        provider, None, False, Quartz.kCGRenderingIntentDefault)
+    url = Quartz.CFURLCreateWithFileSystemPath(None, path, Quartz.kCFURLPOSIXPathStyle, False)
+    dest = Quartz.CGImageDestinationCreateWithURL(url, "public.png", 1, None)
+    Quartz.CGImageDestinationAddImage(dest, image, None)
+    if not Quartz.CGImageDestinationFinalize(dest):
+        raise RuntimeError(f"could not write {path}")
+    return width * height, 1
 
 
 def render(kind, width, height, t, *, speed, opacity, theme, path):
     """Draw one frame of ``kind`` to a PNG at ``path``; returns (segments, strokes)."""
+    if kind in SHADER_KINDS:
+        return render_shader(kind, width, height, t, speed=speed, opacity=opacity,
+                             theme=theme, path=path)
     fg, bg = THEMES[theme]
     ctx = CGBitmapContextCreate(None, width, height, 8, 0,
                                 CGColorSpaceCreateDeviceRGB(),
@@ -87,8 +123,9 @@ def _size(text):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--kind", action="append", choices=sorted(ANIMATIONS),
-                        help="animation to render (repeatable; default: all of TFM's)")
+    parser.add_argument("--kind", action="append",
+                        choices=sorted(set(ANIMATIONS) | set(SHADER_KINDS)),
+                        help="scene to render (repeatable; default: all of TFM's)")
     parser.add_argument("--size", type=_size, default=(900, 600), help="WxH, default 900x600")
     parser.add_argument("--time", type=float, default=6.0, help="scene time in seconds")
     parser.add_argument("--speed", type=float, default=0.6, help="speed multiplier (TFM default 0.6)")
@@ -97,7 +134,8 @@ def main():
     parser.add_argument("--out", default="temp", help="output directory (default: temp/)")
     args = parser.parse_args()
 
-    kinds = args.kind or sorted(tfm_background_animations.ANIMATION_KINDS)
+    kinds = args.kind or sorted(set(tfm_background_animations.ANIMATION_KINDS)
+                                | set(SHADER_KINDS))
     width, height = args.size
     os.makedirs(args.out, exist_ok=True)
     for kind in kinds:

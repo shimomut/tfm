@@ -4,16 +4,49 @@ How TFM's animated backgrounds are defined, registered and drawn, and what to do
 to add one. End-user documentation is in
 [BACKGROUND_ANIMATIONS_FEATURE.md](../BACKGROUND_ANIMATIONS_FEATURE.md).
 
+## Two renderers, one namespace
+
+A theme names a scene through a single `animation` key, but there are two ways a
+scene can be painted, and the choice follows from what the scene needs:
+
+| | **Segment scenes** | **Shader scenes** |
+|---|---|---|
+| Defined in | `src/tfm_background_animations.py` | `src/tfm_background_shaders.py` |
+| Written as | Python returning line segments | Metal fragment shader source |
+| Painted by | CoreGraphics, on the CPU | the GPU, per pixel |
+| Descriptor | `puikit.background.Background3D` | `puikit.background.Shader` |
+| Registry | `puikit.background.ANIMATIONS` | `SHADER_KINDS` (resolved in `tfm.py`) |
+| Cost | ~1.4µs per segment | independent of what it draws |
+| Repaints the UI to animate | yes, every frame | no |
+| Colour | one per scene | full RGBA per pixel |
+| Available | anywhere the GUI backend runs | macOS + Metal only |
+| Scenes | starfield, rain, constellation, grid | wave |
+
+`_resolve_background` in `tfm.py` checks `SHADER_KINDS` first and builds a
+`Shader`, otherwise a `Background3D`. The two name-spaces must stay disjoint —
+there is a test for it — since a name in both would resolve by accident of
+ordering.
+
+**Pick the CPU path** for scenes made of *structure*: a few hundred lines, dots or
+streaks, where one colour is fine. **Pick the GPU path** for scenes made of
+*density and colour*: thousands of particles, gradients, glow. The wave is the
+worked example of why the split exists — as segments it measured 10ms/frame and
+still looked sparse; as a shader it is denser than the reference and costs a
+fraction of that.
+
 ## Where the pieces live
 
 | Concern | Location |
 |---------|----------|
-| The scenes themselves | `src/tfm_background_animations.py` (TFM) |
-| Registry a scene is published into | `puikit.background.ANIMATIONS` (PuiKit) |
-| Descriptor a theme resolves to | `puikit.background.Background3D` (PuiKit) |
+| Segment scenes | `src/tfm_background_animations.py` (TFM) |
+| Shader scenes | `src/tfm_background_shaders.py` (TFM) |
+| Registry a segment scene is published into | `puikit.background.ANIMATIONS` (PuiKit) |
+| Descriptors | `Background3D` / `Shader` in `puikit.background` (PuiKit) |
 | Theme → descriptor resolution | `_resolve_background` in `tfm.py` |
 | Push to the backend on theme switch | `TfmApp._apply_background` in `tfm.py` |
 | Stroking the segments | `MacOSBackend._render_animation` (PuiKit) |
+| Compiling and drawing a shader | `puikit/backends/_metal.py` (PuiKit) |
+| Compositing the GPU layer | `MacOSBackend._sync_shader_layer` (PuiKit) |
 
 The split is deliberate: **PuiKit owns how a scene is stroked, TFM owns what the
 scenes are.** PuiKit ships only the wireframe cube — a reference scene that
@@ -172,6 +205,87 @@ did originally.
 - `_TUNNEL_MIN_DEPTH` guards the perspective divide when a pitched or yawed
   camera swings a near corner behind the eye; such a point projects to `None` and
   its segment is dropped.
+
+## The shader path
+
+### Writing one
+
+A shader scene is a single Metal fragment function named `puikit_bg_fragment`.
+PuiKit prepends `SHADER_PRELUDE` — the uniform struct and a fullscreen-triangle
+vertex stage — so app source is only that function and cannot break the pipeline:
+
+```metal
+fragment float4 puikit_bg_fragment(float4 pos [[position]],
+                                   constant BackgroundUniforms &u [[buffer(0)]])
+```
+
+`u` carries `resolution` (pixels), `time` (seconds, already scaled by the theme's
+speed), `opacity`, and the theme's `ink`/`backdrop` as RGBA. Honour `speed` via
+`time` (so `speed=0` freezes, as the segment scenes do) and derive colour from
+`ink` so the scene stays in the palette's family.
+
+Add the scene to `SHADER_KINDS` with any scene-owned `Shader` fields. The dict is
+splatted into `Shader(...)`, so a stray key is a `TypeError` at theme-apply time —
+there is a test that constructs every entry.
+
+### Compositing
+
+A `CALayer` draws its sublayers *above* its own contents, so the GPU layer cannot
+live inside the UI view — it has to be a sibling behind it. `open()` therefore puts
+the UI view inside a container, and `_sync_shader_layer` inserts a `CAMetalLayer`
+at index 0 of the container's layer. Everything reads `_view.bounds()` rather than
+the content view, so no other call site is affected.
+
+When a shader is active the render pass clears the UI view to **transparent**
+(with `NSCompositingOperationCopy` — source-over would leave the previous frame),
+so the layer behind shows through. Otherwise the clear is the opaque backdrop
+exactly as before.
+
+The layer is created lazily on first use, so an app that never sets a shader
+creates no Metal objects, and a machine without Metal reports
+`background_shader: False` and never gets there.
+
+### It does not repaint the UI
+
+The biggest cost of an animated background is not the scene — it is that a segment
+scene lives inside the UI's render pass, so advancing it repaints the whole file
+manager 60 times a second. Measured: the wave's own cost was 0.5ms/frame while the
+repaint it triggered was 8.1ms.
+
+A shader has its own layer behind the UI, so `_background_tick` draws straight into
+that layer and never marks the view dirty. The UI then repaints only on real
+change. Idle, that took the wave from ~52% of a core to ~4% — and left it roughly
+7× cheaper than the CPU scenes despite being far denser.
+
+This is why `_render_into_view` deliberately does *not* dispatch on `Shader`: the
+only thing the UI pass owes a shader is the transparent clear.
+
+### Cost
+
+Per-pixel, so the tunables that matter are the per-pixel loop and the resolution:
+
+- `LAYERS × 3 cells` is the wave's inner loop. Measured roughly linear in
+  `LAYERS`; 12 is the current setting.
+- Everything inside that loop is deliberately transcendental-free. The usual
+  `fract(sin(n) * 43758.0)` hash and a gaussian `exp()` splat together cost more
+  than the surface itself; they are an arithmetic hash and a squared clamped
+  polynomial instead.
+- `Shader.resolution_scale` renders below native and lets the compositor scale up.
+  The wave uses `0.5` — a quarter of the pixels, invisible on diffuse grain, and
+  the difference between affordable and not on a Retina display.
+
+Measure with `tools/render_background_animations.py` plus a timing loop over
+`MetalBackground.render_to_texture`, or in the real app with `PUIKIT_BG_PROFILE=1`.
+
+### Verifying a shader
+
+`MetalBackground` renders to an offscreen texture as readily as to a layer, so a
+shader can be compiled, drawn and inspected with no window — which is what both
+the tests and the render tool use:
+
+```bash
+PYTHONPATH=.:src python tools/render_background_animations.py --kind wave
+```
 
 ## Tuning notes
 
