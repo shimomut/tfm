@@ -44,6 +44,7 @@ for _modules_dir in (_here / "src", _here / "tfm_modules"):
         break
 
 from puikit import EventType, Font, Item, Panel, PostEffect, Style, TextAttribute, Theme, VSplit, derive_theme, mix  # noqa: E402
+from puikit.background import Background3D  # noqa: E402
 from puikit.posteffect import PRESETS as _POST_EFFECT_PRESETS  # noqa: E402
 from puikit.backends import create_backend  # noqa: E402
 from puikit.menu import Menu, MenuItem, SEPARATOR  # noqa: E402
@@ -709,6 +710,7 @@ class TfmApp:
         # Apply the restored theme's recommended post effect at launch too (the
         # backend stores it and re-attaches it once its window opens).
         self._apply_post_effect(self.themes[self._theme_index][1])
+        self._apply_background_3d(self.themes[self._theme_index][1])
         self.left_view = FilePane(
             self.pm.left_pane,
             config=self.config,
@@ -2093,6 +2095,7 @@ class TfmApp:
         name, theme = self.themes[self._theme_index]
         self.panel.theme = theme
         self._apply_post_effect(theme)
+        self._apply_background_3d(theme)
         self.state_manager.set_state("theme", name)  # remember across restarts
         self.log_info(f"Theme: {name}")
 
@@ -2103,6 +2106,30 @@ class TfmApp:
         capability (a terminal) inherits the base no-op, so this never branches on
         the backend."""
         self.backend.set_post_effect(theme.extras.get("post_effect"))
+
+    def _apply_background_3d(self, theme: Theme) -> None:
+        """Opt-in animated 3D background (a slowly spinning wireframe cube),
+        enabled by setting the ``TFM_BG3D`` environment variable — a feasibility
+        toggle, off by default. The edge color is derived from the theme's
+        foreground so it stays on-palette, and it re-applies on theme switch. A
+        backend without the ``background_3d`` capability (a terminal) inherits the
+        base no-op, so this never branches on the backend.
+
+        ``reveal`` dissolves the pane *surface* fills toward translucent so the
+        cube reads *through* the panes (framed dialogs and text stay opaque, so
+        the UI stays legible). ``backdrop`` is the theme background: the dissolved
+        surfaces fall back to it rather than the backend's neutral dark clear, so
+        the cube stays visible on *light* themes too (a dark ``theme.text`` line
+        reads against the light backdrop instead of vanishing into near-black) and
+        the panes don't muddy toward dark where dissolved. Tune the constants
+        below to taste."""
+        if not os.environ.get("TFM_BG3D"):
+            self.backend.set_background_3d(None)
+            return
+        self.backend.set_background_3d(
+            Background3D(color=theme.text, speed=0.6, opacity=0.6, reveal=0.4,
+                         backdrop=theme.surfaces.get("content"))
+        )
 
     def _cycle_theme(self) -> None:
         """Advance to the next palette (the ``toggle_color_scheme`` / T action)."""
