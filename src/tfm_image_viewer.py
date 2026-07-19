@@ -365,16 +365,16 @@ class ImageViewer(Widget):
                     base_w: float, base_h: float) -> None:
         """Draw the picture into the body at ``(x, y)``.
 
-        At the fit level (zoom 1) the whole image is shown letterboxed: the
-        backend does the aspect math from the image's real dimensions — correct
-        on GUI points and TUI cell pixels alike — so this passes plain
-        ``fit="contain"`` with no crop. Zoomed in, the image is grown past the
-        client area and clipped to it (``_fill_geometry``) so it *fills* the body
-        rather than floating in a letterbox; dest and source are proportional, so
-        ``fit="fill"`` draws them undistorted."""
-        geom = None if self.zoom <= MIN_ZOOM else self._fill_geometry(
-            body_w, body_h, base_w, base_h)
-        if geom is None:
+        The *scaled-image-clipped-to-the-client-area* geometry (``_fill_geometry``)
+        drives every zoom level, including the fit level. At fit it returns a
+        **centered** destination box holding the whole image (``src=(0,0,1,1)``),
+        so the letterbox splits evenly — a plain ``fit="contain"`` would let a
+        terminal place the letterboxed picture at the top-left of its cell box,
+        leaving all the empty space at the bottom. Zoomed in, the box grows to
+        cover the client area so the image fills it. Dest and source stay
+        proportional, so ``fit="fill"`` draws them undistorted."""
+        geom = self._fill_geometry(body_w, body_h, base_w, base_h)
+        if geom is None:  # size unknown — let the backend contain the whole image
             ctx.draw_image(x, y, self._local,
                            hints={"w": body_w, "h": body_h, "fit": "contain",
                                   "src": None, "alt": "🖼"})

@@ -384,15 +384,18 @@ def test_draw_fills_the_client_area_when_zoomed(images):
     assert hints["h"] == pytest.approx(body_h)  # ...and height
 
 
-def test_draw_uses_contain_with_no_crop_when_fitted(images):
-    # At fit level the whole image shows, letterboxed: the viewer sends
-    # fit="contain" + src=None so the backend does the aspect math from the real
-    # image dimensions (no source rect to get wrong).
+def test_draw_centers_the_whole_image_when_fitted(images):
+    # At fit level the whole image shows (src covers all of it), in a *centered*
+    # destination box so the letterbox splits evenly — a plain contain would let a
+    # terminal top-left-align the picture, leaving the empty space all at the
+    # bottom. images[0] is 200x100 (2:1) in a wider-than-tall body, so it
+    # letterboxes left/right and centers horizontally (a positive x offset).
     backend = MemoryBackend(width=60, height=20, capabilities=PROFILE_GUI_DESKTOP)
-    _render(backend, ImageViewer(images[0]))
-    hints = _image_hints(backend)
-    assert hints["fit"] == "contain"
-    assert hints["src"] is None
+    viewer = ImageViewer(images[0])
+    _render(backend, viewer)
+    x, y, path, hints = backend.image_calls[-1]
+    assert hints["src"] == (0.0, 0.0, 1.0, 1.0)  # the whole image
+    assert x > 0  # centered in the body, not drawn flush at the origin
 
 
 def test_draw_targets_the_body_between_header_and_footer(images):

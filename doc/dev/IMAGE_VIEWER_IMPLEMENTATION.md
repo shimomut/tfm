@@ -26,23 +26,37 @@ Rendering is PuiKit's job (per `CLAUDE.md`), so the work divides:
 
 The viewer never re-encodes an image to zoom. It holds three numbers — `zoom`,
 and a pan center `cx`/`cy` in normalized image coordinates — and turns them into
-a destination rect + source crop each frame (`_draw_image` / `_fill_geometry`).
+a destination rect + source crop each frame (`_draw_image` / `_fill_geometry`),
+the *scaled-image-clipped-to-the-client-area* model that real viewers (Preview,
+browsers) use. The image is scaled by *fit-scale × zoom*; the visible intersection
+with the body is the destination and the matching image region is the `src` crop,
+drawn `fit="fill"`. One code path covers every zoom level:
 
-Two regimes, split at the fit level:
-
-- **Fit (`zoom == 1`)** — the whole image, letterboxed. The viewer sends plain
-  `fit="contain"` with `src=None` and lets the backend do the aspect math from
-  the image's real dimensions (correct on GUI points and TUI cell pixels alike).
-- **Zoomed (`zoom > 1`)** — the *scaled-image-clipped-to-the-client-area* model,
-  the standard image-viewer behaviour. The image is scaled by *fit-scale × zoom*,
-  which makes it overflow the body; the visible intersection with the body is the
-  destination and the matching image region is the `src` crop, drawn `fit="fill"`.
+- **Fit (`zoom == 1`)** — the destination is the whole image's contain box,
+  **centered** in the body (`src = (0, 0, 1, 1)`), so the letterbox splits evenly.
+- **Zoomed (`zoom > 1`)** — the box grows to cover the body, so the image fills
+  the client area instead of floating in a letterbox.
 
 ```python
 (dx, dy, dw, dh), src = self._fill_geometry(body_w, body_h, base_w, base_h)
 ctx.draw_image(x + dx, y + dy, self._local,
                hints={"w": dw, "h": dh, "fit": "fill", "src": src, "alt": "🖼"})
 ```
+
+Centering matters on TUI specifically: a terminal places a letterboxed image at
+the **top-left** of its cell box, so a plain `fit="contain"` would leave all the
+empty space at the bottom. Driving the fit level through `_fill_geometry` too puts
+the picture in a centered destination box, so the blank cells split top and bottom.
+
+Centering the box is only half of it, though: the image also has to *fill* that
+box, or the terminal's own scale-to-fit re-introduces a within-box letterbox at
+the bottom (the box is centered, but the picture floats to the top of it). So
+`_terminal_graphics.render()` resizes a cropped image to the box's pixel size
+**exactly** (the `src` crop already matches the box aspect, so this is not a
+distortion), and the protocol is told to *stretch* rather than re-fit — iTerm2 via
+`preserveAspectRatio=0`. The image then fills the centered box, and the only
+residual is the ≤1-cell rounding of the box onto the grid (a character cell cannot
+be split). GUI is unaffected — it never routes through `render()`.
 
 ### Why the clipped-to-viewport model (and not a fixed contain box)
 
@@ -70,6 +84,14 @@ image filled only the top of the client area). `base_pixel_size` reports the
 cell's true pixel size (from `TIOCGWINSZ`, nominal `8×16` when the terminal is
 silent), so the crop matches the cell box and the terminal fills it. Now exact on
 both GUI and TUI.
+
+The `TIOCGWINSZ` division is **fractional** (`_terminal_graphics.cell_pixels`).
+`ws_ypixel` is rarely an exact multiple of the row count, and integer-dividing
+(e.g. `1290 / 80 = 16.125 → 16`) drops a pixel per row: a couple of blank rows at
+the bottom of a tall image, and a cell aspect that no longer matches the
+emulator's own, so it re-letterboxes what should fill. Keeping the fraction makes
+the scaled image line up with the real cell grid — the fix for "1–2 rows of white
+space when zoomed in".
 
 ### `src` is normalized, not pixels — and why
 
