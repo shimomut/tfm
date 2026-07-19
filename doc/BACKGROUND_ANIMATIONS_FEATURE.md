@@ -25,6 +25,8 @@ on-palette whichever theme (or custom palette) you use.
 | `constellation` | Slowly drifting points that link to their near neighbours, the links fading in and out as points pass. |
 | `grid` | Flying down a wireframe corridor — floor, ceiling and both walls gridded, converging on a vanishing point that wanders as the camera slowly drifts and turns. |
 | `wave` | A dense field of particles flowing over a rolling wave surface, with a colour gradient sweeping along it. |
+| `datastream` | Horizontal telemetry traffic: layered rows of dashes streaming past at different rates, mostly short with the occasional long streak, each leading with a bright head and some ending in a small upright tick. Busy and quiet regions drift across the field. |
+| `hologram` | A depth of holographic panels drifting toward you, each a small flat readout — pseudo-text that types itself out left to right, bar and line charts, progress bars, ring gauges, wireframe meshes — struck here and there with a warm accent. Panels fade up, hold and vanish on their own clock as the field flies slowly past, with a fine haze of distant ones behind, speed streaks raking outward from the vanishing point, and soft out-of-focus dots, rings and strokes drifting across it all. |
 
 The UI toolkit's own `cube` (a spinning wireframe) also works. It exists as a
 reference scene for the rendering path rather than as a finished look.

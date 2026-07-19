@@ -1093,6 +1093,1279 @@ float4 puikit_bg_fragment(float4 pos : SV_Position) : SV_Target {
 }
 """
 
+#: Horizontal data traffic — layered tracks of dashes streaming past the viewer.
+#:
+#: The look this chases is a telemetry wall seen side-on: rows of bright segments of
+#: many lengths sliding by at different rates, faint tick marks standing between
+#: them, the whole field clumping into busy and quiet regions. Where :data:`RAIN_MSL`
+#: falls, this *travels* — the two are the same idea rotated, but the differences
+#: that matter are the ones a rotation does not give you: parallax layers, a
+#: leading-edge hot head, and the vertical connectors.
+#:
+#: Structure: each layer is a stack of rows, and a row is a lane of dashes. A pixel
+#: finds its row by division and its dash by another, so it consults exactly one cell
+#: per layer — no neighbour visits at all, because a dash is contained in its cell by
+#: construction (the cell *is* the dash's slot; only its length varies). That is the
+#: cheapest form the grid device takes anywhere in this module, which is what pays
+#: for running several layers.
+#:
+#: Layers recede by a constant factor in pitch, cell length, speed and brightness, so
+#: the far ones read as distance rather than as clutter. Every row flows the same
+#: direction and differs only in rate: counter-flowing rows read as noise, while a
+#: shared direction reads as travel.
+#:
+#: **Time is folded, not accumulated.** A lane's offset grows without bound, and
+#: feeding ``x + t*speed`` straight into the cell hash would lose the fractional part
+#: to float32 after a long uptime — the dashes would start to jitter on a machine
+#: left running for days. So the offset is split into its integer cell count and its
+#: fraction: the fraction positions the pixel inside a cell, the integer only
+#: *identifies* which cell (wrapped at :data:`_DS_WRAP` cells, ~10^5 px of travel, so
+#: the hash input stays exact). The field repeats after that, which is unobservable
+#: and the whole point.
+DATASTREAM_MSL = """
+// --- tunables ---------------------------------------------------------------
+constant int   LAYERS      = 3;     // depth stack; each is a full field of rows
+constant float ROW_PX      = 13.0;  // row pitch of the nearest layer, pixels
+constant float CELL_PX     = 240.0; // dash slot length of the nearest layer
+constant float RATE        = 58.0;  // nearest layer's drift, pixels/second
+constant float LINE_PX     = 1.5;   // dash thickness, pixels
+constant float DASH_MIN    = 0.06;  // dash length as a fraction of its slot. Skewed
+constant float DASH_RANGE  = 0.90;  // short (see DASH_SKEW) so the long ones are rare
+constant float DASH_SKEW   = 2.0;   // and read as the exception rather than the rule
+constant float HEAD_PX     = 14.0;  // hot leading edge, pixels -- a length, not a
+                                    // fraction, so a long streak is not all head
+constant float DENSITY     = 0.55;  // fraction of slots that carry a dash
+constant float LAYER_STEP  = 0.62;  // each further layer's pitch/speed factor
+constant float LAYER_DIM   = 0.60;  // ...and its brightness factor
+constant float SPEED_MIN   = 0.35;  // per-row rate spread, x the layer's rate
+constant float SPEED_RANGE = 1.30;
+constant float TAIL_FLOOR  = 0.42;  // how far a dash dims from head to tail
+constant float HEAD_GLOW   = 0.70;  // how far a leading edge pales toward white
+constant float TICK_SHARE  = 0.30;  // share of dashes that also stand a tick
+constant float TICK_PX     = 1.4;   // tick width, pixels
+constant float TICK_FRAC   = 0.92;  // tick height, as a fraction of the row pitch
+constant float TICK_ALPHA  = 0.85;
+constant float WASH_X      = 2.6;   // the drifting density wash: spatial frequency
+constant float WASH_Y      = 1.7;   // in each axis, and how fast it moves
+constant float WASH_RATE   = 0.11;
+constant float WASH_FLOOR  = 0.55;  // density multiplier at the quietest
+constant float WASH_RANGE  = 0.60;
+constant float AA_PX       = 0.8;   // edge softening, pixels
+constant float CELL_WRAP   = 4096.0;// see the note on folding time, above
+
+// The arithmetic-only hash used throughout this module: no transcendentals, and
+// exact for the integer-valued inputs it is given here.
+static inline float3 hash33(float2 p) {
+    float3 v = fract(float3(p.xyx) * float3(0.1031, 0.1030, 0.0973));
+    v += dot(v, v.yzx + 33.33);
+    return fract((v.xxy + v.yzz) * v.zyx);
+}
+
+fragment float4 puikit_bg_fragment(float4 pos [[position]],
+                                   constant BackgroundUniforms &u [[buffer(0)]]) {
+    float t = u.time;
+    float2 uv = pos.xy / u.resolution;
+
+    // Busy and quiet regions drifting across the field. Modulating the *density*
+    // threshold rather than the brightness is what makes it read as traffic
+    // thinning out instead of the whole field dimming.
+    float wash = 0.5 + 0.5 * sin(uv.x * WASH_X + t * WASH_RATE)
+                           * sin(uv.y * WASH_Y - t * WASH_RATE * 0.77);
+    float dens = DENSITY * (WASH_FLOOR + WASH_RANGE * wash);
+
+    float lit = 0.0;   // coverage at this pixel
+    float far = 0.0;   // the share of it owed to the receding layers, for the hue
+    float hot = 0.0;   // proximity to a leading edge, for the white head
+
+    float scale = 1.0;
+    float dim = 1.0;
+    for (int i = 0; i < LAYERS; ++i) {
+        float rowH = ROW_PX * scale;
+        float cellW = CELL_PX * scale;
+        // Floors: the far layers must not thin below what a pixel can draw, or they
+        // stop being distance and become a grey haze over the file list.
+        float halfT = max(0.55, LINE_PX * 0.5 * scale);
+        float tickHalf = rowH * TICK_FRAC * 0.5;
+
+        float row = floor(pos.y / rowH);
+        float dy = abs(pos.y - (row + 0.5) * rowH);
+        // Most pixels sit in a row's gap. Rejecting on the tallest thing the row can
+        // hold skips the rest of the layer for them.
+        if (dy <= tickHalf + AA_PX) {
+            float3 r = hash33(float2(row, float(i) * 91.0));
+            float speed = RATE * scale * (SPEED_MIN + SPEED_RANGE * r.x);
+
+            // Fold time: the fraction places this pixel in its slot, the integer
+            // only names the slot (see the module note).
+            float shift = t * speed / cellW;
+            float shiftI = floor(shift);
+            float uX = pos.x / cellW + (shift - shiftI);
+            float cell = floor(uX);
+            float f = uX - cell;
+            float cid = fmod(cell + shiftI, CELL_WRAP);
+
+            float3 c = hash33(float2(cid, row + float(i) * 313.0));
+            if (c.x <= dens) {
+                // Skewed short: most slots carry a stub, a few carry a streak most
+                // of the slot long. A flat distribution gives every dash roughly the
+                // same length, which reads as a dashed rule rather than as traffic.
+                float dash = DASH_MIN + DASH_RANGE * pow(c.y, DASH_SKEW);
+                float aa = AA_PX / cellW;          // the AA width, in slot units
+                float bright = (0.45 + 0.55 * c.z) * dim;
+
+                // The lane slides left, so f = 0 is the dash's leading edge.
+                float covY = 1.0 - smoothstep(halfT, halfT + AA_PX, dy);
+                float covX = smoothstep(0.0, aa, f)
+                           * (1.0 - smoothstep(dash - aa, dash, f));
+                float k = f / dash;                // 0 at the head, 1 at the tail
+                float a = covX * covY * bright * mix(1.0, TAIL_FLOOR, k * k);
+                lit = max(lit, a);
+                far = max(far, a * (1.0 - dim));
+                // The head is a fixed number of pixels, not a fraction of the dash:
+                // a motion streak's hot tip is the same size however long the streak
+                // is, and scaling it with the length makes the long ones glow end to
+                // end instead of leading with a bright point.
+                hot = max(hot, a * (1.0 - smoothstep(0.0, HEAD_PX, f * cellW)));
+
+                // A vertical connector standing at the *trailing* end of some dashes
+                // -- the circuit-trace tick. At the trailing end rather than the
+                // leading one so it reads as a terminator: it carries the dash's
+                // untapered brightness, so against the faded tail it stands out,
+                // whereas at the head it would merge into the hot leading edge.
+                // Confined to its own row on purpose: a tick spanning several rows
+                // would have to be found by pixels in rows that do not own it, and
+                // the one-cell lookup is what makes this scene cheap.
+                if (c.x < TICK_SHARE * dens) {
+                    float m = 1.0 - smoothstep(TICK_PX * 0.5, TICK_PX * 0.5 + AA_PX,
+                                               abs(f - dash) * cellW);
+                    float covT = 1.0 - smoothstep(tickHalf, tickHalf + AA_PX, dy);
+                    lit = max(lit, m * covT * bright * TICK_ALPHA);
+                }
+            }
+        }
+        scale *= LAYER_STEP;
+        dim *= LAYER_DIM;
+    }
+
+    // Colour: the near tracks carry the theme ink; the far ones recede toward a
+    // cooler, bluer cast of it, and a leading edge pales toward white. Both ends are
+    // the ink pushed rather than fixed colours, so the field stays on-palette.
+    float3 nearInk = u.ink.rgb;
+    float3 farInk = u.ink.rgb * float3(0.42, 0.80, 1.15);
+    float3 rgb = mix(nearInk, farInk, clamp(far / max(lit, 1e-4), 0.0, 1.0));
+    rgb = mix(rgb, float3(1.0), clamp(hot, 0.0, 1.0) * HEAD_GLOW);
+
+    rgb = mix(u.backdrop.rgb, rgb, clamp(lit, 0.0, 1.0) * u.opacity);
+    return float4(rgb, 1.0);
+}
+"""
+
+#: The HLSL translation of :data:`DATASTREAM_MSL` (see :data:`WAVE_HLSL` for why a
+#: scene ships both). Line-for-line; only the dialect differs — ``fract``/``mix``
+#: become ``frac``/``lerp``, ``constant`` becomes ``static const``, and the uniforms
+#: are cbuffer globals. Keep the two in sync when tuning the scene.
+DATASTREAM_HLSL = """
+// --- tunables (see DATASTREAM_MSL for the rationale of each) -----------------
+static const int   LAYERS      = 3;
+static const float ROW_PX      = 13.0;
+static const float CELL_PX     = 240.0;
+static const float RATE        = 58.0;
+static const float LINE_PX     = 1.5;
+static const float DASH_MIN    = 0.06;
+static const float DASH_RANGE  = 0.90;
+static const float DASH_SKEW   = 2.0;
+static const float HEAD_PX     = 14.0;
+static const float DENSITY     = 0.55;
+static const float LAYER_STEP  = 0.62;
+static const float LAYER_DIM   = 0.60;
+static const float SPEED_MIN   = 0.35;
+static const float SPEED_RANGE = 1.30;
+static const float TAIL_FLOOR  = 0.42;
+static const float HEAD_GLOW   = 0.70;
+static const float TICK_SHARE  = 0.30;
+static const float TICK_PX     = 1.4;
+static const float TICK_FRAC   = 0.92;
+static const float TICK_ALPHA  = 0.85;
+static const float WASH_X      = 2.6;
+static const float WASH_Y      = 1.7;
+static const float WASH_RATE   = 0.11;
+static const float WASH_FLOOR  = 0.55;
+static const float WASH_RANGE  = 0.60;
+static const float AA_PX       = 0.8;
+static const float CELL_WRAP   = 4096.0;
+
+float3 hash33(float2 p) {
+    float3 v = frac(float3(p.xyx) * float3(0.1031, 0.1030, 0.0973));
+    v += dot(v, v.yzx + 33.33);
+    return frac((v.xxy + v.yzz) * v.zyx);
+}
+
+float4 puikit_bg_fragment(float4 pos : SV_Position) : SV_Target {
+    float t = time;
+    float2 uv = pos.xy / resolution;
+
+    float wash = 0.5 + 0.5 * sin(uv.x * WASH_X + t * WASH_RATE)
+                           * sin(uv.y * WASH_Y - t * WASH_RATE * 0.77);
+    float dens = DENSITY * (WASH_FLOOR + WASH_RANGE * wash);
+
+    float lit = 0.0;
+    float far = 0.0;
+    float hot = 0.0;
+
+    float scale = 1.0;
+    float dim = 1.0;
+    for (int i = 0; i < LAYERS; ++i) {
+        float rowH = ROW_PX * scale;
+        float cellW = CELL_PX * scale;
+        float halfT = max(0.55, LINE_PX * 0.5 * scale);
+        float tickHalf = rowH * TICK_FRAC * 0.5;
+
+        float row = floor(pos.y / rowH);
+        float dy = abs(pos.y - (row + 0.5) * rowH);
+        if (dy <= tickHalf + AA_PX) {
+            float3 r = hash33(float2(row, float(i) * 91.0));
+            float speed = RATE * scale * (SPEED_MIN + SPEED_RANGE * r.x);
+
+            float shift = t * speed / cellW;
+            float shiftI = floor(shift);
+            float uX = pos.x / cellW + (shift - shiftI);
+            float cell = floor(uX);
+            float f = uX - cell;
+            float cid = fmod(cell + shiftI, CELL_WRAP);
+
+            float3 c = hash33(float2(cid, row + float(i) * 313.0));
+            if (c.x <= dens) {
+                float dash = DASH_MIN + DASH_RANGE * pow(c.y, DASH_SKEW);
+                float aa = AA_PX / cellW;
+                float bright = (0.45 + 0.55 * c.z) * dim;
+
+                float covY = 1.0 - smoothstep(halfT, halfT + AA_PX, dy);
+                float covX = smoothstep(0.0, aa, f)
+                           * (1.0 - smoothstep(dash - aa, dash, f));
+                float k = f / dash;
+                float a = covX * covY * bright * lerp(1.0, TAIL_FLOOR, k * k);
+                lit = max(lit, a);
+                far = max(far, a * (1.0 - dim));
+                hot = max(hot, a * (1.0 - smoothstep(0.0, HEAD_PX, f * cellW)));
+
+                // See the MSL twin: the tick stands at the dash's trailing end.
+                if (c.x < TICK_SHARE * dens) {
+                    float m = 1.0 - smoothstep(TICK_PX * 0.5, TICK_PX * 0.5 + AA_PX,
+                                               abs(f - dash) * cellW);
+                    float covT = 1.0 - smoothstep(tickHalf, tickHalf + AA_PX, dy);
+                    lit = max(lit, m * covT * bright * TICK_ALPHA);
+                }
+            }
+        }
+        scale *= LAYER_STEP;
+        dim *= LAYER_DIM;
+    }
+
+    float3 nearInk = ink.rgb;
+    float3 farInk = ink.rgb * float3(0.42, 0.80, 1.15);
+    float3 rgb = lerp(nearInk, farInk, saturate(far / max(lit, 1e-4)));
+    rgb = lerp(rgb, float3(1.0, 1.0, 1.0), saturate(hot) * HEAD_GLOW);
+
+    rgb = lerp(backdrop.rgb, rgb, saturate(lit) * opacity);
+    return float4(rgb, 1.0);
+}
+"""
+
+#: A depth of holographic panels drifting toward the viewer — the data-wall look.
+#:
+#: Structure: a stack of planes at increasing depth, each tiled into cells, each cell
+#: hosting one **panel** — a small flat HUD of rules, blocks and pseudo-text. A plane
+#: sweeps from far to near and recycles, so panels grow and slide outward as they
+#: approach and pass. This is :data:`STARFIELD_MSL`'s depth machinery carrying a
+#: *drawing* instead of a dot, and it inherits that scene's key property: a panel's
+#: identity comes from its position on the plane, which never moves, so approaching
+#: it magnifies it rather than morphing it.
+#:
+#: A panel draws one of six things — typed pseudo-text, a bar chart, a line chart,
+#: progress bars, a ring gauge, or a wireframe mesh — picked by a hash and read off a
+#: threshold chain, so only the winning branch costs anything. Text is much the
+#: commonest; the charts are punctuation.
+#:
+#: **Why the content is procedural blocks and not text.** A background shader is
+#: handed uniforms and binds no textures — there is no font to sample, and glyph
+#: rasterisation in a fragment function would cost more than the whole rest of the
+#: scene. So a row of "text" is a run of blocks with text's *rhythm*: varied widths,
+#: short gaps, a common baseline. At the size panels actually occupy that is what the
+#: reference reads as anyway; the legibility was never there to lose.
+#:
+#: What it does need is text's **order**. A row types out left to right, holds, then
+#: retypes with fresh content, with the mark under the head burning brighter — the
+#: caret. Re-rolling every slot at once (what this did first) costs nothing less and
+#: reads as noise: writing order is most of what identifies a row as writing.
+#:
+#: **Three nested grids, one lookup each.** Cell → panel, panel → row, row → block:
+#: a pixel divides its way down to exactly one block and hashes it. Nothing is
+#: iterated but the depth planes, which is what lets the field be this dense.
+#:
+#: **The concentration lines** raking outward from the vanishing point are the
+#: datastream's dash-in-a-slot wrapped around the centre — a pixel finds its angular
+#: sector and its slot along the ray and consults one cell, so the whole field costs
+#: about what one more depth plane would. They earn their place by selling the motion
+#: the panels only imply: panels *grow*, but nothing about them streaks.
+#:
+#: **Resolution-aware fade.** Depth means far panels pack their rows tighter than a
+#: pixel can resolve, and drawing them anyway turns the far field into crawling
+#: noise. Each panel measures a pixel against its own row pitch — computed
+#: analytically from the depth, since ``fwidth`` is undefined under the non-uniform
+#: branching this scene is built from — and fades out where it can no longer be read.
+#: That is also what bounds the cost of the far planes rather than the plane count.
+#:
+#: **The warm accent.** The reference punctuates its cyan with amber, and a shader
+#: gets exactly one theme colour (``ink``). The accent is therefore the ink with red
+#: and blue swapped: on the cyan this scene is written for that lands on amber
+#: exactly, and on any other palette it stays a hue derived from the theme rather
+#: than a colour imported from outside it.
+HOLOGRAM_MSL = """
+// --- tunables ---------------------------------------------------------------
+constant int   LAYERS      = 12;    // depth planes; each a full grid of panels
+constant float Z_FAR       = 3.0;   // spawn depth / closest approach. The divide
+constant float Z_NEAR      = 0.45;  // blows up as Z_NEAR reaches 0
+constant float RATE        = 0.015;  // fraction of the depth range crossed per second
+constant float FADE_IN     = 0.30;  // fraction of the travel spent fading in
+constant float FADE_OUT    = 0.18;  // ...and fading out as it sweeps past. Long,
+                                    // because a plane at Z_NEAR is wider than the
+                                    // window: a panel has to be gone before it
+                                    // becomes the whole screen and pops out
+constant float GRID        = 3.20;  // panel cells per unit of plane
+constant float PANEL_KEEP  = 0.38;  // share of cells that host a panel at all
+constant float PANEL_W_MIN = 0.40;  // panel size as a fraction of its cell
+constant float PANEL_W_RNG = 0.50;
+constant float PANEL_H_MIN = 0.22;
+constant float PANEL_H_RNG = 0.42;
+
+// What a panel *is*. Cumulative thresholds on one hash, read off in a comparison
+// chain, so a panel draws one kind and only the winning branch costs anything.
+constant float K_TEXT      = 0.660;  // typed pseudo-text (the commonest)
+constant float K_BARS      = 0.725;  // bar chart
+constant float K_LINE      = 0.765;  // line chart
+constant float K_PROG      = 0.875;  // progress bars
+constant float K_PIE       = 0.915;  // ring gauge -- the rest are wireframe
+
+// Text panels
+constant float ROWS        = 9.0;   // content rows per panel
+constant float SEG_MIN     = 8.0;   // character slots per row
+constant float SEG_RNG     = 16.0;
+constant float ROW_FILL    = 0.60;  // share of slots carrying a mark
+constant float BLOCK_H     = 0.32;  // mark height, as a fraction of the row
+constant float BLOCK_MIN   = 0.15;  // mark width, as a fraction of its slot
+constant float BLOCK_RNG   = 0.55;
+constant float RULE_SHARE  = 0.20;  // share of rows drawn as a full-width hairline
+constant float RULE_H      = 0.09;
+constant float TYPE_RATE   = 0.16;  // type-hold-retype cycles per second
+constant float TYPE_FRAC   = 0.34;  // fraction of that cycle spent typing
+constant float CURSOR_LIFT = 0.60;  // extra brightness on the mark at the head
+
+// Bar charts
+constant float BAR_N_MIN   = 5.0;   // bars per panel
+constant float BAR_N_RNG   = 9.0;
+constant float BAR_W       = 0.42;  // bar width, as a fraction of its slot
+constant float BAR_MIN     = 0.12;  // bar height range, as a fraction of the panel
+constant float BAR_RNG     = 0.80;
+constant float BAR_RATE    = 0.22;  // re-rolls per second
+
+// Line charts
+constant float LINE_PTS    = 8.0;   // vertices across the panel
+constant float LINE_W      = 0.022;  // trace thickness, in panel-local units
+constant float LINE_RATE   = 0.18;
+constant float LINE_LO     = 0.12;  // the band the trace stays inside
+constant float LINE_SPAN   = 0.76;
+constant float LINE_FILL   = 0.10;  // brightness of the wash under the trace
+
+// Progress bars
+constant float PROG_ROWS   = 4.0;
+constant float PROG_H      = 0.34;  // bar height, as a fraction of its row
+constant float PROG_RATE   = 0.12;
+constant float PROG_TRACK  = 0.32;  // brightness of the unfilled track
+constant float PROG_LO     = 0.08;  // fill range, so a bar is never quite empty/full
+constant float PROG_SPAN   = 0.86;
+
+// Ring gauges
+constant float PIE_R       = 0.24;  // radius, as a fraction of the panel's short side
+constant float PIE_W       = 0.06;  // ring thickness, as a fraction of the radius
+constant float PIE_RATE    = 0.09;
+constant float PIE_TRACK   = 0.50;  // brightness of the unswept ring
+
+// Wireframes
+constant float WIRE_NX     = 6.0;   // mesh divisions
+constant float WIRE_NY     = 4.0;
+constant float WIRE_DIAG   = 0.50;  // share that also carry diagonals
+constant float WIRE_ALPHA  = 0.50;
+
+// Panel chrome and shading
+constant float FRAME_SHARE = 0.45;  // share of panels carrying an outline
+constant float FRAME_ALPHA = 0.55;
+constant float WARM_SHARE  = 0.14;  // share of marks struck in the warm accent
+constant float NEAR_GLOW   = 0.55;  // how far the nearest panels pale toward white
+constant float DEPTH_DIM   = 0.52;  // brightness of the furthest plane vs the nearest.
+                                    // Without this the field reads flat: every plane
+                                    // draws at the same strength, so the eye gets the
+                                    // *scale* cue and no aerial one, and a big near
+                                    // panel looks like a big panel rather than a
+                                    // close one
+constant float RESOLVE     = 0.85;  // fade a panel out past this many pixels per row
+
+// Concentration lines -- the radial speed streaks
+constant float CONC_SECTORS = 220.0; // angular slots around the vanishing point
+constant float CONC_KEEP    = 0.16;  // share of sectors carrying a streak
+constant float CONC_CELL    = 0.34;  // streak slot length, as a fraction of the radius
+constant float CONC_DASH    = 0.55;  // dash length within its slot
+constant float CONC_RATE    = 0.20;  // outward drift, fraction of the radius/second
+constant float CONC_PX      = 1.1;   // streak width, pixels
+constant float CONC_ALPHA   = 0.42;
+constant float CONC_IN      = 0.16;  // radius (fraction) the streaks start at
+constant float CONC_RAMP    = 0.26;  // ...and how far they take to reach full strength
+constant float CONC_HEAD    = 0.60;  // how far a leading edge pales toward white
+
+constant float LIFE_RATE   = 0.167; // panel appear-hold-vanish cycles per second.
+                                    // Deliberately independent of RATE: see the note
+                                    // in the loop on why the two had to come apart
+constant float LIFE_IN     = 0.12;  // fraction of a life spent fading up
+constant float LIFE_OUT    = 0.18;  // ...and fading out
+
+// The ambient field: soft out-of-focus dots, rings and strokes drifting in *screen*
+// space, with no part in the depth sweep. Everything else here flies at the viewer,
+// which gives the scene one motion and one only; this layer drifts across it instead,
+// so there is something in frame that is simply there rather than arriving.
+constant float AMB_CELL_PX  = 170.0; // ambient cell size, pixels
+constant float AMB_KEEP     = 0.55;  // share of cells carrying an object
+constant float AMB_MAX_R    = 70.0;  // bound on an object's reach: the jitter below is
+                                     // clamped so nothing leaves its own cell, which
+                                     // is what keeps this to one lookup per pixel
+constant float AMB_DRIFT_X  = 5.0;   // field drift, pixels/second
+constant float AMB_DRIFT_Y  = -3.0;
+constant float AMB_ORBIT    = 0.05;  // per-object orbit, turns/second
+constant float AMB_ORBIT_R  = 9.0;   // ...and its radius, pixels
+constant float AMB_K_DOT    = 0.55;  // kind mix: dot / ring / stroke
+constant float AMB_K_RING   = 0.80;
+constant float AMB_DOT_R    = 40.0;
+constant float AMB_DOT_A    = 0.45;
+constant float AMB_RING_R   = 36.0;
+constant float AMB_RING_W   = 1.6;
+constant float AMB_RING_A   = 0.34;
+constant float AMB_LINE_L   = 80.0;
+constant float AMB_LINE_W   = 1.4;
+constant float AMB_LINE_A   = 0.30;
+constant float AMB_SOFT     = 7.0;   // edge softness, pixels -- these read as
+                                     // out-of-focus, so the falloff is wide
+
+constant float CYCLE_WRAP   = 512.0; // keeps the hash inputs exact -- see the note on
+constant float CONC_WRAP    = 4096.0;// folding time in DATASTREAM_MSL
+constant float TAU          = 6.283185307;
+
+static inline float3 hash33(float2 p) {
+    float3 v = fract(float3(p.xyx) * float3(0.1031, 0.1030, 0.0973));
+    v += dot(v, v.yzx + 33.33);
+    return fract((v.xxy + v.yzz) * v.zyx);
+}
+
+// A value that re-rolls on a fixed beat and eases between draws, so charts move
+// rather than jump. Returns the eased value; `gen` is the draw it is heading to.
+static inline float stepped(float2 seed, float beat, float phase) {
+    float ct = beat + phase;
+    float gen = floor(ct);
+    float a = hash33(seed + float2(gen * 53.0, 0.0)).x;
+    float b = hash33(seed + float2((gen + 1.0) * 53.0, 0.0)).x;
+    return mix(a, b, smoothstep(0.0, 1.0, fract(ct)));
+}
+
+// The ambient field: one soft object per screen-space cell, drifting as a whole and
+// orbiting within its cell. The jitter is clamped so an object cannot leave the cell
+// that owns it, which is what lets a pixel consult exactly one cell -- the same
+// bounded-jitter trick the wave uses, and the reason this layer is nearly free.
+//
+// Nothing here takes part in the depth sweep. That is the point: every other element
+// flies at the viewer, so the scene had exactly one kind of motion, and a layer that
+// merely drifts across it reads as depth of field rather than as more traffic.
+static inline float ambient_field(float2 p, float t) {
+    float2 q = p + float2(t * AMB_DRIFT_X, t * AMB_DRIFT_Y);
+    float2 cell = floor(q / AMB_CELL_PX);
+    float2 f = q - cell * AMB_CELL_PX;
+    float3 h = hash33(cell + 91.0);
+    if (h.x > AMB_KEEP) { return 0.0; }
+
+    float3 g = hash33(cell * 1.7 + 13.0);
+    float span = AMB_CELL_PX - 2.0 * AMB_MAX_R;
+    float2 c = float2(AMB_CELL_PX * 0.5) + (g.xy - 0.5) * span;
+    float ang = t * AMB_ORBIT * TAU * (0.6 + 0.8 * g.z) + h.z * TAU;
+    c += float2(cos(ang), sin(ang)) * AMB_ORBIT_R;
+
+    float2 d2 = f - c;
+    float d = length(d2);
+    if (h.y < AMB_K_DOT) {
+        // A squared falloff, not a smoothstep-bounded disc: an out-of-focus
+        // highlight has no edge. (Cubed, the first try, collapses the visible core
+        // to a point -- the dots read as dust rather than as lights.)
+        float r = AMB_DOT_R * (0.5 + 0.9 * g.x);
+        float k = max(0.0, 1.0 - d / r);
+        return k * k * AMB_DOT_A;
+    } else if (h.y < AMB_K_RING) {
+        float r = AMB_RING_R * (0.5 + 0.9 * g.y);
+        return (1.0 - smoothstep(AMB_RING_W, AMB_RING_W + AMB_SOFT, abs(d - r)))
+             * AMB_RING_A;
+    }
+    float a2 = g.z * TAU;
+    float2 dir = float2(cos(a2), sin(a2));
+    float half_len = AMB_LINE_L * 0.5 * (0.5 + 0.9 * g.x);
+    float along = clamp(dot(d2, dir), -half_len, half_len);
+    return (1.0 - smoothstep(AMB_LINE_W, AMB_LINE_W + AMB_SOFT,
+                             length(d2 - dir * along))) * AMB_LINE_A;
+}
+
+// One panel's contents, in panel-local coordinates (0..1 on each axis). Returns
+// coverage in .x and how much of it is struck in the warm accent in .y.
+//
+// `pixCell` is one screen pixel expressed in *cell* units -- the panel's own axes
+// are anisotropic (it is pw x panelH of a cell), so each branch converts as it needs
+// to. Everything is antialiased against that rather than against fwidth: the caller
+// reaches this under heavily non-uniform branching, where a derivative is undefined.
+static inline float2 panel_content(float lx, float ly, float pixCell,
+                                   float pw, float panelH, float2 salt,
+                                   float kind, float kvar, float t) {
+    float pixX = pixCell / pw;          // one pixel, in panel-local x
+    float pixY = pixCell / panelH;      // ...and y
+    float a = 0.0;
+    float acc = 0.0;
+
+    if (kind < K_TEXT) {
+        // --- typed pseudo-text ------------------------------------------------
+        float ry = ly * ROWS;
+        float row = floor(ry);
+        float fy = ry - row;
+        float aaY = pixY * ROWS;
+        float3 rh = hash33(salt + float2(row * 7.0, 3.0));
+        if (rh.x < RULE_SHARE) {
+            a = 1.0 - smoothstep(RULE_H * 0.5, RULE_H * 0.5 + aaY, abs(fy - 0.5));
+        } else {
+            float segs = floor(SEG_MIN + SEG_RNG * rh.y);
+            float sx = lx * segs;
+            float seg = floor(sx);
+            float fx = sx - seg;
+            // A row types out left to right, holds, then retypes with fresh content.
+            // Re-rolling every slot at once (what this did before) is what made the
+            // marks read as noise rather than as characters: text has a writing
+            // *order*, and the order is most of what identifies it as text.
+            float ct = t * TYPE_RATE + rh.z * 7.0;
+            float gen = floor(ct);
+            float head = clamp(fract(ct) / TYPE_FRAC, 0.0, 1.0) * segs;
+            if (seg < head) {
+                float3 sh = hash33(float2(seg + gen * 131.0, salt.y + row));
+                if (sh.x < ROW_FILL) {
+                    float bw = BLOCK_MIN + BLOCK_RNG * sh.y;
+                    float covX = 1.0 - smoothstep(bw - pixX * segs, bw, fx);
+                    float covY = 1.0 - smoothstep(BLOCK_H * 0.5,
+                                                  BLOCK_H * 0.5 + aaY, abs(fy - 0.5));
+                    a = covX * covY;
+                    // The mark under the head burns brighter for a slot or so -- the
+                    // caret, and the cue that reads as "this is being written now".
+                    a *= 1.0 + CURSOR_LIFT * (1.0 - smoothstep(0.0, 1.5, head - seg));
+                    acc = (sh.z > 1.0 - WARM_SHARE) ? a : 0.0;
+                }
+            }
+        }
+    } else if (kind < K_BARS) {
+        // --- bar chart --------------------------------------------------------
+        float bars = floor(BAR_N_MIN + BAR_N_RNG * kvar);
+        float bx = lx * bars;
+        float bar = floor(bx);
+        float fx = bx - bar;
+        float h = BAR_MIN + BAR_RNG * stepped(salt + float2(bar, 0.0),
+                                              t * BAR_RATE, kvar * 5.0);
+        float covX = 1.0 - smoothstep(BAR_W - pixX * bars, BAR_W, fx);
+        // ly runs downward, so a bar standing on the floor is (1 - ly) < h.
+        float covY = 1.0 - smoothstep(h - pixY, h, 1.0 - ly);
+        a = covX * covY;
+        a = max(a, 1.0 - smoothstep(pixY * 0.5, pixY * 1.5, 1.0 - ly));   // baseline
+    } else if (kind < K_LINE) {
+        // --- line chart -------------------------------------------------------
+        float px = lx * LINE_PTS;
+        float ip = floor(px);
+        float fp = px - ip;
+        float y0 = LINE_LO + LINE_SPAN * stepped(salt + float2(ip, 0.0),
+                                                 t * LINE_RATE, kvar * 3.0);
+        float y1 = LINE_LO + LINE_SPAN * stepped(salt + float2(ip + 1.0, 0.0),
+                                                 t * LINE_RATE, kvar * 3.0);
+        float yl = mix(y0, y1, fp);
+        // Perpendicular distance, not vertical: without the slope correction a steep
+        // leg of the trace draws several times thicker than a flat one.
+        float slope = (y1 - y0) * LINE_PTS;
+        float d = abs(ly - yl) / sqrt(1.0 + slope * slope);
+        a = 1.0 - smoothstep(LINE_W * 0.5, LINE_W * 0.5 + pixY, d);
+        a = max(a, (ly > yl) ? LINE_FILL : 0.0);      // the wash under the trace
+    } else if (kind < K_PROG) {
+        // --- progress bars ----------------------------------------------------
+        float ry = ly * PROG_ROWS;
+        float row = floor(ry);
+        float fy = ry - row;
+        float aaY = pixY * PROG_ROWS;
+        float3 rh = hash33(salt + float2(row * 11.0, 17.0));
+        float band = 1.0 - smoothstep(PROG_H * 0.5, PROG_H * 0.5 + aaY, abs(fy - 0.5));
+        float p = PROG_LO + PROG_SPAN * stepped(salt + float2(row * 3.0, 9.0),
+                                                t * PROG_RATE, rh.z * 4.0);
+        float fill = band * (1.0 - smoothstep(p - pixX, p, lx));
+        a = max(band * PROG_TRACK, fill);
+        acc = (rh.y > 1.0 - WARM_SHARE) ? fill : 0.0;
+    } else if (kind < K_PIE) {
+        // --- ring gauge -------------------------------------------------------
+        // Back into cell units, where the axes are isotropic again -- drawn in
+        // panel-local units a circle would come out as an ellipse.
+        float2 q = float2((lx - 0.5) * pw, (ly - 0.5) * panelH);
+        float R = PIE_R * min(pw, panelH);
+        float r = length(q);
+        float ring = 1.0 - smoothstep(R * PIE_W, R * PIE_W + pixCell, abs(r - R));
+        float band = 1.0 - smoothstep(R * PIE_W * 2.4, R * PIE_W * 2.4 + pixCell,
+                                      abs(r - R));
+        float sweep = stepped(salt + float2(31.0, 0.0), t * PIE_RATE, kvar * 6.0);
+        float ang = atan2(q.y, q.x) / TAU + 0.5;
+        float arc = (ang < sweep) ? band : 0.0;
+        a = max(ring * PIE_TRACK, arc);
+        acc = arc;
+    } else {
+        // --- wireframe --------------------------------------------------------
+        float u = lx * WIRE_NX;
+        float v = ly * WIRE_NY;
+        float wu = pixX * WIRE_NX;
+        float wv = pixY * WIRE_NY;
+        a = max(1.0 - smoothstep(0.5 * wu, 1.5 * wu, abs(u - round(u))),
+                1.0 - smoothstep(0.5 * wv, 1.5 * wv, abs(v - round(v))));
+        if (kvar < WIRE_DIAG) {
+            float d = u + v;
+            float wd = wu + wv;
+            a = max(a, 1.0 - smoothstep(0.5 * wd, 1.5 * wd, abs(d - round(d))));
+        }
+        a *= WIRE_ALPHA;
+    }
+    return float2(a, acc);
+}
+
+fragment float4 puikit_bg_fragment(float4 pos [[position]],
+                                   constant BackgroundUniforms &u [[buffer(0)]]) {
+    float2 halfRes = u.resolution * 0.5;
+    // View-height units in both axes, so a panel stays square whatever the window
+    // aspect. (The starfield normalises per-axis instead and lets its field stretch;
+    // a stretching *drawing* would read as a mistake where a stretching dot does not.)
+    float2 P = pos.xy - halfRes;
+    float2 n = P / halfRes.y;
+    float t = u.time;
+
+    float lit = 0.0;    // coverage at this pixel
+    float warm = 0.0;   // the share of it struck in the accent, for the hue
+    float hot = 0.0;    // nearness of whatever covered it, for the white lift
+
+    for (int i = 0; i < LAYERS; ++i) {
+        // Planes evenly offset in phase, so the field always holds panels at every
+        // stage of the approach rather than pulsing in unison.
+        float raw = t * RATE + float(i) / float(LAYERS);
+        float travel = fract(raw);
+        float cycle = fmod(floor(raw), CYCLE_WRAP);   // re-rolls a plane's content
+        // Even steps in 1/z are even steps *on screen* (the same reason the wave
+        // stacks its slabs this way). Stepping z linearly instead spends almost every
+        // plane in the far half, where 1/z barely moves -- which is why the field
+        // came out as one size of panel repeated rather than a depth of them. This
+        // spreads the planes evenly across apparent scale, so a big near panel, a
+        // mid one and the far haze are all on screen at once.
+        float z = 1.0 / mix(1.0 / Z_FAR, 1.0 / Z_NEAR, travel);
+        float alpha = min(1.0, travel / FADE_IN)
+                    * (1.0 - smoothstep(1.0 - FADE_OUT, 1.0, travel));
+        if (alpha <= 0.002) { continue; }
+
+        // Run the projection backwards: at this depth the ray crosses the plane
+        // here, so this is the only cell that can cover this pixel.
+        float2 s = n * z;
+        float2 cell = floor(s * GRID);
+        float2 f = s * GRID - cell;
+
+        // Each panel lives and dies on its own clock, much shorter than its plane's
+        // traversal: it fades up, holds, fades out, and the cell is redrawn with a
+        // fresh one. Decoupling the two is the whole point -- the plane's sweep used
+        // to serve as the panel lifetime as well, so slowing the flight would have
+        // made every panel linger proportionally longer. Now the flight can be slow
+        // and the field still turns over quickly.
+        float3 lh = hash33(cell * 0.61 + float2(float(i) * 3.0, 7.0));
+        float lifeT = t * LIFE_RATE + lh.x * 11.0;
+        float lifeGen = fmod(floor(lifeT), CYCLE_WRAP);
+        float lifePh = fract(lifeT);
+        float life = smoothstep(0.0, LIFE_IN, lifePh)
+                   * (1.0 - smoothstep(1.0 - LIFE_OUT, 1.0, lifePh));
+        if (life <= 0.002) { continue; }
+
+        // ``lifeGen`` rides in every panel hash below, so a cell that comes back
+        // comes back as a different panel rather than as the same one blinking.
+        float3 ph = hash33(cell + float2(cycle * 13.0 + float(i) * 57.0 + lifeGen * 29.0,
+                                         cycle * 7.0 - float(i) * 23.0 + lifeGen * 41.0));
+        if (ph.x > PANEL_KEEP) { continue; }     // this cell is empty space
+
+        float3 qh = hash33(cell * 1.37 + float2(float(i) * 11.0,
+                                                cycle * 3.0 + lifeGen * 17.0));
+        float pw = PANEL_W_MIN + PANEL_W_RNG * ph.y;
+        float panelH = PANEL_H_MIN + PANEL_H_RNG * ph.z;
+        float lx = (f.x - (1.0 - pw) * qh.x) / pw;   // panel-local, 0..1
+        float ly = (f.y - (1.0 - panelH) * qh.y) / panelH;
+        if (lx < 0.0 || lx > 1.0 || ly < 0.0 || ly > 1.0) { continue; }
+
+        // One pixel, in cell units. Derived from the depth rather than from fwidth:
+        // the branching above is non-uniform, which makes a derivative undefined,
+        // and every antialiasing width downstream depends on this.
+        float pixCell = z * GRID / halfRes.y;
+        // Past the point where a pixel spans a good part of a row, the panel cannot
+        // be read at all; fading it out is what keeps the far field from boiling.
+        float resolve = 1.0 - smoothstep(RESOLVE * 0.5, RESOLVE,
+                                         (pixCell / panelH) * ROWS);
+        if (resolve <= 0.0) { continue; }
+
+        // ``travel``, not z: with the 1/z stepping above it is travel that is linear
+        // in apparent scale, so it is the measure that makes the aerial cue agree
+        // with the size cue.
+        float depth = 1.0 - travel;                         // 0 near, 1 far
+        float bright = (0.3 + 0.7 * ph.y) * alpha * life * resolve
+                     * mix(1.0, DEPTH_DIM, depth);
+
+        float2 r = panel_content(lx, ly, pixCell, pw, panelH,
+                                 float2(cell.x * 13.0 + float(i),
+                                        cell.y * 29.0 + cycle + lifeGen * 7.0),
+                                 qh.z, fract(qh.y * 11.7), t);
+        float a = r.x;
+
+        // A hairline outline on some panels, which is most of what makes a cluster
+        // of marks read as a *panel* rather than as loose debris.
+        if (fract(qh.x * 7.3) < FRAME_SHARE) {
+            float edge = min(min(lx, 1.0 - lx) * pw,
+                             min(ly, 1.0 - ly) * panelH) / pixCell;
+            a = max(a, (1.0 - smoothstep(0.6, 1.6, edge)) * FRAME_ALPHA);
+        }
+
+        a *= bright;
+        lit = max(lit, a);
+        warm = max(warm, r.y * bright);
+        hot = max(hot, a * (1.0 - z / Z_FAR));
+    }
+
+    // --- concentration lines --------------------------------------------------
+    // Radial speed streaks raking outward from the vanishing point. This is the
+    // datastream's dash-in-a-slot wrapped around the centre: a pixel finds its
+    // angular sector and its slot along the ray and consults exactly one cell, so a
+    // whole field of them costs about what one more panel plane would. They sell the
+    // forward motion the panels only imply -- the panels grow, but nothing *streaks*.
+    float rad = length(P);
+    float rn = rad / length(halfRes);          // 0 at the centre, 1 at the corner
+    if (rn > CONC_IN && rad > 1.0) {
+        float ang = atan2(P.y, P.x) / TAU + 0.5;
+        // Wrapped, or the slot at ang = 1 would be a different draw from the one at
+        // ang = 0 and the field would carry a seam straight out along -x.
+        float sector = fmod(floor(ang * CONC_SECTORS), CONC_SECTORS);
+        float3 ch = hash33(float2(sector, 4.0));
+        if (ch.x < CONC_KEEP) {
+            // Folded like the datastream's lanes: the fraction places the pixel in
+            // its slot, the integer only names it.
+            float shift = t * CONC_RATE * (0.5 + 1.2 * ch.y) / CONC_CELL;
+            float shiftI = floor(shift);
+            float uu = rn / CONC_CELL - (shift - shiftI);
+            float slot = floor(uu);
+            float fu = uu - slot;
+            float3 dh = hash33(float2(fmod(slot - shiftI, CONC_WRAP), sector));
+            if (dh.x < 0.75) {
+                float dash = CONC_DASH * (0.35 + 0.9 * dh.y);
+                // Constant width in pixels, so the angular half-width has to shrink
+                // as the radius grows -- otherwise a streak fans out into a wedge.
+                float dPx = abs(fract(ang * CONC_SECTORS) - 0.5) / CONC_SECTORS * TAU * rad;
+                float covA = 1.0 - smoothstep(CONC_PX * 0.5, CONC_PX * 0.5 + 1.0, dPx);
+                float covR = smoothstep(0.0, 0.02, fu)
+                           * (1.0 - smoothstep(dash - 0.02, dash, fu));
+                float fade = smoothstep(CONC_IN, CONC_IN + CONC_RAMP, rn);
+                float a = covA * covR * fade * CONC_ALPHA * (0.5 + 0.5 * dh.z);
+                lit = max(lit, a);
+                hot = max(hot, a * (1.0 - smoothstep(0.0, 0.3, fu)) * CONC_HEAD);
+            }
+        }
+    }
+
+    // The ambient layer sits under the rest: dim, soft and cool, never warm or hot.
+    lit = max(lit, ambient_field(pos.xy, t));
+
+    // The accent is the ink with red and blue swapped -- amber out of this scene's
+    // cyan, and a theme-derived hue out of anything else (see the module note).
+    float3 rgb = mix(u.ink.rgb, u.ink.zyx, clamp(warm / max(lit, 1e-4), 0.0, 1.0));
+    rgb = mix(rgb, float3(1.0), clamp(hot, 0.0, 1.0) * NEAR_GLOW);
+
+    rgb = mix(u.backdrop.rgb, rgb, clamp(lit, 0.0, 1.0) * u.opacity);
+    return float4(rgb, 1.0);
+}
+"""
+
+#: The HLSL translation of :data:`HOLOGRAM_MSL` (see :data:`WAVE_HLSL` for why a scene
+#: ships both). Line-for-line; only the dialect differs. Keep the two in sync.
+HOLOGRAM_HLSL = """
+// --- tunables (see HOLOGRAM_MSL for the rationale of each) -------------------
+static const int   LAYERS      = 12;    // depth planes; each a full grid of panels
+static const float Z_FAR       = 3.0;   // spawn depth / closest approach. The divide
+static const float Z_NEAR      = 0.45;  // blows up as Z_NEAR reaches 0
+static const float RATE        = 0.015;  // fraction of the depth range crossed per second
+static const float FADE_IN     = 0.30;  // fraction of the travel spent fading in
+static const float FADE_OUT    = 0.18;  // ...and fading out as it sweeps past. Long,
+                                    // because a plane at Z_NEAR is wider than the
+                                    // window: a panel has to be gone before it
+                                    // becomes the whole screen and pops out
+static const float GRID        = 3.20;  // panel cells per unit of plane
+static const float PANEL_KEEP  = 0.38;  // share of cells that host a panel at all
+static const float PANEL_W_MIN = 0.40;  // panel size as a fraction of its cell
+static const float PANEL_W_RNG = 0.50;
+static const float PANEL_H_MIN = 0.22;
+static const float PANEL_H_RNG = 0.42;
+
+// What a panel *is*. Cumulative thresholds on one hash, read off in a comparison
+// chain, so a panel draws one kind and only the winning branch costs anything.
+static const float K_TEXT      = 0.660;  // typed pseudo-text (the commonest)
+static const float K_BARS      = 0.725;  // bar chart
+static const float K_LINE      = 0.765;  // line chart
+static const float K_PROG      = 0.875;  // progress bars
+static const float K_PIE       = 0.915;  // ring gauge -- the rest are wireframe
+
+// Text panels
+static const float ROWS        = 9.0;   // content rows per panel
+static const float SEG_MIN     = 8.0;   // character slots per row
+static const float SEG_RNG     = 16.0;
+static const float ROW_FILL    = 0.60;  // share of slots carrying a mark
+static const float BLOCK_H     = 0.32;  // mark height, as a fraction of the row
+static const float BLOCK_MIN   = 0.15;  // mark width, as a fraction of its slot
+static const float BLOCK_RNG   = 0.55;
+static const float RULE_SHARE  = 0.20;  // share of rows drawn as a full-width hairline
+static const float RULE_H      = 0.09;
+static const float TYPE_RATE   = 0.16;  // type-hold-retype cycles per second
+static const float TYPE_FRAC   = 0.34;  // fraction of that cycle spent typing
+static const float CURSOR_LIFT = 0.60;  // extra brightness on the mark at the head
+
+// Bar charts
+static const float BAR_N_MIN   = 5.0;   // bars per panel
+static const float BAR_N_RNG   = 9.0;
+static const float BAR_W       = 0.42;  // bar width, as a fraction of its slot
+static const float BAR_MIN     = 0.12;  // bar height range, as a fraction of the panel
+static const float BAR_RNG     = 0.80;
+static const float BAR_RATE    = 0.22;  // re-rolls per second
+
+// Line charts
+static const float LINE_PTS    = 8.0;   // vertices across the panel
+static const float LINE_W      = 0.022;  // trace thickness, in panel-local units
+static const float LINE_RATE   = 0.18;
+static const float LINE_LO     = 0.12;  // the band the trace stays inside
+static const float LINE_SPAN   = 0.76;
+static const float LINE_FILL   = 0.10;  // brightness of the wash under the trace
+
+// Progress bars
+static const float PROG_ROWS   = 4.0;
+static const float PROG_H      = 0.34;  // bar height, as a fraction of its row
+static const float PROG_RATE   = 0.12;
+static const float PROG_TRACK  = 0.32;  // brightness of the unfilled track
+static const float PROG_LO     = 0.08;  // fill range, so a bar is never quite empty/full
+static const float PROG_SPAN   = 0.86;
+
+// Ring gauges
+static const float PIE_R       = 0.24;  // radius, as a fraction of the panel's short side
+static const float PIE_W       = 0.06;  // ring thickness, as a fraction of the radius
+static const float PIE_RATE    = 0.09;
+static const float PIE_TRACK   = 0.50;  // brightness of the unswept ring
+
+// Wireframes
+static const float WIRE_NX     = 6.0;   // mesh divisions
+static const float WIRE_NY     = 4.0;
+static const float WIRE_DIAG   = 0.50;  // share that also carry diagonals
+static const float WIRE_ALPHA  = 0.50;
+
+// Panel chrome and shading
+static const float FRAME_SHARE = 0.45;  // share of panels carrying an outline
+static const float FRAME_ALPHA = 0.55;
+static const float WARM_SHARE  = 0.14;  // share of marks struck in the warm accent
+static const float NEAR_GLOW   = 0.55;  // how far the nearest panels pale toward white
+static const float DEPTH_DIM   = 0.52;  // brightness of the furthest plane vs the nearest.
+                                    // Without this the field reads flat: every plane
+                                    // draws at the same strength, so the eye gets the
+                                    // *scale* cue and no aerial one, and a big near
+                                    // panel looks like a big panel rather than a
+                                    // close one
+static const float RESOLVE     = 0.85;  // fade a panel out past this many pixels per row
+
+// Concentration lines -- the radial speed streaks
+static const float CONC_SECTORS = 220.0; // angular slots around the vanishing point
+static const float CONC_KEEP    = 0.16;  // share of sectors carrying a streak
+static const float CONC_CELL    = 0.34;  // streak slot length, as a fraction of the radius
+static const float CONC_DASH    = 0.55;  // dash length within its slot
+static const float CONC_RATE    = 0.20;  // outward drift, fraction of the radius/second
+static const float CONC_PX      = 1.1;   // streak width, pixels
+static const float CONC_ALPHA   = 0.42;
+static const float CONC_IN      = 0.16;  // radius (fraction) the streaks start at
+static const float CONC_RAMP    = 0.26;  // ...and how far they take to reach full strength
+static const float CONC_HEAD    = 0.60;  // how far a leading edge pales toward white
+
+static const float LIFE_RATE   = 0.167; // panel appear-hold-vanish cycles per second.
+                                    // (see HOLOGRAM_MSL for the rationale)
+static const float LIFE_IN     = 0.12;  // fraction of a life spent fading up
+static const float LIFE_OUT    = 0.18;  // ...and fading out
+
+// The ambient field -- see the MSL twin.
+static const float AMB_CELL_PX  = 170.0; // ambient cell size, pixels
+static const float AMB_KEEP     = 0.55;  // share of cells carrying an object
+static const float AMB_MAX_R    = 70.0;  // bound on an object's reach: the jitter below is
+static const float AMB_DRIFT_X  = 5.0;   // field drift, pixels/second
+static const float AMB_DRIFT_Y  = -3.0;
+static const float AMB_ORBIT    = 0.05;  // per-object orbit, turns/second
+static const float AMB_ORBIT_R  = 9.0;   // ...and its radius, pixels
+static const float AMB_K_DOT    = 0.55;  // kind mix: dot / ring / stroke
+static const float AMB_K_RING   = 0.80;
+static const float AMB_DOT_R    = 40.0;
+static const float AMB_DOT_A    = 0.45;
+static const float AMB_RING_R   = 36.0;
+static const float AMB_RING_W   = 1.6;
+static const float AMB_RING_A   = 0.34;
+static const float AMB_LINE_L   = 80.0;
+static const float AMB_LINE_W   = 1.4;
+static const float AMB_LINE_A   = 0.30;
+static const float AMB_SOFT     = 7.0;   // edge softness, pixels -- these read as
+
+static const float CYCLE_WRAP   = 512.0; // keeps the hash inputs exact -- see the note on
+static const float CONC_WRAP    = 4096.0;// folding time in DATASTREAM_MSL
+static const float TAU          = 6.283185307;
+
+float3 hash33(float2 p) {
+    float3 v = frac(float3(p.xyx) * float3(0.1031, 0.1030, 0.0973));
+    v += dot(v, v.yzx + 33.33);
+    return frac((v.xxy + v.yzz) * v.zyx);
+}
+
+// A value that re-rolls on a fixed beat and eases between draws, so charts move
+// rather than jump. Returns the eased value; `gen` is the draw it is heading to.
+float stepped(float2 seed, float beat, float phase) {
+    float ct = beat + phase;
+    float gen = floor(ct);
+    float a = hash33(seed + float2(gen * 53.0, 0.0)).x;
+    float b = hash33(seed + float2((gen + 1.0) * 53.0, 0.0)).x;
+    return lerp(a, b, smoothstep(0.0, 1.0, frac(ct)));
+}
+
+// The ambient field: one soft object per screen-space cell, drifting as a whole and
+// orbiting within its cell. The jitter is clamped so an object cannot leave the cell
+// that owns it, which is what lets a pixel consult exactly one cell -- the same
+// bounded-jitter trick the wave uses, and the reason this layer is nearly free.
+//
+// Nothing here takes part in the depth sweep. That is the point: every other element
+// flies at the viewer, so the scene had exactly one kind of motion, and a layer that
+// merely drifts across it reads as depth of field rather than as more traffic.
+float ambient_field(float2 p, float t) {
+    float2 q = p + float2(t * AMB_DRIFT_X, t * AMB_DRIFT_Y);
+    float2 cell = floor(q / AMB_CELL_PX);
+    float2 f = q - cell * AMB_CELL_PX;
+    float3 h = hash33(cell + 91.0);
+    if (h.x > AMB_KEEP) { return 0.0; }
+
+    float3 g = hash33(cell * 1.7 + 13.0);
+    float span = AMB_CELL_PX - 2.0 * AMB_MAX_R;
+    float2 c = float2(AMB_CELL_PX * 0.5) + (g.xy - 0.5) * span;
+    float ang = t * AMB_ORBIT * TAU * (0.6 + 0.8 * g.z) + h.z * TAU;
+    c += float2(cos(ang), sin(ang)) * AMB_ORBIT_R;
+
+    float2 d2 = f - c;
+    float d = length(d2);
+    if (h.y < AMB_K_DOT) {
+        // A squared falloff, not a smoothstep-bounded disc: an out-of-focus
+        // highlight has no edge. (Cubed, the first try, collapses the visible core
+        // to a point -- the dots read as dust rather than as lights.)
+        float r = AMB_DOT_R * (0.5 + 0.9 * g.x);
+        float k = max(0.0, 1.0 - d / r);
+        return k * k * AMB_DOT_A;
+    } else if (h.y < AMB_K_RING) {
+        float r = AMB_RING_R * (0.5 + 0.9 * g.y);
+        return (1.0 - smoothstep(AMB_RING_W, AMB_RING_W + AMB_SOFT, abs(d - r)))
+             * AMB_RING_A;
+    }
+    float a2 = g.z * TAU;
+    float2 dir = float2(cos(a2), sin(a2));
+    float half_len = AMB_LINE_L * 0.5 * (0.5 + 0.9 * g.x);
+    float along = clamp(dot(d2, dir), -half_len, half_len);
+    return (1.0 - smoothstep(AMB_LINE_W, AMB_LINE_W + AMB_SOFT,
+                             length(d2 - dir * along))) * AMB_LINE_A;
+}
+
+// One panel's contents, in panel-local coordinates (0..1 on each axis). Returns
+// coverage in .x and how much of it is struck in the warm accent in .y.
+//
+// `pixCell` is one screen pixel expressed in *cell* units -- the panel's own axes
+// are anisotropic (it is pw x panelH of a cell), so each branch converts as it needs
+// to. Everything is antialiased against that rather than against fwidth: the caller
+// reaches this under heavily non-uniform branching, where a derivative is undefined.
+float2 panel_content(float lx, float ly, float pixCell,
+                                   float pw, float panelH, float2 salt,
+                                   float kind, float kvar, float t) {
+    float pixX = pixCell / pw;          // one pixel, in panel-local x
+    float pixY = pixCell / panelH;      // ...and y
+    float a = 0.0;
+    float acc = 0.0;
+
+    if (kind < K_TEXT) {
+        // --- typed pseudo-text ------------------------------------------------
+        float ry = ly * ROWS;
+        float row = floor(ry);
+        float fy = ry - row;
+        float aaY = pixY * ROWS;
+        float3 rh = hash33(salt + float2(row * 7.0, 3.0));
+        if (rh.x < RULE_SHARE) {
+            a = 1.0 - smoothstep(RULE_H * 0.5, RULE_H * 0.5 + aaY, abs(fy - 0.5));
+        } else {
+            float segs = floor(SEG_MIN + SEG_RNG * rh.y);
+            float sx = lx * segs;
+            float seg = floor(sx);
+            float fx = sx - seg;
+            // A row types out left to right, holds, then retypes with fresh content.
+            // Re-rolling every slot at once (what this did before) is what made the
+            // marks read as noise rather than as characters: text has a writing
+            // *order*, and the order is most of what identifies it as text.
+            float ct = t * TYPE_RATE + rh.z * 7.0;
+            float gen = floor(ct);
+            float head = clamp(frac(ct) / TYPE_FRAC, 0.0, 1.0) * segs;
+            if (seg < head) {
+                float3 sh = hash33(float2(seg + gen * 131.0, salt.y + row));
+                if (sh.x < ROW_FILL) {
+                    float bw = BLOCK_MIN + BLOCK_RNG * sh.y;
+                    float covX = 1.0 - smoothstep(bw - pixX * segs, bw, fx);
+                    float covY = 1.0 - smoothstep(BLOCK_H * 0.5,
+                                                  BLOCK_H * 0.5 + aaY, abs(fy - 0.5));
+                    a = covX * covY;
+                    // The mark under the head burns brighter for a slot or so -- the
+                    // caret, and the cue that reads as "this is being written now".
+                    a *= 1.0 + CURSOR_LIFT * (1.0 - smoothstep(0.0, 1.5, head - seg));
+                    acc = (sh.z > 1.0 - WARM_SHARE) ? a : 0.0;
+                }
+            }
+        }
+    } else if (kind < K_BARS) {
+        // --- bar chart --------------------------------------------------------
+        float bars = floor(BAR_N_MIN + BAR_N_RNG * kvar);
+        float bx = lx * bars;
+        float bar = floor(bx);
+        float fx = bx - bar;
+        float h = BAR_MIN + BAR_RNG * stepped(salt + float2(bar, 0.0),
+                                              t * BAR_RATE, kvar * 5.0);
+        float covX = 1.0 - smoothstep(BAR_W - pixX * bars, BAR_W, fx);
+        // ly runs downward, so a bar standing on the floor is (1 - ly) < h.
+        float covY = 1.0 - smoothstep(h - pixY, h, 1.0 - ly);
+        a = covX * covY;
+        a = max(a, 1.0 - smoothstep(pixY * 0.5, pixY * 1.5, 1.0 - ly));   // baseline
+    } else if (kind < K_LINE) {
+        // --- line chart -------------------------------------------------------
+        float px = lx * LINE_PTS;
+        float ip = floor(px);
+        float fp = px - ip;
+        float y0 = LINE_LO + LINE_SPAN * stepped(salt + float2(ip, 0.0),
+                                                 t * LINE_RATE, kvar * 3.0);
+        float y1 = LINE_LO + LINE_SPAN * stepped(salt + float2(ip + 1.0, 0.0),
+                                                 t * LINE_RATE, kvar * 3.0);
+        float yl = lerp(y0, y1, fp);
+        // Perpendicular distance, not vertical: without the slope correction a steep
+        // leg of the trace draws several times thicker than a flat one.
+        float slope = (y1 - y0) * LINE_PTS;
+        float d = abs(ly - yl) / sqrt(1.0 + slope * slope);
+        a = 1.0 - smoothstep(LINE_W * 0.5, LINE_W * 0.5 + pixY, d);
+        a = max(a, (ly > yl) ? LINE_FILL : 0.0);      // the wash under the trace
+    } else if (kind < K_PROG) {
+        // --- progress bars ----------------------------------------------------
+        float ry = ly * PROG_ROWS;
+        float row = floor(ry);
+        float fy = ry - row;
+        float aaY = pixY * PROG_ROWS;
+        float3 rh = hash33(salt + float2(row * 11.0, 17.0));
+        float band = 1.0 - smoothstep(PROG_H * 0.5, PROG_H * 0.5 + aaY, abs(fy - 0.5));
+        float p = PROG_LO + PROG_SPAN * stepped(salt + float2(row * 3.0, 9.0),
+                                                t * PROG_RATE, rh.z * 4.0);
+        float fill = band * (1.0 - smoothstep(p - pixX, p, lx));
+        a = max(band * PROG_TRACK, fill);
+        acc = (rh.y > 1.0 - WARM_SHARE) ? fill : 0.0;
+    } else if (kind < K_PIE) {
+        // --- ring gauge -------------------------------------------------------
+        // Back into cell units, where the axes are isotropic again -- drawn in
+        // panel-local units a circle would come out as an ellipse.
+        float2 q = float2((lx - 0.5) * pw, (ly - 0.5) * panelH);
+        float R = PIE_R * min(pw, panelH);
+        float r = length(q);
+        float ring = 1.0 - smoothstep(R * PIE_W, R * PIE_W + pixCell, abs(r - R));
+        float band = 1.0 - smoothstep(R * PIE_W * 2.4, R * PIE_W * 2.4 + pixCell,
+                                      abs(r - R));
+        float sweep = stepped(salt + float2(31.0, 0.0), t * PIE_RATE, kvar * 6.0);
+        float ang = atan2(q.y, q.x) / TAU + 0.5;
+        float arc = (ang < sweep) ? band : 0.0;
+        a = max(ring * PIE_TRACK, arc);
+        acc = arc;
+    } else {
+        // --- wireframe --------------------------------------------------------
+        float u = lx * WIRE_NX;
+        float v = ly * WIRE_NY;
+        float wu = pixX * WIRE_NX;
+        float wv = pixY * WIRE_NY;
+        a = max(1.0 - smoothstep(0.5 * wu, 1.5 * wu, abs(u - round(u))),
+                1.0 - smoothstep(0.5 * wv, 1.5 * wv, abs(v - round(v))));
+        if (kvar < WIRE_DIAG) {
+            float d = u + v;
+            float wd = wu + wv;
+            a = max(a, 1.0 - smoothstep(0.5 * wd, 1.5 * wd, abs(d - round(d))));
+        }
+        a *= WIRE_ALPHA;
+    }
+    return float2(a, acc);
+}
+
+float4 puikit_bg_fragment(float4 pos : SV_Position) : SV_Target {
+    float2 halfRes = resolution * 0.5;
+    // View-height units in both axes, so a panel stays square whatever the window
+    // aspect. (The starfield normalises per-axis instead and lets its field stretch;
+    // a stretching *drawing* would read as a mistake where a stretching dot does not.)
+    float2 P = pos.xy - halfRes;
+    float2 n = P / halfRes.y;
+    float t = time;
+
+    float lit = 0.0;    // coverage at this pixel
+    float warm = 0.0;   // the share of it struck in the accent, for the hue
+    float hot = 0.0;    // nearness of whatever covered it, for the white lift
+
+    for (int i = 0; i < LAYERS; ++i) {
+        // Planes evenly offset in phase, so the field always holds panels at every
+        // stage of the approach rather than pulsing in unison.
+        float raw = t * RATE + float(i) / float(LAYERS);
+        float travel = frac(raw);
+        float cycle = fmod(floor(raw), CYCLE_WRAP);   // re-rolls a plane's content
+        // Even steps in 1/z are even steps *on screen* (the same reason the wave
+        // stacks its slabs this way). Stepping z linearly instead spends almost every
+        // plane in the far half, where 1/z barely moves -- which is why the field
+        // came out as one size of panel repeated rather than a depth of them. This
+        // spreads the planes evenly across apparent scale, so a big near panel, a
+        // mid one and the far haze are all on screen at once.
+        float z = 1.0 / lerp(1.0 / Z_FAR, 1.0 / Z_NEAR, travel);
+        float alpha = min(1.0, travel / FADE_IN)
+                    * (1.0 - smoothstep(1.0 - FADE_OUT, 1.0, travel));
+        if (alpha <= 0.002) { continue; }
+
+        // Run the projection backwards: at this depth the ray crosses the plane
+        // here, so this is the only cell that can cover this pixel.
+        float2 s = n * z;
+        float2 cell = floor(s * GRID);
+        float2 f = s * GRID - cell;
+
+        // Each panel lives and dies on its own clock, much shorter than its plane's
+        // traversal: it fades up, holds, fades out, and the cell is redrawn with a
+        // fresh one. Decoupling the two is the whole point -- the plane's sweep used
+        // to serve as the panel lifetime as well, so slowing the flight would have
+        // made every panel linger proportionally longer. Now the flight can be slow
+        // and the field still turns over quickly.
+        float3 lh = hash33(cell * 0.61 + float2(float(i) * 3.0, 7.0));
+        float lifeT = t * LIFE_RATE + lh.x * 11.0;
+        float lifeGen = fmod(floor(lifeT), CYCLE_WRAP);
+        float lifePh = frac(lifeT);
+        float life = smoothstep(0.0, LIFE_IN, lifePh)
+                   * (1.0 - smoothstep(1.0 - LIFE_OUT, 1.0, lifePh));
+        if (life <= 0.002) { continue; }
+
+        // ``lifeGen`` rides in every panel hash below, so a cell that comes back
+        // comes back as a different panel rather than as the same one blinking.
+        float3 ph = hash33(cell + float2(cycle * 13.0 + float(i) * 57.0 + lifeGen * 29.0,
+                                         cycle * 7.0 - float(i) * 23.0 + lifeGen * 41.0));
+        if (ph.x > PANEL_KEEP) { continue; }     // this cell is empty space
+
+        float3 qh = hash33(cell * 1.37 + float2(float(i) * 11.0,
+                                                cycle * 3.0 + lifeGen * 17.0));
+        float pw = PANEL_W_MIN + PANEL_W_RNG * ph.y;
+        float panelH = PANEL_H_MIN + PANEL_H_RNG * ph.z;
+        float lx = (f.x - (1.0 - pw) * qh.x) / pw;   // panel-local, 0..1
+        float ly = (f.y - (1.0 - panelH) * qh.y) / panelH;
+        if (lx < 0.0 || lx > 1.0 || ly < 0.0 || ly > 1.0) { continue; }
+
+        // One pixel, in cell units. Derived from the depth rather than from fwidth:
+        // the branching above is non-uniform, which makes a derivative undefined,
+        // and every antialiasing width downstream depends on this.
+        float pixCell = z * GRID / halfRes.y;
+        // Past the point where a pixel spans a good part of a row, the panel cannot
+        // be read at all; fading it out is what keeps the far field from boiling.
+        float resolve = 1.0 - smoothstep(RESOLVE * 0.5, RESOLVE,
+                                         (pixCell / panelH) * ROWS);
+        if (resolve <= 0.0) { continue; }
+
+        // ``travel``, not z: with the 1/z stepping above it is travel that is linear
+        // in apparent scale, so it is the measure that makes the aerial cue agree
+        // with the size cue.
+        float depth = 1.0 - travel;                         // 0 near, 1 far
+        float bright = (0.3 + 0.7 * ph.y) * alpha * life * resolve
+                     * lerp(1.0, DEPTH_DIM, depth);
+
+        float2 r = panel_content(lx, ly, pixCell, pw, panelH,
+                                 float2(cell.x * 13.0 + float(i),
+                                        cell.y * 29.0 + cycle + lifeGen * 7.0),
+                                 qh.z, frac(qh.y * 11.7), t);
+        float a = r.x;
+
+        // A hairline outline on some panels, which is most of what makes a cluster
+        // of marks read as a *panel* rather than as loose debris.
+        if (frac(qh.x * 7.3) < FRAME_SHARE) {
+            float edge = min(min(lx, 1.0 - lx) * pw,
+                             min(ly, 1.0 - ly) * panelH) / pixCell;
+            a = max(a, (1.0 - smoothstep(0.6, 1.6, edge)) * FRAME_ALPHA);
+        }
+
+        a *= bright;
+        lit = max(lit, a);
+        warm = max(warm, r.y * bright);
+        hot = max(hot, a * (1.0 - z / Z_FAR));
+    }
+
+    // --- concentration lines --------------------------------------------------
+    // Radial speed streaks raking outward from the vanishing point. This is the
+    // datastream's dash-in-a-slot wrapped around the centre: a pixel finds its
+    // angular sector and its slot along the ray and consults exactly one cell, so a
+    // whole field of them costs about what one more panel plane would. They sell the
+    // forward motion the panels only imply -- the panels grow, but nothing *streaks*.
+    float rad = length(P);
+    float rn = rad / length(halfRes);          // 0 at the centre, 1 at the corner
+    if (rn > CONC_IN && rad > 1.0) {
+        float ang = atan2(P.y, P.x) / TAU + 0.5;
+        // Wrapped, or the slot at ang = 1 would be a different draw from the one at
+        // ang = 0 and the field would carry a seam straight out along -x.
+        float sector = fmod(floor(ang * CONC_SECTORS), CONC_SECTORS);
+        float3 ch = hash33(float2(sector, 4.0));
+        if (ch.x < CONC_KEEP) {
+            // Folded like the datastream's lanes: the fraction places the pixel in
+            // its slot, the integer only names it.
+            float shift = t * CONC_RATE * (0.5 + 1.2 * ch.y) / CONC_CELL;
+            float shiftI = floor(shift);
+            float uu = rn / CONC_CELL - (shift - shiftI);
+            float slot = floor(uu);
+            float fu = uu - slot;
+            float3 dh = hash33(float2(fmod(slot - shiftI, CONC_WRAP), sector));
+            if (dh.x < 0.75) {
+                float dash = CONC_DASH * (0.35 + 0.9 * dh.y);
+                // Constant width in pixels, so the angular half-width has to shrink
+                // as the radius grows -- otherwise a streak fans out into a wedge.
+                float dPx = abs(frac(ang * CONC_SECTORS) - 0.5) / CONC_SECTORS * TAU * rad;
+                float covA = 1.0 - smoothstep(CONC_PX * 0.5, CONC_PX * 0.5 + 1.0, dPx);
+                float covR = smoothstep(0.0, 0.02, fu)
+                           * (1.0 - smoothstep(dash - 0.02, dash, fu));
+                float fade = smoothstep(CONC_IN, CONC_IN + CONC_RAMP, rn);
+                float a = covA * covR * fade * CONC_ALPHA * (0.5 + 0.5 * dh.z);
+                lit = max(lit, a);
+                hot = max(hot, a * (1.0 - smoothstep(0.0, 0.3, fu)) * CONC_HEAD);
+            }
+        }
+    }
+
+    // The ambient layer sits under the rest: dim, soft and cool, never warm or hot.
+    lit = max(lit, ambient_field(pos.xy, t));
+
+    // The accent is the ink with red and blue swapped -- amber out of this scene's
+    // cyan, and a theme-derived hue out of anything else (see the module note).
+    float3 rgb = lerp(ink.rgb, ink.zyx, clamp(warm / max(lit, 1e-4), 0.0, 1.0));
+    rgb = lerp(rgb, float3(1.0, 1.0, 1.0), clamp(hot, 0.0, 1.0) * NEAR_GLOW);
+
+    rgb = lerp(backdrop.rgb, rgb, clamp(lit, 0.0, 1.0) * opacity);
+    return float4(rgb, 1.0);
+}
+"""
+
 #: Every scene TFM offers, by the name a theme's ``animation`` key uses, paired with
 #: the puikit ``Shader`` fields that belong to the scene rather than to the theme.
 #: ``_resolve_background`` in ``tfm.py`` resolves a theme's ``animation`` name here
@@ -1122,4 +2395,13 @@ SHADER_KINDS: dict[str, dict] = {
     "grid": {"source": GRID_MSL, "source_hlsl": GRID_HLSL},
     # Dots and hairline edges, so again full resolution.
     "constellation": {"source": CONSTELLATION_MSL, "source_hlsl": CONSTELLATION_HLSL},
+    # Thin dashes with crisp leading edges, and the far layers' rows are only a few
+    # pixels apart — halving the scale would merge them into a band.
+    "datastream": {"source": DATASTREAM_MSL, "source_hlsl": DATASTREAM_HLSL},
+    # Hairline rules, 1px panel outlines and blocks a couple of pixels tall, all of
+    # which the upscale from a half-scale render would smear into mush. It is also
+    # the scene that most wants the resolution: its far planes fade out exactly where
+    # a pixel stops resolving a row, so rendering at half scale would throw away
+    # depth, not just sharpness.
+    "hologram": {"source": HOLOGRAM_MSL, "source_hlsl": HOLOGRAM_HLSL},
 }

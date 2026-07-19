@@ -24,17 +24,22 @@ TFM supports different color schemes to look good in different terminal environm
 ### Retro themes with screen effects
 
 Beyond the standard palettes (Dark+, Light+, Monokai, Dracula, Nord, Solarized,
-Gruvbox), TFM ships two **retro hardware** themes, each pairing a period-correct
-palette with a recommended *screen effect*:
+Gruvbox), TFM ships three **screen** themes, each pairing a palette with a
+recommended *screen effect*:
 
 - **Sci-Fi** — a tactical-HUD look: soft cyan-white text on a deep navy, cool cyan
   chrome and a warm amber selection accent, behind a strong emissive bloom halo and
   glow with a vignette — no scanlines, no rolling glitch.
+- **Cyber** — a data-wall look: dense cyan telemetry on near-black navy, amber for
+  the things you need to find (cursor, i-search) and magenta for links. Same
+  emissive treatment as Sci-Fi *plus* scanlines and an occasional roll glitch, over
+  a depth of [`hologram`](BACKGROUND_ANIMATIONS_FEATURE.md) panels drifting toward
+  you. Filenames decode into place as they arrive.
 - **Segment LCD** — a positive/reflective digital display: near-black "segments"
   on a sage-green base (just two colours), flat — no scanlines or glow — where the
   black segments (text) cast a soft drop shadow for an embossed LCD look.
 
-Select either from **View → Theme** or by cycling with `T`.
+Select any of them from **View → Theme** or by cycling with `T`.
 
 The screen effect is composited over the whole frame and is only rendered by the
 **GUI backend** (`tfm.py --backend gui` on macOS/Windows) — a terminal shows the

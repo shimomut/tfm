@@ -402,6 +402,53 @@ _THEME_SPECS: list[tuple[str, dict]] = [
                     # backstop for a very tall window (120 x 8ms ≈ 1s).
                     text_effect={"kind": "typewriter", "duration_ms": 260,
                                  "stagger_ms": 8, "max_rows": 120})),
+    # Cyber: a data-wall look — near-black navy under dense cyan telemetry, with a
+    # warm amber for the things that need to be found (cursor, i-search, numbers) and
+    # a magenta reserved for links. Where Sci-Fi is a calm tactical HUD, this one is
+    # *busy*: the same emissive treatment plus scanlines and an occasional roll
+    # glitch, over the horizontal ``datastream`` traffic (see tfm_background_shaders).
+    #
+    # The scanline is what separates the two effects. Sci-Fi deliberately has none so
+    # its bloom can spread into a broad holographic halo; here the scanline keeps the
+    # bloom tight and gives the whole frame the texture of a monitor being read off,
+    # which is the point of the look. ``roll`` is low on purpose — it is a glitch,
+    # and a glitch that fires often is just a flicker.
+    ("Cyber", dict(bg=(9, 17, 28), fg=(198, 230, 244), muted=(94, 128, 154),
+                   accent=(64, 214, 236), surface=(17, 31, 48), selection=(24, 82, 108),
+                   accent2=(255, 196, 84),
+                   status=lambda p: mix(p["bg"], p["accent"], 0.18),
+                   footer=lambda p: mix(p["bg"], p["accent"], 0.18),
+                   file_types={"directory": (120, 230, 248), "link": (236, 132, 200)},
+                   cursor={"active": (255, 196, 84), "inactive": (118, 96, 52)},
+                   syntax={"keyword": (64, 214, 236), "string": (255, 196, 84),
+                           "comment": (94, 128, 154), "number": (255, 224, 138),
+                           "operator": (236, 132, 200), "builtin": (140, 240, 250)},
+                   post_effect={"bloom": 0.5, "glow": 0.26, "scanline": 0.14,
+                                "vignette": 0.32, "roll": 0.12},
+                   # The one theme that overrides the scene's ink. A shader defaults
+                   # to the theme *foreground*, which here is a near-white blue —
+                   # right for text, but it renders the panels as grey haze. The
+                   # identity of this look is that the data is *cyan*, so the scene
+                   # is anchored on the accent instead. (``color`` is the theme-side
+                   # name for what the GPU contract calls ``ink``.) The scene derives
+                   # its amber accent by swapping that colour's red and blue, so the
+                   # choice of cyan here is what puts the warm marks on screen too.
+                   # ``opacity`` is how strongly the scene reads against the backdrop
+                   # — the brightness knob for a background that is composited rather
+                   # than lit. Kept low: this scene is busy, and it sits behind a
+                   # working file list that has to stay the thing you look at.
+                   animation={"type": "hologram", "color": (64, 214, 236),
+                              "opacity": 0.21},
+                   opacity=0.62,           # chrome at 62% so the traffic reads through
+                   pane_frame={"color": (64, 214, 236), "arm": 2},
+                   pane_dim=True,
+                   # Sci-Fi picks ``typewriter`` because a decoding tail competes with
+                   # the filename that has already resolved. Cyber takes the opposite
+                   # side of that trade on purpose — the churn *is* the theme's
+                   # identity — and pays for it by being quicker, so the noisier
+                   # effect spends less time between the user and their file list.
+                   text_effect={"kind": "decode", "duration_ms": 220,
+                                "stagger_ms": 7, "max_rows": 120})),
     # Segment LCD: a positive/reflective digital display — a sage-green base with
     # near-black "segments" (just two colors: the green + black). A light-polarity
     # mono theme; because the text is genuine black (maximally dark), the app's

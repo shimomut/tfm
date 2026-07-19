@@ -2,9 +2,9 @@
 
 Two things a theme can now turn on as pure data, with no app code behind them:
 corner brackets framing the *focused* file pane (``extras['pane_frame']``) and an
-ink wash over the *resting* one (``extras['pane_dim']``). Sci-Fi is the only
-built-in that opts in; every other theme must render exactly as it did before
-these existed, which is what most of this file checks.
+ink wash over the *resting* one (``extras['pane_dim']``). Only the themes in
+``OPTED_IN`` below use them; every other theme must render exactly as it did
+before these existed, which is what most of this file checks.
 
 Also covers ``tfm_dialog_geometry.animate_open`` — the one place TFM's modal
 entrance is defined, so the eleven dialogs that call it cannot drift apart.
@@ -33,6 +33,11 @@ from puikit.capability import CapabilityProfile  # noqa: E402
 THEMES = dict(tfm.THEMES)
 SCIFI = THEMES["Sci-Fi"]
 DARK = THEMES["Dark+"]
+
+#: The built-ins that opt into the focus chrome and the arriving-text effect. The
+#: guarantee these tests defend is not "exactly one theme uses them" but "a theme
+#: that does not name them is untouched" — so adding a look costs one entry here.
+OPTED_IN = ("Sci-Fi", "Cyber")
 
 
 class _VectorBackend(MemoryBackend):
@@ -92,11 +97,16 @@ class ThemeOptIn(unittest.TestCase):
                          {"color": (130, 205, 255), "arm": 2})
         self.assertTrue(SCIFI.extras["pane_dim"])
 
+    def test_cyber_opts_into_both(self):
+        cyber = THEMES["Cyber"]
+        self.assertEqual(cyber.extras["pane_frame"], {"color": (64, 214, 236), "arm": 2})
+        self.assertTrue(cyber.extras["pane_dim"])
+
     def test_no_other_builtin_theme_opts_in(self):
-        # The guarantee that makes this a safe addition: every pre-existing theme
-        # renders byte-for-byte as before.
+        # The guarantee that makes this a safe addition: a theme that does not ask
+        # for the chrome renders byte-for-byte as it did before the chrome existed.
         for name, theme in tfm.THEMES:
-            if name == "Sci-Fi":
+            if name in OPTED_IN:
                 continue
             self.assertIsNone(theme.extras.get("pane_frame"), name)
             self.assertIsNone(theme.extras.get("pane_dim"), name)
@@ -119,9 +129,19 @@ class ThemeOptIn(unittest.TestCase):
         self.assertLessEqual(effect.duration_ms, 400)
         self.assertTrue(effect.max_rows)
 
+    def test_cyber_takes_the_louder_reveal(self):
+        # The opposite side of the trade Sci-Fi makes above: Cyber's identity *is*
+        # the decoding churn, and it pays for the noise by being quicker.
+        from puikit import textfx
+        cyber = textfx.coerce(THEMES["Cyber"].extras["text_effect"])
+        scifi = textfx.coerce(SCIFI.extras["text_effect"])
+        self.assertEqual(cyber.kind, "decode")
+        self.assertLess(cyber.duration_ms, scifi.duration_ms)
+        self.assertTrue(cyber.max_rows)
+
     def test_no_other_builtin_theme_animates_text(self):
         for name, theme in tfm.THEMES:
-            if name == "Sci-Fi":
+            if name in OPTED_IN:
                 continue
             self.assertIsNone(theme.extras.get("text_effect"), name)
 
