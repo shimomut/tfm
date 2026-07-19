@@ -1095,6 +1095,11 @@ class TfmApp:
         self._event_driven = self.panel.dispatches_to_main_thread
         self._wake_lock = threading.Lock()
         self._wake_pending = False
+        # Guard against a render that feeds itself: see ``_wake_pump``. The UI
+        # thread is whichever thread builds the app — the same one that runs the
+        # backend's event loop.
+        self._rendering = False
+        self._ui_thread_ident = threading.get_ident()
         if not self._event_driven:
             self.panel.request_animation_ticks(self._reload_tick)
 
@@ -1447,7 +1452,7 @@ class TfmApp:
         for the app's lifetime (returns True). Used only on backends that can't
         dispatch to the main thread; the event-driven path uses ``_wake_pump``."""
         if self._pump_monitoring():
-            self.panel.render()
+            self._pump_render()
         return True
 
     # --- event-driven pump (no idle timer) -----------------------------------
@@ -1459,6 +1464,17 @@ class TfmApp:
         main-thread hop. No-op on a poll-loop backend, where the animation-tick
         pump drains queues each frame instead."""
         if not self._event_driven:
+            return
+        # A write from the UI thread *during* a render must not schedule another
+        # render. stdout/stderr are routed into the log pane, so a single stray
+        # write from the draw path (a `logger.warning` on a handler-less logger
+        # reaches stderr via logging.lastResort) would otherwise self-sustain:
+        # render → write → wake → drain → render → …, pegging a core while the
+        # UI still responds. The line is not lost — it stays queued and the next
+        # pump drains it; it just no longer causes the frame that re-emits it.
+        # Only the UI thread is skipped: a worker racing a render is exactly the
+        # case this method exists to serve, and must still wake it.
+        if self._rendering and threading.get_ident() == self._ui_thread_ident:
             return
         with self._wake_lock:
             if self._wake_pending:
@@ -1473,7 +1489,19 @@ class TfmApp:
         with self._wake_lock:
             self._wake_pending = False
         if self._pump_monitoring():
+            self._pump_render()
+
+    def _pump_render(self) -> None:
+        """Render a pump-driven frame with the self-feeding guard raised, so
+        output written from the draw path cannot schedule the next frame. Only
+        the pump's own renders need this: a handler-triggered render that writes
+        schedules at most one wake, and that wake lands here, where the chain
+        stops."""
+        self._rendering = True
+        try:
             self.panel.render()
+        finally:
+            self._rendering = False
 
     def _any_pane_loading(self) -> bool:
         return any(self.pane(n).get("loading") for n in ("left", "right"))
@@ -1484,7 +1512,7 @@ class TfmApp:
         threshold and installs a completed listing. Unregisters (returns False)
         once no pane is loading, so it never runs at idle."""
         if self._pump_monitoring():
-            self.panel.render()
+            self._pump_render()
         return self._any_pane_loading()
 
     def _process_reload_queue(self) -> bool:

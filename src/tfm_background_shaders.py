@@ -2175,7 +2175,9 @@ float ambient_field(float2 p, float t) {
 
     float3 g = hash33(cell * 1.7 + 13.0);
     float span = AMB_CELL_PX - 2.0 * AMB_MAX_R;
-    float2 c = float2(AMB_CELL_PX * 0.5) + (g.xy - 0.5) * span;
+    // HLSL vector constructors take one argument per component -- there is no scalar
+    // broadcast, which is what the MSL twin's ``float2(AMB_CELL_PX * 0.5)`` relies on.
+    float2 c = float2(AMB_CELL_PX * 0.5, AMB_CELL_PX * 0.5) + (g.xy - 0.5) * span;
     float ang = t * AMB_ORBIT * TAU * (0.6 + 0.8 * g.z) + h.z * TAU;
     c += float2(cos(ang), sin(ang)) * AMB_ORBIT_R;
 

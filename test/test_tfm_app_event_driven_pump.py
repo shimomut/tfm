@@ -38,6 +38,8 @@ def _app(event_driven=True):
     app._event_driven = event_driven
     app._wake_lock = threading.Lock()
     app._wake_pending = False
+    app._rendering = False              # self-feeding-render guard; see _wake_pump
+    app._ui_thread_ident = threading.get_ident()
     app.panel = FakePanel()
     app._pump_monitoring = lambda: False  # nothing to drain in these unit tests
     return app
