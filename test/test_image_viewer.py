@@ -1,11 +1,13 @@
 """Built-in image viewer: zoom, pan, and prev/next navigation.
 
-The modal image viewer resolves zoom and pan as *geometry* — a source crop the
-backend samples (``puikit.image.zoom_window``, reaching it as the ``src`` hint)
-— rather than by re-encoding pixels, so these tests assert on the hints that
-reach the backend. Where no picture can be drawn (a terminal with no inline-image
-protocol) the viewer falls back to a metadata card, which is checked against the
-TUI profile. See doc/dev/IMAGE_VIEWER_IMPLEMENTATION.md.
+The modal image viewer resolves zoom and pan as *geometry* — a destination rect
+plus a source crop (the ``src`` hint) computed per frame — rather than by
+re-encoding pixels, so these tests assert on the hints that reach the backend. At
+fit it sends ``contain`` + no crop; zoomed, it grows the image past the client
+area and clips to it (``fit="fill"``) so the picture fills the body. Where no
+picture can be drawn (a terminal with no inline-image protocol) the viewer falls
+back to a metadata card, checked against the TUI profile. See
+doc/dev/IMAGE_VIEWER_IMPLEMENTATION.md.
 
 Run with: PYTHONPATH=.:src pytest test/test_image_viewer.py -v
 """
@@ -23,7 +25,6 @@ sys.path.insert(0, os.path.join(_HERE, ".."))  # the app entry point, tfm.py
 
 from puikit import Event, EventType, Panel, PROFILE_GUI_DESKTOP, PROFILE_TUI
 from puikit.backends.memory_backend import MemoryBackend
-from puikit.image import zoom_window
 from puikit.widgets.base import Widget
 
 from tfm_image_viewer import (IMAGE_SUFFIXES, MAX_ZOOM, MIN_ZOOM, PAN_STEP,
@@ -200,11 +201,13 @@ def test_pan_moves_the_center_by_a_share_of_the_visible_extent(images):
 
 
 def test_pan_center_clamps_to_the_reachable_range(images):
-    # The center only travels within [w/2, 1 - w/2] (w = 1/zoom = 0.5 here). It
-    # must NOT accumulate to 0/1: parking off the edge is the bug that made
-    # reversing direction move nothing for several presses.
+    # The center only travels within the range the client area can actually
+    # reach. It must NOT accumulate to 0/1: parking off the edge is the bug that
+    # made reversing direction move nothing for several presses. A body matching
+    # the 200x100 image's 2:1 aspect makes the reachable range symmetric.
     viewer = ImageViewer(images[0])
-    viewer.zoom = 2.0
+    viewer._view = (200, 100, 1, 1)  # cached client area (matches image aspect)
+    viewer.zoom = 2.0                # reachable range = [1/(2*zoom), 1-1/(2*zoom)]
     for _ in range(50):
         viewer.handle_event(_key(key="right"))
         viewer.handle_event(_key(key="down"))
@@ -218,41 +221,60 @@ def test_pan_center_clamps_to_the_reachable_range(images):
 
 
 def test_reversing_pan_moves_immediately_at_the_edge(images):
-    # Regression: one reverse press must move the window straight back off the
-    # edge, because the center was never allowed past what the window can reach.
+    # Regression: one reverse press must move the view straight back off the
+    # edge, because the center was never allowed past what the client area reaches.
     viewer = ImageViewer(images[0])
+    viewer._view = (200, 100, 1, 1)
     viewer.zoom = 2.0
     for _ in range(20):  # jam against the right edge
         viewer.handle_event(_key(key="right"))
-    x_edge, _, _, _ = viewer._source()
-    viewer.handle_event(_key(key="left"))  # a single reverse press
-    x_after, _, _, _ = viewer._source()
-    assert x_after < x_edge  # the window actually moved left
+    assert viewer.cx == pytest.approx(0.75)  # the reachable edge
+    viewer.handle_event(_key(key="left"))    # a single reverse press
+    assert viewer.cx < 0.75                   # moved immediately, no dead presses
 
 
 def test_zooming_out_pulls_the_center_back_into_range(images):
     # Zoom in at a corner, then zoom out: the reachable range shrinks, so the
     # center must be pulled back in rather than left stranded off the edge.
     viewer = ImageViewer(images[0])
+    viewer._view = (200, 100, 1, 1)
     viewer.zoom = 8.0
     for _ in range(30):
         viewer.handle_event(_key(key="right"))
     assert viewer.cx > 0.8
     viewer.zoom = 2.0
     viewer._clamp_center()
-    assert viewer.cx == pytest.approx(0.75)  # 1 - (0.5 / 2)
+    assert viewer.cx == pytest.approx(0.75)  # pulled back to the 2x reachable edge
 
 
-def test_pan_at_an_edge_preserves_the_zoom_level(images):
-    # Clamping must slide the source window, never shrink it. The window is
-    # normalized, so 4x zoom is a 1/4 fraction of each axis whatever the image.
+def test_fill_uses_the_real_cell_aspect_on_a_grid(images):
+    # Regression (TUI white-space bug): on a character grid base_size is (1,1) but
+    # a cell is ~1:2 tall. Feeding the *real* cell pixel aspect makes the source
+    # crop match the cell box, so the terminal fills it; a square-cell assumption
+    # produced a wrong-aspect crop that the terminal letterboxed, leaving a big
+    # blank band. This is why the viewer reads ctx.base_pixel_size, not base_size.
+    viewer = ImageViewer(images[2])  # 640x480
+    viewer.zoom = 3.0
+    iw, ih = viewer._size
+    # 100x40 cells at a real 8x16 px cell -> an 800x640 px (1.25:1) client area.
+    (dx, dy, dw, dh), src = viewer._fill_geometry(100, 40, 8, 16)
+    crop_aspect = (src[2] * iw) / (src[3] * ih)
+    box_aspect = (100 * 8) / (40 * 16)
+    assert crop_aspect == pytest.approx(box_aspect)  # matches the box -> fills
+
+
+def test_pan_at_an_edge_keeps_filling_the_client_area(images):
+    # Panning to a border slides the visible window; it must not shrink, so the
+    # image keeps filling the body and the zoom level survives hitting the edge.
     viewer = ImageViewer(images[0])
+    viewer._view = (200, 100, 1, 1)
     viewer.zoom = 4.0
     for _ in range(50):
         viewer.handle_event(_key(key="left"))
-    x, _, w, h = viewer._source()
-    assert (w, h) == pytest.approx((0.25, 0.25))
-    assert x == pytest.approx(0.0)  # slid flush to the left edge, not shrunk
+    (dx, dy, dw, dh), src = viewer._fill_geometry(200, 100, 1, 1)
+    assert (dw, dh) == pytest.approx((200, 100))  # dest still fills the whole body
+    assert src[0] == pytest.approx(0.0)           # flush to the left image edge
+    assert src[2] == pytest.approx(0.25)          # visible width = 1/zoom
 
 
 def test_drag_pans_opposite_the_pointer(images):
@@ -347,24 +369,30 @@ def test_index_is_recovered_when_it_disagrees_with_the_path(images):
 # --- drawing: real picture vs metadata card ----------------------------------
 
 
-def test_draw_emits_a_contain_fit_with_the_zoom_crop(images):
+def test_draw_fills_the_client_area_when_zoomed(images):
+    # The fix for "the image floats in a letterbox when zoomed": a zoomed image
+    # is grown past the client area and clipped to it, filling the whole body.
     backend = MemoryBackend(width=60, height=20, capabilities=PROFILE_GUI_DESKTOP)
     viewer = ImageViewer(images[0])
     viewer.zoom, viewer.cx, viewer.cy = 2.0, 0.5, 0.5
     _render(backend, viewer)
-    hints = _image_hints(backend)
-    assert hints["fit"] == "contain"  # aspect-locked destination: never distorted
-    # The crop is normalized (0..1), so it is DPI-independent -- the fix for the
-    # image rendering tiny in the top-left on a Retina display.
-    assert hints["src"] == zoom_window(2.0, 0.5, 0.5)
+    x, y, path, hints = backend.image_calls[-1]
+    assert hints["fit"] == "fill"      # dest and src proportional -> undistorted
+    assert hints["src"] is not None    # a zoom/pan crop
+    body_w, body_h, _, _ = viewer._view
+    assert hints["w"] == pytest.approx(body_w)  # fills the client width
+    assert hints["h"] == pytest.approx(body_h)  # ...and height
 
 
-def test_draw_sends_no_crop_when_fitted(images):
-    # At fit level the whole image shows, so the viewer sends src=None and the
-    # backend takes its plain whole-image path (no source rect to get wrong).
+def test_draw_uses_contain_with_no_crop_when_fitted(images):
+    # At fit level the whole image shows, letterboxed: the viewer sends
+    # fit="contain" + src=None so the backend does the aspect math from the real
+    # image dimensions (no source rect to get wrong).
     backend = MemoryBackend(width=60, height=20, capabilities=PROFILE_GUI_DESKTOP)
     _render(backend, ImageViewer(images[0]))
-    assert _image_hints(backend)["src"] is None
+    hints = _image_hints(backend)
+    assert hints["fit"] == "contain"
+    assert hints["src"] is None
 
 
 def test_draw_targets_the_body_between_header_and_footer(images):

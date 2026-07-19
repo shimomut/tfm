@@ -26,27 +26,50 @@ Rendering is PuiKit's job (per `CLAUDE.md`), so the work divides:
 
 The viewer never re-encodes an image to zoom. It holds three numbers — `zoom`,
 and a pan center `cx`/`cy` in normalized image coordinates — and turns them into
-a **source window** via `puikit.image.zoom_window()`, handed to the backend as the
-`src` hint:
+a destination rect + source crop each frame (`_draw_image` / `_fill_geometry`).
+
+Two regimes, split at the fit level:
+
+- **Fit (`zoom == 1`)** — the whole image, letterboxed. The viewer sends plain
+  `fit="contain"` with `src=None` and lets the backend do the aspect math from
+  the image's real dimensions (correct on GUI points and TUI cell pixels alike).
+- **Zoomed (`zoom > 1`)** — the *scaled-image-clipped-to-the-client-area* model,
+  the standard image-viewer behaviour. The image is scaled by *fit-scale × zoom*,
+  which makes it overflow the body; the visible intersection with the body is the
+  destination and the matching image region is the `src` crop, drawn `fit="fill"`.
 
 ```python
-ctx.draw_image(pad_x, head_h, self._local,
-               hints={"w": iw, "h": body_h, "fit": "contain",
-                      "src": self._source(), "alt": "🖼"})
+(dx, dy, dw, dh), src = self._fill_geometry(body_w, body_h, base_w, base_h)
+ctx.draw_image(x + dx, y + dy, self._local,
+               hints={"w": dw, "h": dh, "fit": "fill", "src": src, "alt": "🖼"})
 ```
 
-`fit` shapes the *destination*; `src` picks how much of the source feeds it. The
-two are orthogonal, which is what makes the combination correct:
+### Why the clipped-to-viewport model (and not a fixed contain box)
 
-- `contain` gives a destination box aspect-locked to the image.
-- `zoom_window` returns a window that also keeps the image's aspect ratio
-  (it is square in *fraction* space, `w == h == 1/zoom`).
+The obvious first cut — always `fit="contain"` with a `zoom_window` source crop —
+looks right but **wastes the client area when zoomed**: `contain`'s destination
+box is aspect-locked to the *whole image*, so a wide image in a near-square window
+stays letterboxed top-and-bottom no matter how far you zoom; zooming only crops
+the source inside that fixed box. Real viewers (Preview, browsers) instead grow
+the image as you zoom until it overflows the window and *fills* it, and that is
+what `_fill_geometry` reproduces: at `zoom 1` the destination is the contain box
+(letterbox), and as zoom rises the destination expands to cover the body — the
+letterbox shrinks continuously and disappears once the image overflows that axis.
 
-So nothing is distorted at any zoom, and only the sampled region changes.
+`_fill_geometry` works in **device pixels** — base units × `ctx.base_pixel_size`
+— because a base unit is not square, so the aspect ratio is only correct in pixel
+space. Destination and source stay proportional (the image is uniformly scaled),
+so `fit="fill"` draws them undistorted.
 
-Both GUI backends already computed a `(dest, source)` pair for the `cover` fit,
-so honoring an explicit `src` was a small extension to
-`MacOSBackend._fit_rects` / `WindowsBackend._fit_image_rects`.
+It reads `ctx.base_pixel_size`, **not** `ctx.base_size`. On GUI the two agree (a
+cell's point dimensions). On TUI `base_size` is `(1, 1)` — the grid's layout unit
+— but a terminal cell is ~1:2 (tall), so a square-cell assumption computes a
+wrong-aspect crop; the terminal-graphics `render()` then preserves that aspect
+inside the cell box and letterboxes it, leaving a blank band (a real bug: the
+image filled only the top of the client area). `base_pixel_size` reports the
+cell's true pixel size (from `TIOCGWINSZ`, nominal `8×16` when the terminal is
+silent), so the crop matches the cell box and the terminal fills it. Now exact on
+both GUI and TUI.
 
 ### `src` is normalized, not pixels — and why
 
@@ -66,34 +89,30 @@ gap never leaves the backend. Two per-backend details remain: **Cocoa's source
 rect is bottom-left origin**, so a top band `(y, h)` maps to `(1 - y - h)` from
 the bottom; Direct2D and Pillow are top-left, unflipped.
 
-At the fit level the viewer sends `src=None`, not a full-image crop, so the
-backend takes its plain whole-image path with no source rect to get wrong.
-
-### Why clamping slides instead of shrinking
-
-`zoom_window` clamps a pan that runs past an edge by *sliding* the window back
-inside the image, keeping its extent. Shrinking it instead would silently drop
-the zoom level whenever you panned into a corner — you would pan to the edge of
-a 8× view and arrive at something closer to 5×. The test
-`test_pan_at_an_edge_preserves_the_zoom_level` pins this.
-
-The pan step is divided by the zoom (`_pan_by`), so one keypress always covers
-the same share of the *visible* extent rather than of the whole image.
+The fit level still sends `src=None` (plain whole-image path, no source rect to
+get wrong); the `src` crops in the zoomed path are computed by `_fill_geometry`.
 
 ### The pan center must be clamped to its *reachable* range
 
-The visible window is a fraction `w = 1/zoom` of the image, and its center can
-only travel within `[w/2, 1 - w/2]` — past that the window is already flush
-against an edge. `_clamp_center` clamps `cx`/`cy` to exactly that range, **not**
-the full `0..1`.
+The pan step is divided by the zoom (`_pan_by`), so one keypress covers roughly
+the same share of the *visible* extent at every zoom. `_clamp_center` then keeps
+`cx`/`cy` within the range the client area can actually **reach**, using the
+client-area geometry cached at the last draw (`self._view`):
 
-Clamping to `0..1` was a bug: panning past a border kept incrementing an
-unreachable center (e.g. `cx` climbing to `1.0` while the window stopped moving
-at `cx = 0.75`), so reversing direction moved *nothing* until the value wound
-back into range — several dead keypresses. `_clamp_center` also runs after a
-zoom, because zooming out shrinks the reachable range and can strand a center
-that was valid at higher zoom; at the fit level the range collapses to a point,
-so it doubles as the re-center.
+- An axis the displayed image does **not** overflow (`dw <= bw`) cannot pan, so
+  the center pins to `0.5` (centred).
+- An axis it does overflow pans within `[k, 1 - k]`, where `k` is half the
+  visible fraction of the image on that axis.
+
+Clamping to the full `0..1` was a bug: panning past a border kept incrementing an
+unreachable center (e.g. `cx` climbing to `1.0` while the view stopped moving at
+`cx = 0.75`), so reversing direction moved *nothing* until the value wound back
+into range — several dead keypresses. `_clamp_center` also runs after a zoom
+(zooming out shrinks the reachable range and can strand a center that was valid
+higher in), and at the fit level it re-centers unconditionally (nothing to pan).
+Because the clamp reflects the true reachable range, the displayed image always
+*slides* to an edge rather than shrinking — the zoom level survives a pan into a
+corner (`test_pan_at_an_edge_keeps_filling_the_client_area`).
 
 ## The post-effect is suspended while a picture is up
 

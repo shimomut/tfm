@@ -7,16 +7,15 @@ overlay. Push it with :func:`show_image_viewer`.
 
 Three interactions, all resolved as *geometry* rather than re-encoded pixels:
 
-- **Zoom** — :func:`puikit.image.zoom_window` turns a zoom factor plus a pan
-  center into the source rect the backend samples, which reaches it as the
-  ``src`` hint. ``1.0`` fits the whole image in the window; each step multiplies
-  by :data:`ZOOM_STEP` up to :data:`MAX_ZOOM`. Because the window keeps the
-  image's aspect ratio and the destination is a ``contain`` box, nothing is
-  distorted at any zoom.
-- **Pan** — the arrow keys (and a mouse drag) move that center by a fraction of
-  the *visible* extent, so a step feels the same however far in you are.
-  Panning past an edge slides the window back inside the image, so the zoom
-  level survives hitting a border.
+- **Zoom** — ``1.0`` fits the whole image in the window (letterboxed); each step
+  multiplies by :data:`ZOOM_STEP` up to :data:`MAX_ZOOM`. Once zoomed, the image
+  is grown past the client area and clipped to it (:meth:`_fill_geometry`), so it
+  *fills* the body instead of floating in a letterbox — the standard image-viewer
+  behaviour. Dest and source stay proportional, so nothing is distorted.
+- **Pan** — the arrow keys (and a mouse drag) move the view center by a fraction
+  of the *visible* extent, so a step feels the same however far in you are. The
+  center is clamped to what the client area can reach, so panning to an edge
+  slides the image flush (never shrinks it) and reversing moves immediately.
 - **Prev / next** — the viewer is handed the sibling images from the pane it was
   opened from, so navigation walks the file list the user was already looking
   at, in the order they see it.
@@ -40,7 +39,7 @@ from typing import Any, Sequence
 
 from puikit.backend import Style, TextAttribute
 from puikit.event import Event, EventType
-from puikit.image import image_size, zoom_window
+from puikit.image import image_size
 from puikit.panel import Rect
 from puikit.text import elide
 from puikit.widgets.base import Widget
@@ -141,6 +140,10 @@ class ImageViewer(Widget):
         # pixel delta into a pan.
         self._body_rect: tuple[float, float, float, float] | None = None
         self._drag: tuple[float, float] | None = None
+        # Client-area geometry captured each draw — (body_w, body_h, base_w,
+        # base_h), the first two in base units and the last two the pixel size of
+        # a base unit — so pan clamping knows the real client area between frames.
+        self._view: tuple[float, float, float, float] | None = None
         self._resolve()
 
     # --- current image --------------------------------------------------------
@@ -229,30 +232,78 @@ class ImageViewer(Widget):
         self.cy += dy / self.zoom
         self._clamp_center()
 
+    def _pixel_dims(self, body_w: float, body_h: float,
+                    base_w: float, base_h: float):
+        """The client area and the displayed image, both in *device pixels*, as
+        ``(bw, bh, dw, dh)`` — or ``None`` when the image size is unknown.
+
+        Working in device pixels (base units × the pixel size of a base unit)
+        keeps the aspect ratio correct where a base unit is not square — GUI
+        cells are taller than wide. ``bw``/``bh`` is the client area; ``dw``/``dh``
+        is the image scaled by *fit-scale × zoom*, where fit-scale is the largest
+        that shows the whole image. So at zoom 1 the image just fits the body and
+        at zoom 2 it is twice that — big enough to overflow and fill the body."""
+        if self._size is None:
+            return None
+        iw, ih = self._size
+        bw, bh = body_w * base_w, body_h * base_h
+        if bw <= 0 or bh <= 0 or iw <= 0 or ih <= 0:
+            return None
+        scale = min(bw / iw, bh / ih) * self.zoom
+        return bw, bh, iw * scale, ih * scale
+
     def _clamp_center(self) -> None:
         """Clamp the pan center to the range it can actually *reach*.
 
-        The visible window is a fraction ``w = 1/zoom`` of the image, and its
-        center can only travel within ``[w/2, 1 - w/2]`` — past that the window
-        is already flush against an edge. Clamping ``cx``/``cy`` to that range
+        A dimension the displayed image does not overflow (``dw <= bw``) cannot
+        pan — it is centered, so the center pins to ``0.5``. A dimension it does
+        overflow pans within ``[k, 1 - k]``, where ``k`` is half the visible
+        fraction of the image on that axis. Clamping to the *reachable* range
         (not the full ``0..1``) is what stops the center accumulating off the
         edge: otherwise panning past a border keeps incrementing an unreachable
         value, and reversing direction moves nothing until it winds back in.
-        At the fit level (``zoom == 1``) the range collapses to a point, so this
-        also re-centers a fitted image."""
-        half = 0.5 / self.zoom
-        self.cx = min(1.0 - half, max(half, self.cx))
-        self.cy = min(1.0 - half, max(half, self.cy))
 
-    def _source(self) -> tuple[float, float, float, float] | None:
-        """The crop the backend should sample — the ``src`` hint, as normalized
-        (x, y, w, h) fractions — or ``None`` when the whole image is shown (fit
-        level). Returning ``None`` at fit keeps the backend's plain whole-image
-        path and needs no pixel dimensions, so it is DPI-independent by
-        construction."""
+        Uses the client-area geometry cached at the last draw; before any draw it
+        falls back to a plain ``0..1`` clamp."""
         if self.zoom <= MIN_ZOOM:
+            self.cx = self.cy = 0.5  # fit: the whole image shows, nothing to pan
+            return
+        dims = self._pixel_dims(*self._view) if self._view is not None else None
+        if dims is None:
+            self.cx = min(1.0, max(0.0, self.cx))
+            self.cy = min(1.0, max(0.0, self.cy))
+            return
+        bw, bh, dw, dh = dims
+        self.cx = 0.5 if dw <= bw else min(1 - bw / (2 * dw), max(bw / (2 * dw), self.cx))
+        self.cy = 0.5 if dh <= bh else min(1 - bh / (2 * dh), max(bh / (2 * dh), self.cy))
+
+    def _fill_geometry(self, body_w: float, body_h: float,
+                       base_w: float, base_h: float):
+        """The destination rect and source crop for the *scaled-image-clipped-to-
+        the-client-area* view, or ``None`` when the size is unknown.
+
+        Returns ``((dx, dy, dw, dh), src)``: the dest offset+size in base units
+        (relative to the body origin) and the normalized ``src`` crop. As the
+        zoom grows the image overflows the body and the visible rect expands to
+        cover it, so a zoomed image fills the whole client area instead of
+        floating in a letterbox. Dest and source stay proportional (the image is
+        uniformly scaled), so ``fit="fill"`` draws them without distortion."""
+        dims = self._pixel_dims(body_w, body_h, base_w, base_h)
+        if dims is None:
             return None
-        return zoom_window(self.zoom, self.cx, self.cy)
+        bw, bh, dw, dh = dims
+        # Top-left of the displayed image within the body (device px): centered
+        # while it fits an axis, else panned and clamped so it always covers it.
+        ox = (bw - dw) / 2 if dw <= bw else min(0.0, max(bw - dw, bw / 2 - self.cx * dw))
+        oy = (bh - dh) / 2 if dh <= bh else min(0.0, max(bh - dh, bh / 2 - self.cy * dh))
+        # Visible intersection of the displayed image with the body.
+        vx0, vy0 = max(0.0, ox), max(0.0, oy)
+        vx1, vy1 = min(bw, ox + dw), min(bh, oy + dh)
+        dest = (vx0 / base_w, vy0 / base_h,
+                (vx1 - vx0) / base_w, (vy1 - vy0) / base_h)
+        src = ((vx0 - ox) / dw, (vy0 - oy) / dh,
+               (vx1 - vx0) / dw, (vy1 - vy0) / dh)
+        return dest, src
 
     def _can_render(self, ctx) -> bool:
         """Whether a real picture can be drawn: the backend must support images
@@ -297,14 +348,41 @@ class ImageViewer(Widget):
         fy = hu - 1.0 - pad_y
         body_h = max(1.0, fy - head_h)
         self._body_rect = (pad_x, head_h, iw, body_h)
+        # The *physical* pixel size of a base unit, not base_size: on a character
+        # grid base_size is (1, 1) but a cell is taller than wide, and the image
+        # fit is aspect-sensitive — a square-cell assumption crops to the wrong
+        # aspect and the terminal letterboxes the picture. On GUI the two agree.
+        base_w, base_h = ctx.base_pixel_size
+        self._view = (iw, body_h, base_w, base_h)  # for pan clamping between frames
         if self._can_render(ctx):
-            ctx.draw_image(pad_x, head_h, self._local,
-                           hints={"w": iw, "h": body_h, "fit": "contain",
-                                  "src": self._source(), "alt": "🖼"})
+            self._draw_image(ctx, pad_x, head_h, iw, body_h, base_w, base_h)
         else:
             self._draw_card(ctx, pad_x, head_h, iw, body_h, text_fg, muted, bg)
 
         draw_status_bar(ctx, fy, self._hint(ctx), pad_x=pad_x, bottom_pad=pad_y)
+
+    def _draw_image(self, ctx, x: float, y: float, body_w: float, body_h: float,
+                    base_w: float, base_h: float) -> None:
+        """Draw the picture into the body at ``(x, y)``.
+
+        At the fit level (zoom 1) the whole image is shown letterboxed: the
+        backend does the aspect math from the image's real dimensions — correct
+        on GUI points and TUI cell pixels alike — so this passes plain
+        ``fit="contain"`` with no crop. Zoomed in, the image is grown past the
+        client area and clipped to it (``_fill_geometry``) so it *fills* the body
+        rather than floating in a letterbox; dest and source are proportional, so
+        ``fit="fill"`` draws them undistorted."""
+        geom = None if self.zoom <= MIN_ZOOM else self._fill_geometry(
+            body_w, body_h, base_w, base_h)
+        if geom is None:
+            ctx.draw_image(x, y, self._local,
+                           hints={"w": body_w, "h": body_h, "fit": "contain",
+                                  "src": None, "alt": "🖼"})
+            return
+        (dx, dy, dw, dh), src = geom
+        ctx.draw_image(x + dx, y + dy, self._local,
+                       hints={"w": dw, "h": dh, "fit": "fill", "src": src,
+                              "alt": "🖼"})
 
     def _dimensions_label(self) -> str:
         """The right-hand header tag: pixel dimensions and file size, as far as
