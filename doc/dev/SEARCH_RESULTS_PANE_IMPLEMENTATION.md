@@ -114,11 +114,19 @@ re-pointing renamed ones), re-applies sort + filter, and clamps `focused_index` 
 ## Entry & reveal UX
 
 **Entry — feed-by-default.** The dialog's `on_accept` closes it and calls
-`_feed_search_results(mode, dialog.results, root, query)` with the dialog's full
-result list (not the single accepted value). For **content** mode, results
+`_feed_search_results(mode, dialog.results, root, query, focus=value)` with the
+dialog's full result list *plus* the accepted hit. For **content** mode, results
 collapse to **one entry per file** (operations act on files, not lines), keeping
 the *first* match's `{line, text}` in `virtual["meta"]`. The set is fed at the
 dialog's `_RESULT_CAP` (1000); the cap is noted in the header banner.
+
+The accepted `value` does not navigate, but it does decide **where the cursor
+lands**: `_focus_result` places the cursor on that hit's row in the fed listing
+and scrolls it into view (issue #224). Matching is by **full path**, not name —
+a result set spans directories, so two hits can share a basename. The fed order
+is the walk order while `pane["files"]` is sorted, so the row must be looked up
+after `refresh_files`. Feeding without a `focus` (or with one that filtered out)
+leaves the cursor at the top, as before.
 
 **Reveal a result's location.** Since accept no longer navigates, the pane-sync
 keys reveal the highlighted hit's real location, driven by **whichever pane holds

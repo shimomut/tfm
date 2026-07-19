@@ -2801,9 +2801,11 @@ class TfmApp:
             # Feed-by-default: accepting doesn't navigate to the one hit — it
             # feeds the *whole* result set into the active pane as a flat virtual
             # listing, so every file operation can act on it. Read the dialog's
-            # full results + current query (the accepted ``value`` is ignored).
+            # full results + current query; the accepted ``value`` only decides
+            # which row the cursor lands on (issue #224).
             self._feed_search_results(mode, list(dialog.results),
-                                      root, dialog.query_edit.text.strip())
+                                      root, dialog.query_edit.text.strip(),
+                                      focus=value)
 
         dialog = show_progressive_search(
             self.panel, initial_mode=initial_mode,
@@ -2811,13 +2813,18 @@ class TfmApp:
             region=self._active_pane_region())
         self.panel.render()
 
-    def _feed_search_results(self, mode: str, results: list, root, query: str) -> None:
+    def _feed_search_results(self, mode: str, results: list, root, query: str,
+                             focus=None) -> None:
         """Turn a search result set into the active pane's flat, virtual listing
         (feed-by-default; see the search dialog's ``on_accept``). Filename results
         are ``Path`` objects; content results are ``{path, line, text}`` hits,
         collapsed to **one entry per file** (ops act on files, not lines) with the
         *first* match's line/text kept in ``virtual['meta']`` for the Info dialog
-        and reveal-at-line. Starts unfiltered, keeping the pane's current sort."""
+        and reveal-at-line. Starts unfiltered, keeping the pane's current sort.
+
+        ``focus`` is the hit that was accepted in the dialog (a ``Path``, or a
+        content hit dict); the cursor lands on its row rather than at the top, so
+        the file you picked is the one under the cursor (issue #224)."""
         pane = self.active_pane()
         meta: dict[str, dict] = {}
         if mode == "content":
@@ -2845,9 +2852,25 @@ class TfmApp:
         pane["scroll_offset"] = 0
         pane["selected_files"].clear()
         self.flm.refresh_files(pane)  # virtual-aware: sorts/filters the set in memory
+        self._focus_result(pane, focus)
         self.log_info(f'Search results for "{query}": {len(paths)} item(s)  '
                       f'— O go to location · Shift-O reveal in other pane · ⌫ back')
         self.panel.render()
+
+    def _focus_result(self, pane: dict, focus) -> None:
+        """Land ``pane``'s cursor on the fed result ``focus`` (a ``Path`` or a
+        content-hit dict), scrolling it into view. Matching is by full path — a
+        search set spans directories, so names alone can collide. A missing or
+        unmatched ``focus`` leaves the cursor where it is (the top)."""
+        if focus is None:
+            return
+        target = focus["path"] if isinstance(focus, dict) else focus
+        target = str(target)
+        for i, entry in enumerate(pane["files"]):
+            if str(entry) == target:
+                pane["focused_index"] = i
+                self.pm.adjust_scroll_for_focus(pane, self._display_height())
+                return
 
     def _iter_filename_matches(self, root, pattern, cancel, node_cap: int = 50000):
         """Depth-first walk under ``root`` yielding entries whose name matches

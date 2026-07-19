@@ -141,6 +141,54 @@ class AppVirtual(unittest.TestCase):
         self.assertEqual([p.name for p in pane["files"]], ["x.txt"])  # one entry
         self.assertEqual(pane["virtual"]["meta"][str(f)]["line"], 2)  # first match
 
+    def test_feed_lands_cursor_on_accepted_hit(self):
+        # Issue #224: accepting a hit feeds the whole set, but the cursor must
+        # land on the file that was picked — not on the top row.
+        a = self._write("one/a.txt")
+        z = self._write("two/z.txt")
+        self.app._feed_search_results("filename", [a, z], Path(self.tmp), "txt",
+                                      focus=z)
+        pane = self.app.active_pane()
+        self.assertEqual(pane["files"][pane["focused_index"]].name, "z.txt")
+
+    def test_feed_lands_cursor_on_accepted_content_hit(self):
+        # A content hit is a {path, line, text} dict; the cursor lands on its file.
+        a = self._write("one/a.txt", "needle\n")
+        z = self._write("two/z.txt", "needle\n")
+        hits = [{"path": a, "line": 1, "text": "needle"},
+                {"path": z, "line": 1, "text": "needle"}]
+        self.app._feed_search_results("content", hits, Path(self.tmp), "needle",
+                                      focus=hits[1])
+        pane = self.app.active_pane()
+        self.assertEqual(pane["files"][pane["focused_index"]].name, "z.txt")
+
+    def test_feed_matches_focus_by_full_path_not_name(self):
+        # Same basename in two directories: the accepted one wins.
+        first = self._write("one/dup.txt")
+        second = self._write("two/dup.txt")
+        self.app._feed_search_results("filename", [first, second],
+                                      Path(self.tmp), "dup", focus=second)
+        pane = self.app.active_pane()
+        self.assertEqual(str(pane["files"][pane["focused_index"]]), str(second))
+
+    def test_feed_without_focus_stays_at_top(self):
+        a = self._write("one/a.txt")
+        z = self._write("two/z.txt")
+        self.app._feed_search_results("filename", [a, z], Path(self.tmp), "txt")
+        pane = self.app.active_pane()
+        self.assertEqual(pane["focused_index"], 0)
+
+    def test_feed_scrolls_accepted_hit_into_view(self):
+        paths = [self._write(f"d{i:03d}/f.txt") for i in range(200)]
+        self.app._feed_search_results("filename", paths, Path(self.tmp), "txt",
+                                      focus=paths[-1])
+        pane = self.app.active_pane()
+        idx = pane["focused_index"]
+        self.assertEqual(str(pane["files"][idx]), str(paths[-1]))
+        # The cursor is on screen, not below a stale offset of 0.
+        height = self.app._display_height()
+        self.assertTrue(pane["scroll_offset"] <= idx < pane["scroll_offset"] + height)
+
     def test_delete_reconciles_virtual_set(self):
         a = self._write("sub/a.txt")
         b = self._write("sub2/b.txt")

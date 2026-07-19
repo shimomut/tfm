@@ -184,6 +184,43 @@ class AppIntegration(unittest.TestCase):
             app.file_monitor.stop_monitoring()
             b.close()
 
+    def test_accept_lands_pane_cursor_on_picked_hit(self):
+        # Issue #224: accepting a row feeds the whole result set into the pane,
+        # and the cursor must land on the row that was picked.
+        from puikit.backends import create_backend
+
+        for i in range(5):
+            self._write(f"sub{i}/needle{i}.txt")
+
+        b = create_backend("memory")
+        b.open()
+        app = tfm.TfmApp(b, self.tmp, self.tmp, left_provided=True, right_provided=True)
+        try:
+            app._settle_listings()
+            app._open_search("filename")
+            dlg = app.panel._layers[-1].widget
+
+            dlg.query_edit.text = "needle"
+            dlg._start_search()
+            dlg._thread.join(timeout=5)
+            b.run_animation_ticks()
+            self.assertEqual(len(dlg.results), 5)
+
+            # Accept the hit that sorts *last* in the pane's name order, so a
+            # cursor left at the top would be a visible failure regardless of
+            # the order the walk happened to produce.
+            picked = max(dlg.results, key=str)
+            dlg._accept_index(dlg.results.index(picked))
+
+            pane = app.active_pane()
+            self.assertIsNotNone(pane["virtual"])
+            self.assertEqual(len(pane["files"]), 5)  # whole set fed
+            self.assertEqual(pane["focused_index"], 4)
+            self.assertEqual(str(pane["files"][pane["focused_index"]]), str(picked))
+        finally:
+            app.file_monitor.stop_monitoring()
+            b.close()
+
 
 if __name__ == "__main__":
     unittest.main()
