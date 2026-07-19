@@ -335,6 +335,21 @@ class Config:
         # type's rich renderer (Markdown for *.md), matched by name in-context.
         'toggle_view_mode': ['M'],             # Text viewer: toggle rendered (Markdown) / raw text
 
+        # === Image Viewer ===
+        # Image-viewer-only actions, matched by name in-context like the text
+        # viewer's above. '-' and '_' intentionally share with
+        # 'reset_pane_boundary' / 'reset_log_height': those apply to the file
+        # list only, never to an open viewer, and each context matches its own
+        # action by name via KeyBindings.is_action_for_event, so the shared keys
+        # are unambiguous. Arrow keys pan and Home/End jump to the first/last
+        # image; those stay viewer-local (not rebindable), like the text viewer's
+        # scroll keys.
+        'image_zoom_in': ['+', '='],           # Image viewer: zoom in ('=' is unshifted '+')
+        'image_zoom_out': ['-', '_'],          # Image viewer: zoom out
+        'image_zoom_reset': ['0'],             # Image viewer: fit the whole image to the window
+        'image_next': ['n'],                   # Image viewer: next image in the file list
+        'image_prev': ['p'],                   # Image viewer: previous image in the file list
+
         # === Display & Appearance ===
         'toggle_hidden': ['.'],                # Toggle visibility of hidden files (dotfiles)
         'toggle_color_scheme': ['T'],          # Switch between dark and light color schemes
@@ -487,10 +502,16 @@ class Config:
             'open|view': ['open', '-a', 'Preview'],
             'edit': None,
         },
-        # Image files
+        # Image files. 'view' is deliberately None so V opens TFM's own image
+        # viewer (zoom / pan / prev-next, staying inside TFM) rather than handing
+        # the file to Preview; 'open' still hands it to the OS app for editing or
+        # a full-fidelity look. Set 'open|view' back to Preview if you would
+        # rather V left TFM. Formats beyond these four still reach the built-in
+        # viewer by falling through with no rule at all.
         {
             'pattern': ['*.jpg', '*.jpeg', '*.png', '*.gif'],
-            'open|view': ['open', '-a', 'Preview'],
+            'open': ['open', '-a', 'Preview'],
+            'view': None,
             'edit': ['open', '-a', 'GIMP'],
         },
         # Video files

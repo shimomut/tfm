@@ -2,6 +2,8 @@
 # pygments for syntax highlighting (will fallback gracefully if not available)
 # boto3 for AWS S3 support
 # watchdog for automatic file list reloading
+# pillow for the built-in image viewer (decode/crop/scale; the viewer degrades
+#   to a metadata card without it, and inline terminal images need it too)
 #
 # Platform-specific dependencies are selected automatically via environment
 # markers below, so this file is the single source of truth for both
@@ -12,5 +14,6 @@
 pygments
 boto3
 watchdog
+pillow
 pyobjc; sys_platform == "darwin"
 windows-curses; sys_platform == "win32"

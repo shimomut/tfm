@@ -1,0 +1,492 @@
+"""Built-in image viewer: zoom, pan, and prev/next navigation.
+
+The modal image viewer resolves zoom and pan as *geometry* — a source crop the
+backend samples (``puikit.image.zoom_window``, reaching it as the ``src`` hint)
+— rather than by re-encoding pixels, so these tests assert on the hints that
+reach the backend. Where no picture can be drawn (a terminal with no inline-image
+protocol) the viewer falls back to a metadata card, which is checked against the
+TUI profile. See doc/dev/IMAGE_VIEWER_IMPLEMENTATION.md.
+
+Run with: PYTHONPATH=.:src pytest test/test_image_viewer.py -v
+"""
+
+import os
+import struct
+import sys
+import zlib
+
+import pytest
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(_HERE, "..", "src"))
+sys.path.insert(0, os.path.join(_HERE, ".."))  # the app entry point, tfm.py
+
+from puikit import Event, EventType, Panel, PROFILE_GUI_DESKTOP, PROFILE_TUI
+from puikit.backends.memory_backend import MemoryBackend
+from puikit.image import zoom_window
+
+from tfm_image_viewer import (IMAGE_SUFFIXES, MAX_ZOOM, MIN_ZOOM, PAN_STEP,
+                              ZOOM_STEP, ImageViewer, is_image_file,
+                              show_image_viewer)
+from tfm_path import Path
+
+# Imported at module scope, not inside a test: both the repo root and test/ are
+# packages, so once pytest prepends the repo's *parent* to sys.path a later
+# ``import tfm`` would resolve to the repo directory (its __init__.py) instead of
+# the tfm.py app entry. Binding it here, right after the inserts above, gets the
+# entry point -- the same thing test_tfm_app_open_viewer.py relies on.
+import tfm  # noqa: E402
+
+
+def _png(path, w, h):
+    """Write a minimal valid RGB PNG of the given pixel size."""
+    raw = bytearray()
+    for _ in range(h):
+        raw.append(0)  # filter type 0
+        raw += bytes((120, 120, 120) * w)
+
+    def chunk(tag, data):
+        body = tag + data
+        return (struct.pack(">I", len(data)) + body
+                + struct.pack(">I", zlib.crc32(body) & 0xFFFFFFFF))
+
+    ihdr = struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0)
+    path.write_bytes(
+        b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", ihdr)
+        + chunk(b"IDAT", zlib.compress(bytes(raw))) + chunk(b"IEND", b"")
+    )
+    return path
+
+
+def _key(key=None, char=None):
+    return Event(type=EventType.KEY, key=key, char=char)
+
+
+@pytest.fixture
+def images(tmp_path):
+    """Three images (plus a non-image) in one directory, as tfm_path.Paths."""
+    _png(tmp_path / "a.png", 200, 100)
+    _png(tmp_path / "b.png", 40, 40)
+    _png(tmp_path / "c.png", 640, 480)
+    (tmp_path / "notes.txt").write_text("not an image")
+    return [Path(str(tmp_path / n)) for n in ("a.png", "b.png", "c.png")]
+
+
+@pytest.fixture(params=[PROFILE_TUI, PROFILE_GUI_DESKTOP], ids=["tui", "gui"])
+def backend(request):
+    return MemoryBackend(width=60, height=20, capabilities=request.param)
+
+
+def _render(backend, viewer):
+    """Push the viewer onto a panel and draw one frame."""
+    panel = Panel(backend)
+    viewer._panel = panel
+    panel.push_layer(viewer, z=80, hints={"x": 0, "y": 0, "w": 60, "h": 20})
+    panel.render()
+    return panel
+
+
+def _image_hints(backend):
+    assert backend.image_calls, "expected the picture to be drawn"
+    return backend.image_calls[-1][3]
+
+
+# --- file-type claim ---------------------------------------------------------
+
+
+def test_is_image_file_matches_extension_case_insensitively(tmp_path):
+    assert is_image_file(Path(str(tmp_path / "x.PNG")))
+    assert is_image_file(Path(str(tmp_path / "x.jpeg")))
+    assert not is_image_file(Path(str(tmp_path / "x.txt")))
+    assert not is_image_file(Path(str(tmp_path / "noextension")))
+
+
+def test_is_image_file_tolerates_objects_without_a_suffix():
+    assert not is_image_file(object())
+
+
+def test_claimed_suffixes_are_normalized():
+    # Every entry must be lower-case and dotted, or the lookup silently misses.
+    for suffix in IMAGE_SUFFIXES:
+        assert suffix.startswith(".") and suffix == suffix.lower()
+
+
+# --- opening / metadata ------------------------------------------------------
+
+
+def test_viewer_reads_dimensions_and_size(images):
+    viewer = ImageViewer(images[0])
+    assert viewer._size == (200, 100)
+    assert viewer._bytes == os.path.getsize(str(images[0]))
+    assert viewer._error is None
+
+
+def test_viewer_starts_fitted_and_centered(images):
+    viewer = ImageViewer(images[0])
+    assert viewer.zoom == MIN_ZOOM
+    assert (viewer.cx, viewer.cy) == (0.5, 0.5)
+
+
+def test_unreadable_image_records_an_error_instead_of_raising(tmp_path):
+    broken = tmp_path / "broken.png"
+    broken.write_bytes(b"not really a png")
+    viewer = ImageViewer(Path(str(broken)))
+    # It must open — a corrupt file should not make a directory unbrowsable.
+    assert viewer._size is None or viewer._error is not None
+
+
+# --- zoom --------------------------------------------------------------------
+
+
+def test_zoom_in_and_out_step_geometrically(images):
+    viewer = ImageViewer(images[0])
+    viewer.handle_event(_key(char="+"))
+    assert viewer.zoom == pytest.approx(ZOOM_STEP)
+    viewer.handle_event(_key(char="+"))
+    assert viewer.zoom == pytest.approx(ZOOM_STEP ** 2)
+    viewer.handle_event(_key(char="-"))
+    assert viewer.zoom == pytest.approx(ZOOM_STEP)
+
+
+def test_zoom_is_clamped_to_the_allowed_range(images):
+    viewer = ImageViewer(images[0])
+    for _ in range(200):
+        viewer.handle_event(_key(char="+"))
+    assert viewer.zoom == pytest.approx(MAX_ZOOM)
+    for _ in range(200):
+        viewer.handle_event(_key(char="-"))
+    # MIN_ZOOM is fit-to-window; there is nothing smaller to show.
+    assert viewer.zoom == pytest.approx(MIN_ZOOM)
+
+
+def test_zoom_reset_returns_to_fit_and_recenters(images):
+    viewer = ImageViewer(images[0])
+    for _ in range(4):
+        viewer.handle_event(_key(char="+"))
+    viewer.handle_event(_key(key="right"))
+    viewer.handle_event(_key(char="0"))
+    assert viewer.zoom == pytest.approx(MIN_ZOOM)
+    assert (viewer.cx, viewer.cy) == (0.5, 0.5)
+
+
+def test_zooming_back_out_to_fit_recenters(images):
+    # A stale pan center at fit would make the next zoom-in jump to a corner.
+    viewer = ImageViewer(images[0])
+    viewer.handle_event(_key(char="+"))
+    viewer.handle_event(_key(key="right"))
+    viewer.handle_event(_key(char="-"))
+    assert viewer.zoom == pytest.approx(MIN_ZOOM)
+    assert (viewer.cx, viewer.cy) == (0.5, 0.5)
+
+
+def test_scroll_zooms(images):
+    viewer = ImageViewer(images[0])
+    viewer.handle_event(Event(type=EventType.MOUSE_SCROLL, scroll=1, hints={}))
+    assert viewer.zoom > MIN_ZOOM
+
+
+# --- pan ---------------------------------------------------------------------
+
+
+def test_pan_moves_the_center_by_a_share_of_the_visible_extent(images):
+    viewer = ImageViewer(images[0])
+    viewer.zoom = 2.0
+    viewer.handle_event(_key(key="right"))
+    # The step is divided by the zoom, so it covers the same share of screen.
+    assert viewer.cx == pytest.approx(0.5 + PAN_STEP / 2.0)
+    viewer.handle_event(_key(key="down"))
+    assert viewer.cy == pytest.approx(0.5 + PAN_STEP / 2.0)
+
+
+def test_pan_center_is_clamped_to_the_image(images):
+    viewer = ImageViewer(images[0])
+    viewer.zoom = 2.0
+    for _ in range(50):
+        viewer.handle_event(_key(key="right"))
+        viewer.handle_event(_key(key="down"))
+    assert viewer.cx == pytest.approx(1.0)
+    assert viewer.cy == pytest.approx(1.0)
+    for _ in range(100):
+        viewer.handle_event(_key(key="left"))
+        viewer.handle_event(_key(key="up"))
+    assert viewer.cx == pytest.approx(0.0)
+    assert viewer.cy == pytest.approx(0.0)
+
+
+def test_pan_at_an_edge_preserves_the_zoom_level(images):
+    # Clamping must slide the source window, never shrink it. The window is
+    # normalized, so 4x zoom is a 1/4 fraction of each axis whatever the image.
+    viewer = ImageViewer(images[0])
+    viewer.zoom = 4.0
+    for _ in range(50):
+        viewer.handle_event(_key(key="left"))
+    x, _, w, h = viewer._source()
+    assert (w, h) == pytest.approx((0.25, 0.25))
+    assert x == pytest.approx(0.0)  # slid flush to the left edge, not shrunk
+
+
+def test_drag_pans_opposite_the_pointer(images):
+    viewer = ImageViewer(images[0])
+    viewer.zoom = 2.0
+    viewer._body_rect = (0.0, 1.0, 60.0, 18.0)
+    viewer.handle_event(Event(type=EventType.MOUSE_DOWN, x=30.0, y=10.0, hints={}))
+    viewer.handle_event(Event(type=EventType.MOUSE_DRAG, x=36.0, y=10.0, hints={}))
+    # Dragging right moves the image right, i.e. the source window left.
+    assert viewer.cx < 0.5
+    viewer.handle_event(Event(type=EventType.MOUSE_UP, x=36.0, y=10.0, hints={}))
+    assert viewer._drag is None
+
+
+def test_drag_does_nothing_while_fitted(images):
+    viewer = ImageViewer(images[0])
+    viewer._body_rect = (0.0, 1.0, 60.0, 18.0)
+    viewer.handle_event(Event(type=EventType.MOUSE_DOWN, x=30.0, y=10.0, hints={}))
+    viewer.handle_event(Event(type=EventType.MOUSE_DRAG, x=50.0, y=10.0, hints={}))
+    assert (viewer.cx, viewer.cy) == (0.5, 0.5)
+
+
+# --- prev / next navigation --------------------------------------------------
+
+
+def test_next_and_prev_walk_the_sibling_list(images):
+    viewer = ImageViewer(images[0], siblings=images, index=0)
+    viewer.handle_event(_key(char="n"))
+    assert viewer.path.name == "b.png"
+    viewer.handle_event(_key(char="n"))
+    assert viewer.path.name == "c.png"
+    viewer.handle_event(_key(char="p"))
+    assert viewer.path.name == "b.png"
+
+
+def test_navigation_wraps_at_both_ends(images):
+    viewer = ImageViewer(images[0], siblings=images, index=0)
+    viewer.handle_event(_key(char="p"))
+    assert viewer.path.name == "c.png"
+    viewer.handle_event(_key(char="n"))
+    assert viewer.path.name == "a.png"
+
+
+def test_home_and_end_jump_to_first_and_last(images):
+    viewer = ImageViewer(images[1], siblings=images, index=1)
+    viewer.handle_event(_key(key="end"))
+    assert viewer.path.name == "c.png"
+    viewer.handle_event(_key(key="home"))
+    assert viewer.path.name == "a.png"
+
+
+def test_navigation_resets_zoom_and_pan(images):
+    # Carrying a deep crop across would open the next image on a corner of it.
+    viewer = ImageViewer(images[0], siblings=images, index=0)
+    for _ in range(5):
+        viewer.handle_event(_key(char="+"))
+    viewer.handle_event(_key(key="right"))
+    viewer.handle_event(_key(char="n"))
+    assert viewer.zoom == MIN_ZOOM
+    assert (viewer.cx, viewer.cy) == (0.5, 0.5)
+
+
+def test_navigation_reloads_dimensions_for_the_new_image(images):
+    viewer = ImageViewer(images[0], siblings=images, index=0)
+    assert viewer._size == (200, 100)
+    viewer.handle_event(_key(char="n"))
+    assert viewer._size == (40, 40)
+
+
+def test_single_image_has_navigation_disabled(images):
+    viewer = ImageViewer(images[0])
+    viewer.handle_event(_key(char="n"))
+    assert viewer.path.name == "a.png"
+
+
+def test_sibling_list_is_snapshotted_not_referenced(images):
+    # The file monitor mutates the pane's list in place on refresh; holding a
+    # live reference would shift the index out from under the viewer.
+    live = list(images)
+    viewer = ImageViewer(images[0], siblings=live, index=0)
+    live.clear()
+    viewer.handle_event(_key(char="n"))
+    assert viewer.path.name == "b.png"
+
+
+def test_index_is_recovered_when_it_disagrees_with_the_path(images):
+    # A caller passing a stale index must not land the viewer on another file.
+    viewer = ImageViewer(images[2], siblings=images, index=0)
+    assert viewer.path.name == "c.png"
+
+
+# --- drawing: real picture vs metadata card ----------------------------------
+
+
+def test_draw_emits_a_contain_fit_with_the_zoom_crop(images):
+    backend = MemoryBackend(width=60, height=20, capabilities=PROFILE_GUI_DESKTOP)
+    viewer = ImageViewer(images[0])
+    viewer.zoom, viewer.cx, viewer.cy = 2.0, 0.5, 0.5
+    _render(backend, viewer)
+    hints = _image_hints(backend)
+    assert hints["fit"] == "contain"  # aspect-locked destination: never distorted
+    # The crop is normalized (0..1), so it is DPI-independent -- the fix for the
+    # image rendering tiny in the top-left on a Retina display.
+    assert hints["src"] == zoom_window(2.0, 0.5, 0.5)
+
+
+def test_draw_sends_no_crop_when_fitted(images):
+    # At fit level the whole image shows, so the viewer sends src=None and the
+    # backend takes its plain whole-image path (no source rect to get wrong).
+    backend = MemoryBackend(width=60, height=20, capabilities=PROFILE_GUI_DESKTOP)
+    _render(backend, ImageViewer(images[0]))
+    assert _image_hints(backend)["src"] is None
+
+
+def test_draw_targets_the_body_between_header_and_footer(images):
+    backend = MemoryBackend(width=60, height=20, capabilities=PROFILE_GUI_DESKTOP)
+    _render(backend, ImageViewer(images[0]))
+    x, y, _, hints = backend.image_calls[-1]
+    assert y >= 1  # below the header band
+    assert hints["h"] <= 20 - 2  # clear of the header and the footer bar
+
+
+def test_tui_without_an_image_protocol_draws_the_metadata_card(images):
+    backend = MemoryBackend(width=60, height=20, capabilities=PROFILE_TUI)
+    _render(backend, ImageViewer(images[0]))
+    screen = "\n".join(backend.snapshot())
+    assert backend.image_calls == []  # nothing tried to draw pixels
+    assert "PNG" in screen
+    assert "200x100" in screen
+
+
+def test_header_shows_name_dimensions_and_position(images):
+    backend = MemoryBackend(width=60, height=20, capabilities=PROFILE_TUI)
+    _render(backend, ImageViewer(images[0], siblings=images, index=0))
+    screen = "\n".join(backend.snapshot())
+    assert "a.png" in screen
+    assert "1/3" in screen
+
+
+def test_header_shows_the_zoom_factor_only_while_zoomed(images):
+    backend = MemoryBackend(width=60, height=20, capabilities=PROFILE_GUI_DESKTOP)
+    viewer = ImageViewer(images[0])
+    _render(backend, viewer)
+    assert "2.0x" not in "\n".join(backend.snapshot())
+    viewer.zoom = 2.0
+    backend.clear()
+    _render(backend, viewer)
+    assert "2.0x" in "\n".join(backend.snapshot())
+
+
+def test_footer_hides_pan_hint_until_zoomed(images):
+    backend = MemoryBackend(width=60, height=20, capabilities=PROFILE_GUI_DESKTOP)
+    viewer = ImageViewer(images[0])
+    _render(backend, viewer)
+    assert "pan" not in "\n".join(backend.snapshot())
+    viewer.zoom = 2.0
+    backend.clear()
+    _render(backend, viewer)
+    assert "pan" in "\n".join(backend.snapshot())
+
+
+def test_draw_works_on_both_profiles(backend, images):
+    # Whatever the fidelity, drawing must not raise.
+    _render(backend, ImageViewer(images[0], siblings=images, index=0))
+    assert "a.png" in "\n".join(backend.snapshot())
+
+
+# --- modal behaviour ---------------------------------------------------------
+
+
+def test_escape_closes_the_viewer(images):
+    backend = MemoryBackend(width=60, height=20, capabilities=PROFILE_GUI_DESKTOP)
+    panel = Panel(backend)
+    viewer = show_image_viewer(panel, images[0], siblings=images, index=0)
+    panel.render()
+    assert panel.has_layers
+    viewer.handle_event(_key(key="escape"))
+    assert not panel.has_layers
+
+
+def test_viewer_swallows_unhandled_events(images):
+    # Modal: nothing leaks through to the file manager underneath.
+    viewer = ImageViewer(images[0])
+    assert viewer.handle_event(_key(char="Z")) is True
+    assert viewer.handle_event(Event(type=EventType.RESIZE, hints={})) is True
+
+
+def test_show_image_viewer_stacks_help_above_itself(images):
+    backend = MemoryBackend(width=60, height=20, capabilities=PROFILE_GUI_DESKTOP)
+    panel = Panel(backend)
+    viewer = show_image_viewer(panel, images[0], z=80)
+    assert viewer._child_z > 80
+
+
+# --- app dispatch ------------------------------------------------------------
+
+
+def _app_open(images, focus, pane_files):
+    """Drive TfmApp._open_viewer directly with a synthetic pane, so the routing
+    is tested without depending on the live config's FILE_ASSOCIATIONS (which
+    decide only whether an *external* program pre-empts the built-in viewer)."""
+    app = tfm.TfmApp.__new__(tfm.TfmApp)  # no curses / no file monitor
+    panel = Panel(MemoryBackend(width=60, height=20,
+                                capabilities=PROFILE_GUI_DESKTOP))
+    app.panel = panel
+    app.state_manager = None
+    app._open_viewer(focus, {"files": pane_files})
+    return panel._layers[-1].widget
+
+
+def test_open_viewer_routes_images_to_the_image_viewer(images):
+    widget = _app_open(images, images[0], list(images))
+    assert isinstance(widget, ImageViewer)
+    assert widget.path.name == "a.png"
+
+
+def test_open_viewer_passes_only_the_image_siblings(tmp_path, images):
+    text = Path(str(tmp_path / "notes.txt"))
+    widget = _app_open(images, images[1], [images[0], text, images[1], images[2]])
+    assert [p.name for p in widget.paths] == ["a.png", "b.png", "c.png"]
+    assert widget.path.name == "b.png"  # index follows the file, not the slot
+
+
+def test_open_viewer_routes_non_images_to_the_text_viewer(tmp_path):
+    from tfm_text_viewer import TextViewer
+
+    note = tmp_path / "notes.txt"
+    note.write_text("hello")
+    path = Path(str(note))
+    widget = _app_open(None, path, [path])
+    assert isinstance(widget, TextViewer)
+
+
+def test_open_viewer_without_a_pane_falls_back_to_a_single_image(images):
+    widget = _app_open(images, images[0], [])
+    assert isinstance(widget, ImageViewer)
+    assert [p.name for p in widget.paths] == ["a.png"]
+
+
+# --- remote / in-archive files ----------------------------------------------
+
+
+def test_non_local_image_is_materialized_to_a_temp_file(images, monkeypatch):
+    # A remote path has no filesystem path for Pillow or the backend to open, so
+    # the bytes are copied to a temp file for the life of the viewer.
+    source = images[0]
+    data = open(str(source), "rb").read()
+
+    class RemotePath:
+        name, suffix = "remote.png", ".png"
+
+        def is_remote(self):
+            return True
+
+        def read_bytes(self):
+            return data
+
+        def __str__(self):
+            return "s3://bucket/remote.png"
+
+    viewer = ImageViewer(RemotePath())
+    assert viewer._temp is not None
+    assert os.path.exists(viewer._temp)
+    assert viewer._size == (200, 100)
+    temp = viewer._temp
+    viewer._release_temp()
+    assert not os.path.exists(temp)

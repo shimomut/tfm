@@ -94,6 +94,7 @@ from tfm_file_operations import (FileOperationService, format_op_errors,  # noqa
                                  format_op_summary)
 from tfm_task import Task, TaskManager  # noqa: E402
 from tfm_text_dialog import show_markdown  # noqa: E402
+from tfm_image_viewer import is_image_file, show_image_viewer  # noqa: E402
 from tfm_text_viewer import looks_binary, show_text_viewer  # noqa: E402
 from tfm_viewer_registry import rich_renderer_for  # noqa: E402
 
@@ -1999,14 +2000,14 @@ class TfmApp:
             self.log_info(f"Entered archive {entry.name}")
             return
         # Nothing built in can render this: warn in the log rather than spending
-        # a full-screen viewer on a placeholder. A rich renderer claims the type
-        # even when it is binary, which is the seam an embedded image viewer
-        # will register through — once one exists, images stop landing here.
+        # a full-screen viewer on a placeholder. Images are binary but the image
+        # viewer renders them, and a rich renderer likewise claims its type even
+        # when binary — so both bypass this guard.
         if handler != "viewer" and rich_renderer_for(entry) is None \
-                and looks_binary(entry):
+                and not is_image_file(entry) and looks_binary(entry):
             self.log_info(self._no_builtin_viewer_message(entry))
             return
-        self._ensure_archive_password(entry, lambda: self._open_viewer(entry))
+        self._ensure_archive_password(entry, lambda: self._open_viewer(entry, pane))
 
     @staticmethod
     def _no_builtin_viewer_message(entry) -> str:
@@ -3294,9 +3295,23 @@ class TfmApp:
 
         prompt()
 
-    def _open_viewer(self, entry) -> None:
-        """Open ``entry`` in the built-in text viewer and redraw."""
-        show_text_viewer(self.panel, entry, state_manager=self.state_manager)
+    def _open_viewer(self, entry, pane: dict | None = None) -> None:
+        """Open ``entry`` in the matching built-in viewer and redraw.
+
+        An image opens in the image viewer, handed the other images from ``pane``
+        so its prev/next walks the list the user is looking at, in the order they
+        see it (already sorted and filtered — see ``tfm_file_list_manager``). The
+        list is snapshotted by the viewer, so a background refresh mutating the
+        pane cannot shift the index underneath it. Everything else opens in the
+        text viewer."""
+        if is_image_file(entry):
+            siblings = [f for f in (pane or {}).get("files", []) if is_image_file(f)]
+            if entry not in siblings:  # a pane we were not given, or a stale list
+                siblings = [entry]
+            show_image_viewer(self.panel, entry, siblings=siblings,
+                              index=siblings.index(entry))
+        else:
+            show_text_viewer(self.panel, entry, state_manager=self.state_manager)
         self.panel.render()
 
     def view_file(self) -> None:
@@ -3323,7 +3338,7 @@ class TfmApp:
         if command and self._launch_associated(entry, command):
             self.log_info(f"Viewing {entry.name} with {command[0]}")
             return
-        self._ensure_archive_password(entry, lambda: self._open_viewer(entry))
+        self._ensure_archive_password(entry, lambda: self._open_viewer(entry, pane))
 
     def diff_files(self) -> None:
         """Compare exactly two selected files side by side. Files may be selected
