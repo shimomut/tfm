@@ -46,7 +46,8 @@ with no usable GPU shader support.
 ## Turning one on
 
 Animations are chosen per theme. Among the built-in themes, **Sci-Fi** ships with
-the starfield; select it from **View → Theme** or cycle themes with `T`.
+the starfield, **Cyber** with the hologram and **Shinagawa** with the wave; select
+one from **View → Theme** or cycle themes with `T`.
 
 To use one in your own theme, add an `animation` key to a theme in the `THEMES`
 dict in `~/.tfm/config.py`:

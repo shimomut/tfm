@@ -496,6 +496,72 @@ _THEME_SPECS: list[tuple[str, dict]] = [
                          # 92% and fades in is the one gesture the metaphor cannot
                          # produce, so dialogs here appear whole, instantly.
                          dialog_effect=False)),
+    # Shinagawa: a bay-at-night look — white text over a deep marine blue, with the
+    # ``wave`` sheet rolling behind it (see tfm_background_shaders). Named for the
+    # Tokyo waterfront. The base is one hue (blue → white), but the *content* colors
+    # are deliberately not: a warm orange for directories with a full-spectrum syntax
+    # palette, so the file list and the code viewer stay maximally sortable at a
+    # glance. Blue backdrop + orange marks is the complementary pairing that buys the
+    # most separation per unit of color, which is why the directories get the orange.
+    ("Shinagawa", dict(bg=(14, 34, 74), fg=(244, 248, 253), muted=(128, 156, 196),
+                       accent=(92, 168, 236), surface=(24, 52, 100), selection=(38, 84, 148),
+                       # accent2 is the i-search wash base, and it takes the same warm
+                       # orange as the directories — the "things to find" hue, held
+                       # apart from the blue chrome (the Sci-Fi / Cyber recipe).
+                       accent2=(255, 168, 76),
+                       status=lambda p: mix(p["bg"], p["accent"], 0.20),
+                       footer=lambda p: mix(p["bg"], p["accent"], 0.20),
+                       file_types={"directory": (255, 168, 76),   # orange
+                                   "link": (94, 234, 214)},        # turquoise
+                       # The cursor stays near-white rather than joining the warm
+                       # family: it frames whichever row you are on, and half those
+                       # rows are now orange directory names — a warm frame around a
+                       # warm name is the one place the cue could disappear.
+                       cursor={"active": (232, 244, 255), "inactive": (110, 140, 180)},
+                       # A full spread of hues, one per token class, each held above
+                       # 4.5:1 on the navy. ``comment`` is the deliberate exception —
+                       # it keeps the muted slate, because a comment's job is to
+                       # recede while the code around it is loud.
+                       syntax={"keyword": (198, 148, 255),   # violet
+                               "string": (158, 232, 138),    # green
+                               "comment": (118, 146, 186),   # slate — recedes
+                               "number": (255, 186, 110),    # amber
+                               "operator": (255, 138, 178),  # pink
+                               "builtin": (108, 224, 240)},  # cyan
+                       # The one effect, and it earns its place twice: Segment LCD uses
+                       # a text shadow for an embossed look, and here the same shadow is
+                       # what lifts white glyphs off a *moving* background — the classic
+                       # reason to shadow text over imagery. No bloom or glow: this is a
+                       # flat, lit UI floating over water, not an emissive screen.
+                       post_effect={"drop_shadow": 0.5},
+                       # Like Cyber, this overrides the scene's ink rather than letting
+                       # it default to the theme foreground.
+                       #
+                       # Two separate knobs, and it is worth not confusing them. How
+                       # *visible* the sheet is comes from ``opacity`` alone — that is
+                       # the term the shader composites over the backdrop with — so it
+                       # is the one raised here. ``color`` only sets where on the
+                       # spectrum the sheet sits.
+                       #
+                       # And it cannot sit on white. The wave shader builds its gradient
+                       # by pushing ``ink`` apart into a violet and a cyan through fixed
+                       # channel scales (see WAVE_MSL); the violet end scales green by
+                       # 0.42, so its green is capped at 42% no matter how bright the
+                       # ink — even a pure-white ink resolves to magenta↔cyan, not
+                       # white. What a near-white ink *does* buy is luminance, so this
+                       # is a pale ice blue: bright enough to read as lit water
+                       # (violet≈(180,97,255), cyan≈(61,253,255)) while keeping the red
+                       # channel low enough that the violet end stays blue-violet rather
+                       # than going orchid. The genuine white is the shader's own crest
+                       # term, which lifts the leading edges up to 70% toward white
+                       # independently of the ink — that is the foam, and raising the
+                       # opacity is what makes it show.
+                       animation={"type": "wave", "color": (180, 230, 255),
+                                  "opacity": 0.5},
+                       opacity=0.7)),   # chrome at 70% so the swell reads through
+    # NB: no ``text_effect`` — text arrives instantly here. Water is the thing that
+    # moves in this theme; having the filenames type themselves in as well would put
+    # two independent animations on screen competing for the same attention.
 ]
 
 THEMES: list[tuple[str, Theme]] = [(name, _theme(**spec)) for name, spec in _THEME_SPECS]
