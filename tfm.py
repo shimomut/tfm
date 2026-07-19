@@ -404,15 +404,15 @@ _THEME_SPECS: list[tuple[str, dict]] = [
                                  "stagger_ms": 8, "max_rows": 120})),
     # Cyber: a data-wall look — near-black navy under dense cyan telemetry, with a
     # warm amber for the things that need to be found (cursor, i-search, numbers) and
-    # a magenta reserved for links. Where Sci-Fi is a calm tactical HUD, this one is
-    # *busy*: the same emissive treatment plus scanlines and an occasional roll
-    # glitch, over the horizontal ``datastream`` traffic (see tfm_background_shaders).
+    # a magenta reserved for links, over the ``hologram`` scene (see
+    # tfm_background_shaders).
     #
-    # The scanline is what separates the two effects. Sci-Fi deliberately has none so
-    # its bloom can spread into a broad holographic halo; here the scanline keeps the
-    # bloom tight and gives the whole frame the texture of a monitor being read off,
-    # which is the point of the look. ``roll`` is low on purpose — it is a glitch,
-    # and a glitch that fires often is just a flicker.
+    # Purely emissive: no ``scanline``, and no ``roll`` glitch. Those two are what
+    # read as a *CRT* — a physical tube being scanned — and this look is a projected
+    # hologram, which has no scan to show. Dropping them also buys the glow it wants:
+    # a scanline darkens every other row and so holds the bloom tight against the
+    # geometry, and without it the halo is free to spread (the same reasoning Sci-Fi
+    # spells out, taken further — the bloom and glow here are roughly double).
     ("Cyber", dict(bg=(9, 17, 28), fg=(198, 230, 244), muted=(94, 128, 154),
                    accent=(64, 214, 236), surface=(17, 31, 48), selection=(24, 82, 108),
                    accent2=(255, 196, 84),
@@ -423,8 +423,7 @@ _THEME_SPECS: list[tuple[str, dict]] = [
                    syntax={"keyword": (64, 214, 236), "string": (255, 196, 84),
                            "comment": (94, 128, 154), "number": (255, 224, 138),
                            "operator": (236, 132, 200), "builtin": (140, 240, 250)},
-                   post_effect={"bloom": 0.5, "glow": 0.26, "scanline": 0.14,
-                                "vignette": 0.32, "roll": 0.12},
+                   post_effect={"bloom": 0.78, "glow": 0.60, "vignette": 0.30},
                    # The one theme that overrides the scene's ink. A shader defaults
                    # to the theme *foreground*, which here is a near-white blue —
                    # right for text, but it renders the panels as grey haze. The

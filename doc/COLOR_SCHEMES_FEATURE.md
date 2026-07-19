@@ -31,10 +31,11 @@ recommended *screen effect*:
   chrome and a warm amber selection accent, behind a strong emissive bloom halo and
   glow with a vignette — no scanlines, no rolling glitch.
 - **Cyber** — a data-wall look: dense cyan telemetry on near-black navy, amber for
-  the things you need to find (cursor, i-search) and magenta for links. Same
-  emissive treatment as Sci-Fi *plus* scanlines and an occasional roll glitch, over
-  a depth of [`hologram`](BACKGROUND_ANIMATIONS_FEATURE.md) panels drifting toward
-  you. Filenames decode into place as they arrive.
+  the things you need to find (cursor, i-search) and magenta for links, over a depth
+  of [`hologram`](BACKGROUND_ANIMATIONS_FEATURE.md) panels drifting toward you.
+  Purely emissive — a strong bloom halo and glow, with no scanlines and no roll
+  glitch, so it reads as a projected hologram rather than a tube being scanned.
+  Filenames decode into place as they arrive.
 - **Segment LCD** — a positive/reflective digital display: near-black "segments"
   on a sage-green base (just two colours), flat — no scanlines or glow — where the
   black segments (text) cast a soft drop shadow for an embossed LCD look.

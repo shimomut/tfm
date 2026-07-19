@@ -1402,6 +1402,12 @@ float4 puikit_bg_fragment(float4 pos : SV_Position) : SV_Target {
 #: a pixel divides its way down to exactly one block and hashes it. Nothing is
 #: iterated but the depth planes, which is what lets the field be this dense.
 #:
+#: **Speed.** Panels creep toward the viewer and the ambient field drifts at a few
+#: pixels a second, which between them make a scene that barely appears to move. The
+#: *fast layer* — barcode bursts, dashes and dots running along horizontal lanes — is
+#: the one element with real pace, and it is what keeps the whole thing from reading
+#: as a still image under a slow zoom.
+#:
 #: **The concentration lines** raking outward from the vanishing point are the
 #: datastream's dash-in-a-slot wrapped around the centre — a pixel finds its angular
 #: sector and its slot along the ray and consults one cell, so the whole field costs
@@ -1511,12 +1517,15 @@ constant float RESOLVE     = 0.85;  // fade a panel out past this many pixels pe
 
 // Concentration lines -- the radial speed streaks
 constant float CONC_SECTORS = 220.0; // angular slots around the vanishing point
-constant float CONC_KEEP    = 0.16;  // share of sectors carrying a streak
+constant float CONC_COUNT   = 4.0;   // how many of them carry a streak. A pixel only
+                                     // ever sees its own sector, so this cannot be a
+                                     // hard cap -- it is the *expected* number, set by
+                                     // keeping a COUNT/SECTORS share of the draws
 constant float CONC_CELL    = 0.34;  // streak slot length, as a fraction of the radius
 constant float CONC_DASH    = 0.55;  // dash length within its slot
 constant float CONC_RATE    = 0.20;  // outward drift, fraction of the radius/second
-constant float CONC_PX      = 1.1;   // streak width, pixels
-constant float CONC_ALPHA   = 0.42;
+constant float CONC_PX      = 2.6;   // streak width, pixels
+constant float CONC_ALPHA   = 0.95;
 constant float CONC_IN      = 0.16;  // radius (fraction) the streaks start at
 constant float CONC_RAMP    = 0.26;  // ...and how far they take to reach full strength
 constant float CONC_HEAD    = 0.60;  // how far a leading edge pales toward white
@@ -1540,18 +1549,40 @@ constant float AMB_DRIFT_X  = 5.0;   // field drift, pixels/second
 constant float AMB_DRIFT_Y  = -3.0;
 constant float AMB_ORBIT    = 0.05;  // per-object orbit, turns/second
 constant float AMB_ORBIT_R  = 9.0;   // ...and its radius, pixels
-constant float AMB_K_DOT    = 0.55;  // kind mix: dot / ring / stroke
-constant float AMB_K_RING   = 0.80;
+constant float AMB_K_DOT    = 0.60;  // kind mix: dot / stroke
 constant float AMB_DOT_R    = 40.0;
 constant float AMB_DOT_A    = 0.45;
-constant float AMB_RING_R   = 36.0;
-constant float AMB_RING_W   = 1.6;
-constant float AMB_RING_A   = 0.34;
 constant float AMB_LINE_L   = 80.0;
 constant float AMB_LINE_W   = 1.4;
 constant float AMB_LINE_A   = 0.30;
 constant float AMB_SOFT     = 7.0;   // edge softness, pixels -- these read as
                                      // out-of-focus, so the falloff is wide
+
+// The fast layer: bright dashes and dots running along horizontal lanes, far quicker
+// than anything else here. The ambient field drifts at a few pixels a second and the
+// panels creep toward the viewer; this is the only element with real speed, and it is
+// what stops the scene reading as a still image with a slow zoom.
+constant float FAST_LANE_PX = 38.0;  // lane pitch, pixels
+constant float FAST_KEEP    = 0.42;  // share of lanes carrying traffic
+constant float FAST_CELL_PX = 150.0; // slot length along a lane, pixels
+constant float FAST_FILL    = 0.55;  // share of slots carrying an object
+constant float FAST_RATE    = 260.0; // lane speed, pixels/second
+constant float FAST_DASH    = 0.16;  // dash length, as a fraction of its slot
+constant float FAST_LINE_W  = 1.3;   // dash thickness, pixels
+constant float FAST_DOT_R   = 2.6;   // dot radius, pixels
+constant float FAST_TICK_H  = 15.0;  // upright tick height, pixels (before variance)
+constant float FAST_TICK_W  = 1.6;   // ...and its width
+constant float FAST_BURST   = 0.30;  // a tick object is a *burst* of bars, spanning
+constant float FAST_TICK_N  = 8.0;   // this fraction of its slot, this many bars
+constant float FAST_TICK_FILL = 0.70;// ...of which this share are actually drawn
+constant float FAST_DOT_MIX = 0.30;  // kind mix, cumulative: dot / upright tick /
+constant float FAST_TICK_MIX = 0.66; // horizontal dash
+constant float FAST_REACH   = 17.0;  // the tallest a lane's contents can reach, for
+                                     // the early-out. A tick varies up to 2x its
+                                     // nominal height, so this is not FAST_TICK_H
+constant float FAST_ALPHA   = 0.85;
+constant float FAST_HEAD    = 0.70;  // how far a dash's leading edge pales to white
+constant float FAST_WRAP    = 4096.0;
 
 constant float CYCLE_WRAP   = 512.0; // keeps the hash inputs exact -- see the note on
 constant float CONC_WRAP    = 4096.0;// folding time in DATASTREAM_MSL
@@ -1603,10 +1634,6 @@ static inline float ambient_field(float2 p, float t) {
         float r = AMB_DOT_R * (0.5 + 0.9 * g.x);
         float k = max(0.0, 1.0 - d / r);
         return k * k * AMB_DOT_A;
-    } else if (h.y < AMB_K_RING) {
-        float r = AMB_RING_R * (0.5 + 0.9 * g.y);
-        return (1.0 - smoothstep(AMB_RING_W, AMB_RING_W + AMB_SOFT, abs(d - r)))
-             * AMB_RING_A;
     }
     float a2 = g.z * TAU;
     float2 dir = float2(cos(a2), sin(a2));
@@ -1614,6 +1641,61 @@ static inline float ambient_field(float2 p, float t) {
     float along = clamp(dot(d2, dir), -half_len, half_len);
     return (1.0 - smoothstep(AMB_LINE_W, AMB_LINE_W + AMB_SOFT,
                              length(d2 - dir * along))) * AMB_LINE_A;
+}
+
+// Bright traffic running along horizontal lanes: short dashes with a hot leading
+// edge, and dots riding the same slots. Folded like the datastream's lanes -- the
+// fraction places the pixel in its slot, the integer only names it -- so a pixel
+// consults exactly one cell however long the app has been running.
+//
+// Returns coverage in .x and how much of it is leading edge in .y.
+static inline float2 fast_field(float2 pos, float t) {
+    float lane = floor(pos.y / FAST_LANE_PX);
+    float dy = abs(pos.y - (lane + 0.5) * FAST_LANE_PX);
+    // Everything in a lane hugs its centre line, so most pixels leave immediately.
+    if (dy > FAST_REACH) { return float2(0.0); }
+
+    float3 lh = hash33(float2(lane, 71.0));
+    if (lh.x > FAST_KEEP) { return float2(0.0); }
+
+    float speed = FAST_RATE * (0.6 + 0.8 * lh.y);
+    float shift = t * speed / FAST_CELL_PX;
+    float shiftI = floor(shift);
+    float uu = pos.x / FAST_CELL_PX + (shift - shiftI);
+    float slot = floor(uu);
+    float fx = uu - slot;
+    float3 sh = hash33(float2(fmod(slot - shiftI, FAST_WRAP), lane));
+    if (sh.x > FAST_FILL) { return float2(0.0); }
+
+    if (sh.y < FAST_DOT_MIX) {
+        float d = length(float2(fx * FAST_CELL_PX, dy));
+        return float2((1.0 - smoothstep(FAST_DOT_R, FAST_DOT_R + 1.2, d))
+                      * FAST_ALPHA, 0.0);
+    }
+    if (sh.y < FAST_TICK_MIX) {
+        // A burst of upright bars -- the barcode the reference runs along its bands.
+        // A single bar per slot (the first try) scatters into isolated tally marks;
+        // it is the *cluster* that reads as a packet of data going past. Heights vary
+        // widely on purpose too: a run of equal bars reads as a ruler.
+        if (fx > FAST_BURST) { return float2(0.0); }
+        float gx = fx / FAST_BURST * FAST_TICK_N;
+        float bar = floor(gx);
+        float gf = gx - bar;
+        float3 th = hash33(float2(bar + slot * 17.0, lane + 5.0));
+        if (th.x > FAST_TICK_FILL) { return float2(0.0); }
+        float half_h = FAST_TICK_H * (0.35 + 1.1 * th.y);
+        float pitch = FAST_BURST * FAST_CELL_PX / FAST_TICK_N;   // bar spacing, px
+        float covX = 1.0 - smoothstep(FAST_TICK_W * 0.5, FAST_TICK_W * 0.5 + 1.0,
+                                      gf * pitch);
+        float covY = 1.0 - smoothstep(half_h, half_h + 1.0, dy);
+        return float2(covX * covY * FAST_ALPHA, 0.0);
+    }
+    float dash = FAST_DASH * (0.4 + 1.2 * sh.z);
+    float aa = 1.0 / FAST_CELL_PX;
+    float covX = smoothstep(0.0, aa, fx) * (1.0 - smoothstep(dash - aa, dash, fx));
+    float covY = 1.0 - smoothstep(FAST_LINE_W * 0.5, FAST_LINE_W * 0.5 + 1.0, dy);
+    float a = covX * covY * FAST_ALPHA;
+    return float2(a, a * (1.0 - smoothstep(0.0, dash * 0.35, fx)));
 }
 
 // One panel's contents, in panel-local coordinates (0..1 on each axis). Returns
@@ -1858,7 +1940,7 @@ fragment float4 puikit_bg_fragment(float4 pos [[position]],
         // ang = 0 and the field would carry a seam straight out along -x.
         float sector = fmod(floor(ang * CONC_SECTORS), CONC_SECTORS);
         float3 ch = hash33(float2(sector, 4.0));
-        if (ch.x < CONC_KEEP) {
+        if (ch.x * CONC_SECTORS < CONC_COUNT) {
             // Folded like the datastream's lanes: the fraction places the pixel in
             // its slot, the integer only names it.
             float shift = t * CONC_RATE * (0.5 + 1.2 * ch.y) / CONC_CELL;
@@ -1885,6 +1967,11 @@ fragment float4 puikit_bg_fragment(float4 pos [[position]],
 
     // The ambient layer sits under the rest: dim, soft and cool, never warm or hot.
     lit = max(lit, ambient_field(pos.xy, t));
+
+    // The fast layer, on top: this is the element that actually moves.
+    float2 fastR = fast_field(pos.xy, t);
+    lit = max(lit, fastR.x);
+    hot = max(hot, fastR.y * FAST_HEAD);
 
     // The accent is the ink with red and blue swapped -- amber out of this scene's
     // cyan, and a theme-derived hue out of anything else (see the module note).
@@ -1989,12 +2076,15 @@ static const float RESOLVE     = 0.85;  // fade a panel out past this many pixel
 
 // Concentration lines -- the radial speed streaks
 static const float CONC_SECTORS = 220.0; // angular slots around the vanishing point
-static const float CONC_KEEP    = 0.16;  // share of sectors carrying a streak
+static const float CONC_COUNT   = 4.0;   // how many of them carry a streak. A pixel only
+                                     // ever sees its own sector, so this cannot be a
+                                     // hard cap -- it is the *expected* number, set by
+                                     // keeping a COUNT/SECTORS share of the draws
 static const float CONC_CELL    = 0.34;  // streak slot length, as a fraction of the radius
 static const float CONC_DASH    = 0.55;  // dash length within its slot
 static const float CONC_RATE    = 0.20;  // outward drift, fraction of the radius/second
-static const float CONC_PX      = 1.1;   // streak width, pixels
-static const float CONC_ALPHA   = 0.42;
+static const float CONC_PX      = 2.6;   // streak width, pixels
+static const float CONC_ALPHA   = 0.95;
 static const float CONC_IN      = 0.16;  // radius (fraction) the streaks start at
 static const float CONC_RAMP    = 0.26;  // ...and how far they take to reach full strength
 static const float CONC_HEAD    = 0.60;  // how far a leading edge pales toward white
@@ -2012,17 +2102,36 @@ static const float AMB_DRIFT_X  = 5.0;   // field drift, pixels/second
 static const float AMB_DRIFT_Y  = -3.0;
 static const float AMB_ORBIT    = 0.05;  // per-object orbit, turns/second
 static const float AMB_ORBIT_R  = 9.0;   // ...and its radius, pixels
-static const float AMB_K_DOT    = 0.55;  // kind mix: dot / ring / stroke
-static const float AMB_K_RING   = 0.80;
+static const float AMB_K_DOT    = 0.60;  // kind mix: dot / stroke
 static const float AMB_DOT_R    = 40.0;
 static const float AMB_DOT_A    = 0.45;
-static const float AMB_RING_R   = 36.0;
-static const float AMB_RING_W   = 1.6;
-static const float AMB_RING_A   = 0.34;
 static const float AMB_LINE_L   = 80.0;
 static const float AMB_LINE_W   = 1.4;
 static const float AMB_LINE_A   = 0.30;
 static const float AMB_SOFT     = 7.0;   // edge softness, pixels -- these read as
+
+// The fast layer -- see the MSL twin.
+static const float FAST_LANE_PX = 38.0;  // lane pitch, pixels
+static const float FAST_KEEP    = 0.42;  // share of lanes carrying traffic
+static const float FAST_CELL_PX = 150.0; // slot length along a lane, pixels
+static const float FAST_FILL    = 0.55;  // share of slots carrying an object
+static const float FAST_RATE    = 260.0; // lane speed, pixels/second
+static const float FAST_DASH    = 0.16;  // dash length, as a fraction of its slot
+static const float FAST_LINE_W  = 1.3;   // dash thickness, pixels
+static const float FAST_DOT_R   = 2.6;   // dot radius, pixels
+static const float FAST_TICK_H  = 15.0;  // upright tick height, pixels (before variance)
+static const float FAST_TICK_W  = 1.6;   // ...and its width
+static const float FAST_BURST   = 0.30;  // a tick object is a *burst* of bars, spanning
+static const float FAST_TICK_N  = 8.0;   // this fraction of its slot, this many bars
+static const float FAST_TICK_FILL = 0.70;// ...of which this share are actually drawn
+static const float FAST_DOT_MIX = 0.30;  // kind mix, cumulative: dot / upright tick /
+static const float FAST_TICK_MIX = 0.66; // horizontal dash
+static const float FAST_REACH   = 17.0;  // the tallest a lane's contents can reach, for
+                                     // the early-out. A tick varies up to 2x its
+                                     // nominal height, so this is not FAST_TICK_H
+static const float FAST_ALPHA   = 0.85;
+static const float FAST_HEAD    = 0.70;  // how far a dash's leading edge pales to white
+static const float FAST_WRAP    = 4096.0;
 
 static const float CYCLE_WRAP   = 512.0; // keeps the hash inputs exact -- see the note on
 static const float CONC_WRAP    = 4096.0;// folding time in DATASTREAM_MSL
@@ -2074,10 +2183,6 @@ float ambient_field(float2 p, float t) {
         float r = AMB_DOT_R * (0.5 + 0.9 * g.x);
         float k = max(0.0, 1.0 - d / r);
         return k * k * AMB_DOT_A;
-    } else if (h.y < AMB_K_RING) {
-        float r = AMB_RING_R * (0.5 + 0.9 * g.y);
-        return (1.0 - smoothstep(AMB_RING_W, AMB_RING_W + AMB_SOFT, abs(d - r)))
-             * AMB_RING_A;
     }
     float a2 = g.z * TAU;
     float2 dir = float2(cos(a2), sin(a2));
@@ -2085,6 +2190,61 @@ float ambient_field(float2 p, float t) {
     float along = clamp(dot(d2, dir), -half_len, half_len);
     return (1.0 - smoothstep(AMB_LINE_W, AMB_LINE_W + AMB_SOFT,
                              length(d2 - dir * along))) * AMB_LINE_A;
+}
+
+// Bright traffic running along horizontal lanes: short dashes with a hot leading
+// edge, and dots riding the same slots. Folded like the datastream's lanes -- the
+// fraction places the pixel in its slot, the integer only names it -- so a pixel
+// consults exactly one cell however long the app has been running.
+//
+// Returns coverage in .x and how much of it is leading edge in .y.
+static inline float2 fast_field(float2 pos, float t) {
+    float lane = floor(pos.y / FAST_LANE_PX);
+    float dy = abs(pos.y - (lane + 0.5) * FAST_LANE_PX);
+    // Everything in a lane hugs its centre line, so most pixels leave immediately.
+    if (dy > FAST_REACH) { return float2(0.0, 0.0); }
+
+    float3 lh = hash33(float2(lane, 71.0));
+    if (lh.x > FAST_KEEP) { return float2(0.0, 0.0); }
+
+    float speed = FAST_RATE * (0.6 + 0.8 * lh.y);
+    float shift = t * speed / FAST_CELL_PX;
+    float shiftI = floor(shift);
+    float uu = pos.x / FAST_CELL_PX + (shift - shiftI);
+    float slot = floor(uu);
+    float fx = uu - slot;
+    float3 sh = hash33(float2(fmod(slot - shiftI, FAST_WRAP), lane));
+    if (sh.x > FAST_FILL) { return float2(0.0, 0.0); }
+
+    if (sh.y < FAST_DOT_MIX) {
+        float d = length(float2(fx * FAST_CELL_PX, dy));
+        return float2((1.0 - smoothstep(FAST_DOT_R, FAST_DOT_R + 1.2, d))
+                      * FAST_ALPHA, 0.0);
+    }
+    if (sh.y < FAST_TICK_MIX) {
+        // A burst of upright bars -- the barcode the reference runs along its bands.
+        // A single bar per slot (the first try) scatters into isolated tally marks;
+        // it is the *cluster* that reads as a packet of data going past. Heights vary
+        // widely on purpose too: a run of equal bars reads as a ruler.
+        if (fx > FAST_BURST) { return float2(0.0, 0.0); }
+        float gx = fx / FAST_BURST * FAST_TICK_N;
+        float bar = floor(gx);
+        float gf = gx - bar;
+        float3 th = hash33(float2(bar + slot * 17.0, lane + 5.0));
+        if (th.x > FAST_TICK_FILL) { return float2(0.0, 0.0); }
+        float half_h = FAST_TICK_H * (0.35 + 1.1 * th.y);
+        float pitch = FAST_BURST * FAST_CELL_PX / FAST_TICK_N;   // bar spacing, px
+        float covX = 1.0 - smoothstep(FAST_TICK_W * 0.5, FAST_TICK_W * 0.5 + 1.0,
+                                      gf * pitch);
+        float covY = 1.0 - smoothstep(half_h, half_h + 1.0, dy);
+        return float2(covX * covY * FAST_ALPHA, 0.0);
+    }
+    float dash = FAST_DASH * (0.4 + 1.2 * sh.z);
+    float aa = 1.0 / FAST_CELL_PX;
+    float covX = smoothstep(0.0, aa, fx) * (1.0 - smoothstep(dash - aa, dash, fx));
+    float covY = 1.0 - smoothstep(FAST_LINE_W * 0.5, FAST_LINE_W * 0.5 + 1.0, dy);
+    float a = covX * covY * FAST_ALPHA;
+    return float2(a, a * (1.0 - smoothstep(0.0, dash * 0.35, fx)));
 }
 
 // One panel's contents, in panel-local coordinates (0..1 on each axis). Returns
@@ -2328,7 +2488,7 @@ float4 puikit_bg_fragment(float4 pos : SV_Position) : SV_Target {
         // ang = 0 and the field would carry a seam straight out along -x.
         float sector = fmod(floor(ang * CONC_SECTORS), CONC_SECTORS);
         float3 ch = hash33(float2(sector, 4.0));
-        if (ch.x < CONC_KEEP) {
+        if (ch.x * CONC_SECTORS < CONC_COUNT) {
             // Folded like the datastream's lanes: the fraction places the pixel in
             // its slot, the integer only names it.
             float shift = t * CONC_RATE * (0.5 + 1.2 * ch.y) / CONC_CELL;
@@ -2355,6 +2515,11 @@ float4 puikit_bg_fragment(float4 pos : SV_Position) : SV_Target {
 
     // The ambient layer sits under the rest: dim, soft and cool, never warm or hot.
     lit = max(lit, ambient_field(pos.xy, t));
+
+    // The fast layer, on top: this is the element that actually moves.
+    float2 fastR = fast_field(pos.xy, t);
+    lit = max(lit, fastR.x);
+    hot = max(hot, fastR.y * FAST_HEAD);
 
     // The accent is the ink with red and blue swapped -- amber out of this scene's
     // cyan, and a theme-derived hue out of anything else (see the module note).
