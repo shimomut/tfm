@@ -1,123 +1,114 @@
-"""
-Test view_file fallback behavior for files without associations
+"""The three-way outcome a view/edit/open lookup can produce.
+
+Deciding what to do with a file is not a yes/no question, and collapsing it to
+one is the easiest way to get this wrong:
+
+  1. an explicit command   -> launch that external program
+  2. an explicit ``None``  -> deliberately use the built-in viewer
+  3. no association at all -> fall back to the is-it-text? check
+
+Cases 2 and 3 both make ``get_program_for_file`` return ``None``, so that
+function alone cannot tell them apart — ``has_explicit_association`` is what
+separates "configured to use the built-in viewer" from "not configured".
+
+These tests inject their own associations rather than asserting against
+whatever ``_config.py`` happens to ship. The previous version of this file
+hard-coded claims about the default config ("readme.txt opens in less") that
+were already false, and asserted nothing, so it passed regardless.
 
 Run with: PYTHONPATH=.:src pytest test/test_view_file_fallback.py -v
 """
 
+import pytest
 
-from tfm_config import get_program_for_file, has_action_for_file
-
-
-def test_view_fallback_behavior():
-    """Test that view action falls back correctly for files without associations"""
-    print("Testing view_file fallback behavior:\n")
-    
-    # Test files with associations
-    print("Files WITH associations:")
-    files_with_assoc = [
-        ('document.pdf', True, 'Should use Preview'),
-        ('photo.jpg', True, 'Should use Preview'),
-        ('video.mp4', True, 'Should use QuickTime'),
-    ]
-    
-    for filename, should_have, description in files_with_assoc:
-        has_view = has_action_for_file(filename, 'view')
-        command = get_program_for_file(filename, 'view')
-        status = "✓" if has_view == should_have else "✗"
-        cmd_str = ' '.join(command) if command else 'None'
-        print(f"  {status} {filename:20s} -> {cmd_str:30s} ({description})")
-    
-    # Test files without associations
-    print("\nFiles WITHOUT associations (should fall back to text viewer check):")
-    files_without_assoc = [
-        ('readme.xyz', False, 'No association - will check if text file'),
-        ('data.bin', False, 'No association - will check if text file'),
-        ('notes.unknown', False, 'No association - will check if text file'),
-    ]
-    
-    for filename, should_have, description in files_without_assoc:
-        has_view = has_action_for_file(filename, 'view')
-        command = get_program_for_file(filename, 'view')
-        status = "✓" if has_view == should_have else "✗"
-        cmd_str = ' '.join(command) if command else 'None'
-        print(f"  {status} {filename:20s} -> {cmd_str:30s} ({description})")
-    
-    # Test text files with associations
-    print("\nText files WITH associations:")
-    text_files_with_assoc = [
-        ('readme.txt', True, 'Should use less'),
-        ('script.py', True, 'Should use less'),
-        ('notes.md', True, 'Should use less'),
-    ]
-    
-    for filename, should_have, description in text_files_with_assoc:
-        has_view = has_action_for_file(filename, 'view')
-        command = get_program_for_file(filename, 'view')
-        status = "✓" if has_view == should_have else "✗"
-        cmd_str = ' '.join(command) if command else 'None'
-        print(f"  {status} {filename:20s} -> {cmd_str:30s} ({description})")
+import tfm_config
+from tfm_config import (get_program_for_file, has_action_for_file,
+                        has_explicit_association)
 
 
-def test_view_vs_open_fallback():
-    """Test that view and open have different fallback behavior"""
-    print("\n\nComparing view vs open fallback:\n")
-    
-    test_files = [
-        'unknown.xyz',
-        'data.bin',
-        'notes.unknown'
-    ]
-    
-    for filename in test_files:
-        open_cmd = get_program_for_file(filename, 'open')
-        view_cmd = get_program_for_file(filename, 'view')
-        
-        open_str = ' '.join(open_cmd) if open_cmd else 'None (will check text file)'
-        view_str = ' '.join(view_cmd) if view_cmd else 'None (will check text file)'
-        
-        print(f"{filename}:")
-        print(f"  Open: {open_str}")
-        print(f"  View: {view_str}")
+class _Config:
+    def __init__(self, associations):
+        self.FILE_ASSOCIATIONS = associations
 
 
-def test_expected_behavior():
-    """Document expected behavior for view_file action"""
-    print("\n\nExpected behavior for view_file (V key):\n")
-    
-    scenarios = [
-        ("photo.jpg", "Has association", "Opens in Preview (from FILE_ASSOCIATIONS)"),
-        ("readme.txt", "Has association", "Opens in less (from FILE_ASSOCIATIONS)"),
-        ("notes.xyz (text)", "No association", "Opens in built-in text viewer (is_text_file check)"),
-        ("data.xyz (binary)", "No association", "Shows error: No viewer configured (not a text file)"),
-    ]
-    
-    for filename, status, behavior in scenarios:
-        print(f"  {filename:25s} [{status:20s}] -> {behavior}")
+@pytest.fixture
+def associations(monkeypatch):
+    def install(entries):
+        monkeypatch.setattr(tfm_config, "get_config", lambda: _Config(entries))
+    return install
 
 
-def main():
-    """Run all tests"""
-    print("=" * 70)
-    print("View File Fallback Behavior Tests")
-    print("=" * 70)
-    
-    try:
-        test_view_fallback_behavior()
-        test_view_vs_open_fallback()
-        test_expected_behavior()
-        
-        print("\n" + "=" * 70)
-        print("✅ All tests completed!")
-        print("=" * 70)
-        print("\nKey Points:")
-        print("  • Files with associations use configured viewer")
-        print("  • Files without associations check if text file first")
-        print("  • Only text files fall back to built-in viewer")
-        print("  • Binary files without associations show error")
-        return 0
-        
-    except Exception as e:
-        print(f"\n❌ Test failed: {e}")
-        import traceback
-        traceback.print_exc()
-        return 1
+ASSOC = [
+    {'pattern': '*.jpg', 'open|view': ['open', '-a', 'Preview'], 'edit': None},
+    {'pattern': '*.txt', 'view': None},          # explicitly: built-in viewer
+    {'pattern': '*.log', 'view': ['less']},
+]
+
+
+def classify(filename, action='view'):
+    """The decision a caller has to make, as a single label."""
+    command = get_program_for_file(filename, action)
+    if command is not None:
+        return 'external'
+    if has_explicit_association(filename, action):
+        return 'builtin'
+    return 'unconfigured'
+
+
+class TestThreeWayOutcome:
+    @pytest.mark.parametrize("filename,expected", [
+        ('photo.jpg', 'external'),      # command present
+        ('server.log', 'external'),
+        ('readme.txt', 'builtin'),      # explicit None
+        ('mystery.xyz', 'unconfigured'),  # no entry matches
+    ])
+    def test_classification(self, associations, filename, expected):
+        associations(ASSOC)
+        assert classify(filename) == expected
+
+    def test_explicit_none_and_no_association_are_distinguishable(self, associations):
+        associations(ASSOC)
+        # Indistinguishable by command alone...
+        assert get_program_for_file('readme.txt', 'view') is None
+        assert get_program_for_file('mystery.xyz', 'view') is None
+        # ...but not by explicitness.
+        assert has_explicit_association('readme.txt', 'view')
+        assert not has_explicit_association('mystery.xyz', 'view')
+
+    def test_has_action_is_false_for_both_none_cases(self, associations):
+        """has_action_for_file answers "is there a program?", so an explicit
+        None reads False — it must not be used to mean "unconfigured"."""
+        associations(ASSOC)
+        assert not has_action_for_file('readme.txt', 'view')
+        assert not has_action_for_file('mystery.xyz', 'view')
+
+
+class TestPerActionIndependence:
+    def test_one_file_can_be_external_for_one_action_and_builtin_for_another(
+            self, associations):
+        associations(ASSOC)
+        assert classify('photo.jpg', 'open') == 'external'
+        assert classify('photo.jpg', 'view') == 'external'
+        assert classify('photo.jpg', 'edit') == 'builtin'   # explicit None
+
+    def test_unlisted_action_is_unconfigured_not_builtin(self, associations):
+        associations(ASSOC)
+        # *.log defines only 'view'; 'edit' was never mentioned.
+        assert classify('server.log', 'edit') == 'unconfigured'
+
+    def test_view_and_open_resolve_independently(self, associations):
+        associations([{'pattern': '*.md', 'open': ['typora'], 'view': None}])
+        assert classify('notes.md', 'open') == 'external'
+        assert classify('notes.md', 'view') == 'builtin'
+
+
+class TestEmptyConfiguration:
+    def test_everything_is_unconfigured(self, associations):
+        associations([])
+        assert classify('photo.jpg') == 'unconfigured'
+        assert not has_explicit_association('photo.jpg', 'view')
+
+    def test_missing_associations_do_not_raise(self, associations):
+        associations(None)
+        assert get_program_for_file('photo.jpg', 'view') is None
+        assert not has_explicit_association('photo.jpg', 'view')

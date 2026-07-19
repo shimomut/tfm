@@ -1,213 +1,136 @@
-"""
-Test priority-based matching in FILE_ASSOCIATIONS
+"""Priority-based matching in FILE_ASSOCIATIONS.
 
-FILE_ASSOCIATIONS is checked from top to bottom.
-First matching entry wins.
+Entries are checked top to bottom and the first entry that matches *and*
+defines the requested action wins. The subtle part — and the reason this needs
+real coverage — is that a matching entry which does *not* define the action
+must not stop the search: lookup falls through to later entries.
+
+These tests drive the production ``tfm_config.get_program_for_file`` against an
+injected config. An earlier version of this file reimplemented the matching
+logic locally and asserted nothing, so it passed no matter what production did.
 
 Run with: PYTHONPATH=.:src pytest test/test_priority_matching.py -v
 """
 
+import pytest
+
+import tfm_config
+from tfm_config import get_program_for_file, has_action_for_file
 
 
-def test_priority_matching():
-    """Test that FILE_ASSOCIATIONS are checked in order"""
-    print("Testing Priority-Based Matching\n")
-    print("=" * 70)
-    
-    # Create a test configuration
-    test_config = [
-        # Specific rule for special Python files
-        {
-            'pattern': 'test_*.py',
-            'open': ['pytest'],
-            'view': ['cat'],
-            'edit': ['nano']
-        },
-        # General rule for all Python files
-        {
-            'pattern': '*.py',
-            'open': ['python3'],
-            'view': ['less'],
-            'edit': ['vim']
-        },
-        # Rule with only some actions
-        {
-            'pattern': '*.txt',
-            'open': ['open', '-e'],
-            'edit': ['vim']
-            # 'view' not specified - will continue to next entry
-        },
-        # Another rule for txt files (fallback for view)
-        {
-            'pattern': '*.txt',
-            'view': ['less']
-        }
-    ]
-    
-    print("\nTest Configuration:")
-    print("1. test_*.py -> open: pytest, view: cat, edit: nano")
-    print("2. *.py      -> open: python3, view: less, edit: vim")
-    print("3. *.txt     -> open: open -e, edit: vim (no view)")
-    print("4. *.txt     -> view: less")
-    print("\n" + "=" * 70)
-    
-    # Simulate the matching logic
-    def get_program(filename, action, config):
-        """Simulate get_program_for_file logic"""
-        import fnmatch
-        filename_lower = filename.lower()
-        
-        for entry in config:
-            if 'pattern' not in entry:
-                continue
-            
-            patterns = entry['pattern']
-            if isinstance(patterns, str):
-                patterns = [patterns]
-            
-            # Check if pattern matches
-            pattern_matches = False
-            for pattern in patterns:
-                if fnmatch.fnmatch(filename_lower, pattern.lower()):
-                    pattern_matches = True
-                    break
-            
-            if not pattern_matches:
-                continue
-            
-            # Pattern matches - check if action exists
-            for key, value in entry.items():
-                if key == 'pattern':
-                    continue
-                actions_in_key = [a.strip() for a in key.split('|')]
-                if action in actions_in_key:
-                    return value
-            
-            # Pattern matched but action not found - continue
-        
-        return None
-    
-    # Test cases
-    test_cases = [
-        ('test_example.py', 'open', ['pytest'], 'Matches first rule (test_*.py)'),
-        ('test_example.py', 'view', ['cat'], 'Matches first rule (test_*.py)'),
-        ('test_example.py', 'edit', ['nano'], 'Matches first rule (test_*.py)'),
-        
-        ('script.py', 'open', ['python3'], 'Matches second rule (*.py)'),
-        ('script.py', 'view', ['less'], 'Matches second rule (*.py)'),
-        ('script.py', 'edit', ['vim'], 'Matches second rule (*.py)'),
-        
-        ('readme.txt', 'open', ['open', '-e'], 'Matches third rule (*.txt with open)'),
-        ('readme.txt', 'edit', ['vim'], 'Matches third rule (*.txt with edit)'),
-        ('readme.txt', 'view', ['less'], 'Skips third rule (no view), matches fourth rule'),
-    ]
-    
-    print("\nTest Results:\n")
-    all_passed = True
-    
-    for filename, action, expected, description in test_cases:
-        result = get_program(filename, action, test_config)
-        passed = result == expected
-        status = "✓" if passed else "✗"
-        
-        if not passed:
-            all_passed = False
-        
-        print(f"{status} {filename:20s} {action:6s} -> {result}")
-        print(f"  Expected: {expected}")
-        print(f"  {description}")
-        print()
-    
-    print("=" * 70)
-    if all_passed:
-        print("✅ All priority matching tests passed!")
-    else:
-        print("❌ Some tests failed!")
-    
-    return
+class _Config:
+    def __init__(self, associations):
+        self.FILE_ASSOCIATIONS = associations
 
 
-def test_real_world_example():
-    """Test a real-world example of priority-based configuration"""
-    print("\n\n" + "=" * 70)
-    print("Real-World Example: Specific Rules Before General Rules")
-    print("=" * 70)
-    
-    example_config = """
-FILE_ASSOCIATIONS = [
-    # Specific: Test files should open in pytest
-    {
-        'pattern': 'test_*.py',
-        'open': ['pytest', '-v'],
-        'edit': ['vim']
-    },
-    
-    # Specific: Config files should open in text editor
-    {
-        'pattern': 'config.py',
-        'open': ['vim'],
-        'view': ['cat']
-    },
-    
-    # General: All Python files
-    {
-        'pattern': '*.py',
-        'open': ['python3'],
-        'view': ['less'],
-        'edit': ['vim']
-    },
-    
-    # Specific: README files with special viewer
-    {
-        'pattern': 'README*',
-        'view': ['glow']  # Markdown renderer
-    },
-    
-    # General: All markdown files
-    {
-        'pattern': '*.md',
-        'open': ['typora'],
-        'edit': ['vim']
-    }
+@pytest.fixture
+def associations(monkeypatch):
+    """Install a FILE_ASSOCIATIONS list for the duration of one test."""
+    def install(entries):
+        monkeypatch.setattr(tfm_config, "get_config", lambda: _Config(entries))
+    return install
+
+
+#: Specific rules ahead of general ones, plus a pair of *.txt entries where the
+#: first deliberately omits 'view' so lookup has to fall through to the second.
+ORDERED = [
+    {'pattern': 'test_*.py', 'open': ['pytest'], 'view': ['cat'], 'edit': ['nano']},
+    {'pattern': '*.py', 'open': ['python3'], 'view': ['less'], 'edit': ['vim']},
+    {'pattern': '*.txt', 'open': ['open', '-e'], 'edit': ['vim']},  # no 'view'
+    {'pattern': '*.txt', 'view': ['less']},
 ]
-"""
-    
-    print("\nConfiguration:")
-    print(example_config)
-    
-    print("\nBehavior:")
-    print("  test_main.py    open  -> pytest -v (specific rule)")
-    print("  script.py       open  -> python3 (general rule)")
-    print("  config.py       open  -> vim (specific rule)")
-    print("  utils.py        open  -> python3 (general rule)")
-    print("  README.md       view  -> glow (specific rule)")
-    print("  notes.md        view  -> (no view in general rule)")
-    
-    print("\n" + "=" * 70)
 
 
-def main():
-    """Run all tests"""
-    print("\n" + "=" * 70)
-    print("FILE_ASSOCIATIONS Priority Matching Tests")
-    print("=" * 70)
-    
-    try:
-        result = test_priority_matching()
-        test_real_world_example()
-        
-        print("\n" + "=" * 70)
-        print("Key Points:")
-        print("  • FILE_ASSOCIATIONS checked from top to bottom")
-        print("  • First matching pattern wins")
-        print("  • If action not in entry, continues to next entry")
-        print("  • Allows specific rules before general rules")
-        print("=" * 70)
-        
-        return result
-        
-    except Exception as e:
-        print(f"\n❌ Test failed: {e}")
-        import traceback
-        traceback.print_exc()
-        return 1
+class TestFirstMatchWins:
+    def test_specific_entry_beats_later_general_one(self, associations):
+        associations(ORDERED)
+        assert get_program_for_file('test_foo.py', 'open') == ['pytest']
+        assert get_program_for_file('test_foo.py', 'edit') == ['nano']
+
+    def test_general_entry_used_when_specific_does_not_match(self, associations):
+        associations(ORDERED)
+        assert get_program_for_file('helper.py', 'open') == ['python3']
+        assert get_program_for_file('helper.py', 'edit') == ['vim']
+
+    def test_order_is_what_decides(self, associations):
+        """Same two entries, reversed — the general one now wins."""
+        associations(list(reversed(ORDERED[:2])))
+        assert get_program_for_file('test_foo.py', 'open') == ['python3']
+
+
+class TestFallThroughOnMissingAction:
+    def test_matching_entry_without_the_action_does_not_halt_lookup(self, associations):
+        associations(ORDERED)
+        # Entry 3 matches *.txt but defines no 'view'; entry 4 must supply it.
+        assert get_program_for_file('notes.txt', 'view') == ['less']
+
+    def test_earlier_entry_still_wins_for_actions_it_does_define(self, associations):
+        associations(ORDERED)
+        assert get_program_for_file('notes.txt', 'open') == ['open', '-e']
+        assert get_program_for_file('notes.txt', 'edit') == ['vim']
+
+
+class TestCombinedActionKeys:
+    def test_open_pipe_view_serves_both(self, associations):
+        associations([{'pattern': '*.jpg', 'open|view': ['open', '-a', 'Preview']}])
+        assert get_program_for_file('a.jpg', 'open') == ['open', '-a', 'Preview']
+        assert get_program_for_file('a.jpg', 'view') == ['open', '-a', 'Preview']
+
+    def test_whitespace_around_the_pipe_is_tolerated(self, associations):
+        associations([{'pattern': '*.jpg', 'open | view': ['preview']}])
+        assert get_program_for_file('a.jpg', 'view') == ['preview']
+
+    def test_combined_key_does_not_supply_unlisted_actions(self, associations):
+        associations([{'pattern': '*.jpg', 'open|view': ['preview']}])
+        assert get_program_for_file('a.jpg', 'edit') is None
+
+
+class TestExplicitNone:
+    def test_none_stops_the_search_rather_than_falling_through(self, associations):
+        """An explicit None means "deliberately nothing" — a later entry must
+        not quietly override it."""
+        associations([
+            {'pattern': '*.pdf', 'edit': None},
+            {'pattern': '*.pdf', 'edit': ['vim']},
+        ])
+        assert get_program_for_file('doc.pdf', 'edit') is None
+        assert not has_action_for_file('doc.pdf', 'edit')
+
+
+class TestPatternForms:
+    def test_pattern_may_be_a_list(self, associations):
+        associations([{'pattern': ['*.jpg', '*.png'], 'open': ['viewer']}])
+        assert get_program_for_file('a.jpg', 'open') == ['viewer']
+        assert get_program_for_file('b.png', 'open') == ['viewer']
+        assert get_program_for_file('c.gif', 'open') is None
+
+    def test_matching_is_case_insensitive(self, associations):
+        associations([{'pattern': '*.JPG', 'open': ['viewer']}])
+        assert get_program_for_file('photo.jpg', 'open') == ['viewer']
+        assert get_program_for_file('PHOTO.JPG', 'open') == ['viewer']
+
+    def test_string_command_is_split_into_a_list(self, associations):
+        associations([{'pattern': '*.txt', 'open': 'open -e'}])
+        assert get_program_for_file('a.txt', 'open') == ['open', '-e']
+
+
+class TestMalformedEntries:
+    """A bad entry should be skipped, not crash the lookup."""
+
+    @pytest.mark.parametrize("bad", [
+        {'open': ['x']},              # no 'pattern'
+        {'pattern': 42, 'open': ['x']},  # pattern is neither str nor list
+        "not-a-dict",
+        None,
+    ])
+    def test_bad_entry_is_skipped_and_later_entries_still_work(self, associations, bad):
+        associations([bad, {'pattern': '*.txt', 'open': ['good']}])
+        assert get_program_for_file('a.txt', 'open') == ['good']
+
+    def test_empty_associations(self, associations):
+        associations([])
+        assert get_program_for_file('a.txt', 'open') is None
+
+    def test_no_match_returns_none(self, associations):
+        associations(ORDERED)
+        assert get_program_for_file('archive.xyz', 'open') is None

@@ -69,7 +69,9 @@ from tfm_backend_detector import is_desktop_mode  # noqa: E402
 # Every background scene TFM offers is a fragment shader; a theme's ``animation`` key
 # names one of these and ``_resolve_background`` turns it into a puikit ``Shader``.
 from tfm_background_shaders import SHADER_KINDS  # noqa: E402
-from tfm_config import KeyBindings, config_manager, get_config, get_favorite_directories  # noqa: E402
+from tfm_config import (KeyBindings, config_manager, get_builtin_handler_for_file,  # noqa: E402
+                        get_config, get_favorite_directories, get_program_for_file,
+                        has_explicit_association, keys_label_for_action)
 from tfm_file_list_manager import FileListManager  # noqa: E402
 from tfm_file_monitor_manager import FileMonitorManager  # noqa: E402
 from tfm_file_pane import FilePane  # noqa: E402
@@ -92,7 +94,8 @@ from tfm_file_operations import (FileOperationService, format_op_errors,  # noqa
                                  format_op_summary)
 from tfm_task import Task, TaskManager  # noqa: E402
 from tfm_text_dialog import show_markdown  # noqa: E402
-from tfm_text_viewer import show_text_viewer  # noqa: E402
+from tfm_text_viewer import looks_binary, show_text_viewer  # noqa: E402
+from tfm_viewer_registry import rich_renderer_for  # noqa: E402
 
 
 # --- theme palettes ----------------------------------------------------------
@@ -1963,14 +1966,62 @@ class TfmApp:
                 self._refresh(pane, on_ready=self._restore_remembered_cursor)
                 self.log_info(f"Entered archive {entry.name}")
             else:
-                # A plain file: open it in the built-in ("embedded") viewer — the
-                # same one V uses, which routes *.md to the Markdown renderer and
-                # shows a placeholder for binaries (issue #212). Enter was
-                # previously a no-op on files. A file inside a password-protected
-                # zip prompts for the password before the viewer opens (#180).
-                self._ensure_archive_password(entry, lambda: self._open_viewer(entry))
+                # A plain file. Enter is the *casual* open: it stays inside TFM
+                # (Cmd/Ctrl-Enter is the one that hands off to another app), so
+                # a FILE_ASSOCIATIONS 'enter' rule selects a built-in handler
+                # rather than a program to launch.
+                self._enter_file(pane, entry)
         except Exception as exc:
             self.log_info(f"Cannot open {entry.name}: {exc}")
+
+    def _enter_file(self, pane: dict, entry) -> None:
+        """Handle Enter on a plain file, inside TFM.
+
+        An ``enter`` rule in FILE_ASSOCIATIONS picks the handler: ``'viewer'``
+        for the built-in viewer, ``'navigate'`` to browse the file as an
+        archive (useful for zip-shaped formats TFM does not recognise by
+        extension, like ``.jar`` or ``.whl``), or ``None`` to do nothing.
+
+        With no rule, the default stands: the built-in viewer — the same one V
+        uses, which routes *.md to the Markdown renderer and shows a
+        placeholder for binaries (issue #212). A file inside a
+        password-protected zip prompts for the password first (#180).
+        """
+        configured, handler = get_builtin_handler_for_file(entry.name)
+        if configured and handler is None:
+            self.log_info(f"Nothing configured to open {entry.name}")
+            return
+        if handler == "navigate" and not self._is_archive(entry):
+            self._remember_cursor(pane)
+            self._exit_virtual(pane)
+            pane["path"] = Path(f"archive://{entry.absolute()}#")
+            self._refresh(pane, on_ready=self._restore_remembered_cursor)
+            self.log_info(f"Entered archive {entry.name}")
+            return
+        # Nothing built in can render this: warn in the log rather than spending
+        # a full-screen viewer on a placeholder. A rich renderer claims the type
+        # even when it is binary, which is the seam an embedded image viewer
+        # will register through — once one exists, images stop landing here.
+        if handler != "viewer" and rich_renderer_for(entry) is None \
+                and looks_binary(entry):
+            self.log_info(self._no_builtin_viewer_message(entry))
+            return
+        self._ensure_archive_password(entry, lambda: self._open_viewer(entry))
+
+    @staticmethod
+    def _no_builtin_viewer_message(entry) -> str:
+        """Warning for a file TFM has no built-in way to display.
+
+        Names the key actually bound to ``open_with_os`` rather than assuming
+        Cmd-Enter — that binding is configurable, and differs on Windows out of
+        the box. Says nothing about a key at all when the action is unbound.
+        """
+        keys = keys_label_for_action("open_with_os")
+        if keys:
+            return (f"No built-in viewer for {entry.name} — "
+                    f"press {keys} to open it in an external program")
+        return (f"No built-in viewer for {entry.name} — bind 'open_with_os' "
+                f"to open it in an external program")
 
     def _go_parent(self, pane: dict) -> None:
         # From a virtual pane, "up" leaves the result set and lists the search
@@ -2169,10 +2220,48 @@ class TfmApp:
         self.flm.refresh_files(self.pm.right_pane)
         self.panel.render()
 
+    def _launch_associated(self, entry, command: list) -> bool:
+        """Run the FILE_ASSOCIATIONS program ``command`` on ``entry``.
+
+        Whether to hand over the display is a property of *our backend*, not of
+        the program, so associations do not describe it:
+
+        * Terminal mode — the child shares our tty, so we suspend curses, wait
+          for it, and restore. Correct for ``less``/``vim``; a launcher like
+          ``open -a`` merely returns straight away and we repaint.
+        * Desktop mode — there is no tty to hand over and blocking would freeze
+          the window, so the child is detached and we keep running.
+
+        Returns False — having logged why — when the program could not be run,
+        so callers can fall back to their built-in behavior rather than leaving
+        the key press doing nothing. An external program needs a real path on
+        disk, so remote and in-archive entries always take that fallback.
+        """
+        if not self._is_local(entry):
+            self.log_info(f"{entry.name}: external programs need a local file")
+            return False
+        argv = list(command) + [str(entry)]
+        if not is_desktop_mode():
+            self._run_in_terminal(argv)
+            return True
+        try:
+            subprocess.Popen(argv)
+        except FileNotFoundError:
+            self.log_info(f"Command not found: {argv[0]}")
+            return False
+        except Exception as exc:
+            self.log_info(f"Failed to open {entry.name}: {exc}")
+            return False
+        return True
+
     def edit_file(self) -> None:
-        """Open the focused file in the configured editor (``TEXT_EDITOR``),
-        handing the terminal to it via the backend suspend/resume. Local files
-        only; directories and remote paths are skipped."""
+        """Open the focused file for editing.
+
+        A matching ``edit`` entry in FILE_ASSOCIATIONS wins; otherwise the
+        configured ``TEXT_EDITOR`` gets the terminal via suspend/resume. An
+        association set explicitly to ``None`` means "no editor for this kind
+        of file" and is honored rather than falling back. Local files only;
+        directories and remote paths are skipped."""
         entry = self._focused_entry()
         if entry is None:
             return
@@ -2185,6 +2274,16 @@ class TfmApp:
                 return
         except Exception:
             pass
+        command = get_program_for_file(entry.name, "edit")
+        if command:
+            if self._launch_associated(entry, command):
+                self.log_info(f"Edited {entry.name} with {command[0]}")
+                return
+        elif has_explicit_association(entry.name, "edit"):
+            # Explicitly None: the config says this type has no editor (a PDF,
+            # say). Falling back to $EDITOR would ignore that on purpose.
+            self.log_info(f"No editor configured for {entry.name}")
+            return
         editor = getattr(self.config, "TEXT_EDITOR", "vim")
         self._run_in_terminal(shlex.split(editor) + [str(entry)])
         self.log_info(f"Edited {entry.name}")
@@ -2337,10 +2436,24 @@ class TfmApp:
         self.panel.render()
 
     def open_with_os(self) -> None:
-        """Open the focused entry with the OS default application (the desktop
-        'open' / 'xdg-open' / 'start'). Errors are logged, not raised."""
+        """Hand the focused entry to an external program — the deliberate open,
+        bound to Cmd/Ctrl-Enter, as opposed to Enter's open-inside-TFM.
+
+        A matching ``open`` entry in FILE_ASSOCIATIONS wins; otherwise the OS
+        default application ('open' / 'xdg-open' / 'start') handles it. An
+        association set explicitly to ``None`` suppresses the launch entirely,
+        which is how you stop a file type from being handed to the OS at all.
+        Errors are logged, not raised."""
         entry = self._focused_entry()
         if entry is None:
+            return
+        command = get_program_for_file(entry.name, "open")
+        if command:
+            if self._launch_associated(entry, command):
+                self.log_info(f"Opened {entry.name} with {command[0]}")
+                return
+        elif has_explicit_association(entry.name, "open"):
+            self.log_info(f"No external program configured for {entry.name}")
             return
         system = platform.system()
         try:
@@ -3164,9 +3277,14 @@ class TfmApp:
         self.panel.render()
 
     def view_file(self) -> None:
-        """Open the focused file in the built-in text viewer (directories are
-        skipped). Binary files show a placeholder rather than garbage. A file
-        inside a password-protected zip prompts for the password first."""
+        """View the focused file (directories are skipped).
+
+        A matching ``view`` entry in FILE_ASSOCIATIONS wins; otherwise the
+        built-in viewer opens it, showing a placeholder for binaries rather
+        than garbage. Setting ``view`` to ``None`` explicitly selects the
+        built-in viewer, which is also what a remote or in-archive file gets —
+        an external viewer has no path it could open. A file inside a
+        password-protected zip prompts for the password first."""
         pane = self.active_pane()
         files = pane["files"]
         if not files:
@@ -3178,6 +3296,10 @@ class TfmApp:
                 return
         except Exception:
             pass
+        command = get_program_for_file(entry.name, "view")
+        if command and self._launch_associated(entry, command):
+            self.log_info(f"Viewing {entry.name} with {command[0]}")
+            return
         self._ensure_archive_password(entry, lambda: self._open_viewer(entry))
 
     def diff_files(self) -> None:

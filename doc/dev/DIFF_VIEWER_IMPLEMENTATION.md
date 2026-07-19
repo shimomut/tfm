@@ -322,7 +322,9 @@ The `'selection': 'required'` ensures the action only works when files are selec
 ### File Manager Integration
 
 1. **Selection System**: Uses `pane_manager.left_pane['selected_files']` and `pane_manager.right_pane['selected_files']`
-2. **Text Detection**: Uses `is_text_file()` from `tfm_text_viewer`
+2. **Text Detection**: none up front — files are read and decoded, with binary
+   content detected from the bytes during the read (see
+   [Text Viewer System](TEXT_VIEWER_SYSTEM.md#text-file-detection))
 3. **Renderer**: Shares the PuiKit rendering backend with the main file manager
 4. **Color Scheme**: Uses same color scheme as file manager
 

@@ -64,30 +64,79 @@ def get_file_associations():
 
 **Returns**: List of file association entries or empty list if none configured.
 
-#### `_expand_association_entry(entry)`
+#### `_lookup_action(filename, action)`
 
-Internal function that expands a compact association entry into individual pattern-action mappings.
+The single walk over `FILE_ASSOCIATIONS` that every public accessor delegates
+to. Extracted because the walk was previously duplicated across
+`get_program_for_file` and `has_explicit_association`, which had to be kept in
+step by hand.
 
 ```python
-def _expand_association_entry(entry):
+def _lookup_action(filename, action):
     """
-    Expand a compact association entry into individual pattern-action mappings.
-    
-    Args:
-        entry: Dictionary with 'extensions' key and action keys
-    
     Returns:
-        List of (pattern, action, command) tuples
+        (found, value, entry)
     """
 ```
 
 **Algorithm**:
-1. Extract extensions (convert string to list if needed)
-2. Iterate through action keys (skip 'extensions')
-3. Split combined action keys (e.g., 'open|view' → ['open', 'view'])
-4. Generate tuple for each (extension, action, command) combination
+1. Iterate entries top to bottom
+2. Skip entries whose pattern(s) do not match (`_entry_matches`)
+3. Within a matching entry, split combined keys (`'open|view'`) and look for
+   the requested action, skipping the reserved keys (`pattern`, and `terminal`
+   for backward compatibility)
+4. Return on the first entry that *defines* the action — a matching entry that
+   does not mention it falls through to later entries
 
-**Returns**: List of `(pattern, action, command)` tuples
+**Why it returns a triple**: `found` separates "explicitly configured as
+`None`" from "not configured at all". Those are indistinguishable by `value`
+alone and mean opposite things at the call site — one selects the built-in
+viewer, the other means "apply the default". `entry` is returned so
+a caller can read entry-level settings without walking the list a second time.
+
+#### `get_builtin_handler_for_file(filename, action='enter')`
+
+Resolves the *casual* (Enter) tier, whose values name built-in handlers rather
+than external commands.
+
+```python
+def get_builtin_handler_for_file(filename, action='enter'):
+    """
+    Returns:
+        (configured, handler)   handler in BUILTIN_HANDLERS, or None
+    """
+```
+
+**Kept separate from `get_program_for_file` deliberately.** That function
+coerces a bare string into a command list, so routing the `enter` tier through
+it would silently turn the handler name `'viewer'` into the command
+`['viewer']`. Different value spaces need different accessors.
+
+An unrecognised handler name is logged as a warning and reported as
+*unconfigured*, so a typo falls back to TFM's default dispatch rather than
+silently disabling the Enter key.
+
+#### Display handover is not a config concern
+
+There is deliberately no `needs_terminal()` accessor and no `'terminal'` key.
+Whether to suspend follows from the **backend**, resolved in
+`_launch_associated()` via `is_desktop_mode()` — the same signal `_config.py`
+already uses to pick `code` vs `vim` for `TEXT_EDITOR`.
+
+An earlier draft did have a per-entry `'terminal': True` flag. Three reasons it
+was removed, worth recording so it does not come back:
+
+1. **It duplicated a decision PuiKit already makes.** `backend.suspended()` is
+   polymorphic — a real curses shell-out dance on the terminal backend, a no-op
+   on GUI backends, which is exactly the distinction the flag encoded.
+2. **It could not express a mixed entry.** `'view': ['less']` with
+   `'edit': ['code']` is a realistic pairing, and an entry-level flag forced
+   both, requiring a duplicated pattern list to work around.
+3. **It failed unsafely.** Omitting it on `less` corrupted the terminal — and
+   omission was the default. The backend rule cannot be forgotten.
+
+`'terminal'` remains in `_RESERVED_KEYS` so a leftover key in a hand-written
+config stays inert rather than being matched as an action name.
 
 #### `get_program_for_file(filename, action='open')`
 
@@ -108,15 +157,15 @@ def get_program_for_file(filename, action='open'):
 ```
 
 **Algorithm**:
-1. Get file associations list from config
-2. Convert filename to lowercase for case-insensitive matching
-3. For each entry, expand using `_expand_association_entry()`
-4. Match pattern and action using `fnmatch.fnmatch()`
-5. Return first matching program command
-6. Convert string commands to list format
-7. Return `None` if no match found
+1. Delegate the walk to `_lookup_action(filename, action)`
+2. Convert a string command to list format (`'open -e'` → `['open', '-e']`)
+3. Return the value if it is a list, otherwise `None`
 
 **Returns**: Command list `['program', 'arg1', 'arg2']` or `None`
+
+Note that `None` here is ambiguous by design — it covers both "explicitly
+configured as `None`" and "no rule matched". Call `has_explicit_association()`
+when the caller needs to tell them apart.
 
 #### `has_action_for_file(filename, action='open')`
 
@@ -192,24 +241,54 @@ File associations integrate with the existing configuration system:
 
 ### Usage in TFM
 
-Components that should use file associations:
+Four handlers in `tfm.py` consult associations, one per action:
 
-1. **File operations**: Open, view, edit actions
-2. **Context menus**: Show available actions for files
-3. **Keyboard shortcuts**: Execute actions based on file type
-4. **External programs**: Launch appropriate programs
+| Handler | Action | Fallback when unconfigured |
+|---|---|---|
+| `_enter_file()` (via `_open`) | `enter` | Built-in viewer |
+| `open_with_os()` | `open` | OS default app (`open`/`xdg-open`/`start`) |
+| `view_file()` | `view` | Built-in viewer |
+| `edit_file()` | `edit` | `TEXT_EDITOR` |
+
+> **History**: these call sites were wired in the pre-PuiKit `tfm_main.py`
+> (commit `f2f60c51`), lost when that file was removed during the port, and
+> restored here. In between, the engine below was complete and correct but had
+> no production callers, so editing `FILE_ASSOCIATIONS` had no observable
+> effect. If association behavior ever appears to "do nothing" again, check
+> that these four handlers still call into `tfm_config` before debugging the
+> matching logic.
+
+All three external actions launch through one helper:
+
+```python
+def _launch_associated(self, entry, command, action) -> bool:
+    """Returns False (having logged why) if the program could not be run,
+    so the caller can fall back to its built-in behavior."""
+```
+
+Two rules it enforces:
+
+1. **Local paths only.** An external program needs a real path on disk, so
+   remote (`s3://`, `ssh://`) and in-archive entries always take the fallback
+   — which for `view` means the built-in viewer, the one thing that *can* read
+   them.
+2. **Handover follows the backend.** `is_desktop_mode()` selects
+   `_run_in_terminal()` (suspend, run, wait, restore, refresh) in terminal mode
+   and a detached `subprocess.Popen` in desktop mode, where blocking would
+   freeze the window and there is no tty to release.
 
 Example integration:
 
 ```python
-from tfm_config import get_program_for_file, has_action_for_file
+from tfm_config import get_program_for_file, has_explicit_association
 
-# Check if action is available
-if has_action_for_file('document.pdf', 'view'):
-    # Get the program command
-    command = get_program_for_file('document.pdf', 'view')
-    # Execute the command
-    subprocess.run(command + ['document.pdf'])
+command = get_program_for_file('document.pdf', 'view')
+if command:
+    launch(command)
+elif has_explicit_association('document.pdf', 'view'):
+    open_builtin_viewer()      # explicitly None -> built-in
+else:
+    apply_default_behavior()   # no rule at all
 ```
 
 ## Data Structures

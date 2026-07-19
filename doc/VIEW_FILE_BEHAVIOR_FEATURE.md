@@ -16,18 +16,19 @@ Check FILE_ASSOCIATIONS for 'view' action
     │   Launch configured viewer program
     │   (e.g., Preview for PDFs, less for text files)
     │
-    └─ Association NOT found?
+    └─ Association NOT found (or explicitly None)?
         ↓ NO
-        Check if file is a text file (is_text_file)
+        Open the built-in text viewer
+        (TFM's internal viewer with syntax highlighting)
             ↓
-            ├─ Is text file?
+            The viewer sniffs the file's bytes:
+            ├─ Decodes as text?
             │   ↓ YES
-            │   Open built-in text viewer
-            │   (TFM's internal viewer with syntax highlighting)
+            │   Show it, with syntax highlighting
             │
-            └─ Is NOT text file?
+            └─ Binary?
                 ↓ NO
-                Show error: "No viewer configured"
+                Show "[Binary file — cannot display as text]"
 ```
 
 ## Examples
@@ -66,31 +67,40 @@ Check FILE_ASSOCIATIONS for 'view' action
 **User Action**: Press V on `notes.xyz` (text content)
 **Result**: 
 1. No association found for `*.xyz`
-2. Checks if file is text using `is_text_file()`
-3. File is detected as text
-4. Opens in built-in text viewer
+2. Opens in the built-in text viewer
+3. The viewer decodes the file successfully and shows it
+
+Note that the unknown `.xyz` extension does not matter — nothing consults it.
 
 ### Binary Files Without Associations
 
 **User Action**: Press V on `data.bin` (binary content)
 **Result**:
 1. No association found for `*.bin`
-2. Checks if file is text using `is_text_file()`
-3. File is NOT text
-4. Shows error: "No viewer configured for 'data.bin' (not a text file)"
+2. Opens in the built-in text viewer
+3. The viewer finds the file is binary and shows
+   `[Binary file — cannot display as text]`
 
 ## Text File Detection
 
-The `is_text_file()` function determines if a file is text by:
+**TFM detects text by reading the bytes, not by looking at the extension.**
+There is no list of "text extensions" anywhere in TFM, by design: any such list
+is wrong for files with no extension (`Makefile`, `README`), an unknown one, or
+a misleading one — and content inspection gets all three right for free.
 
-1. **Extension Check**: Checks against known text extensions
-   - `.txt`, `.md`, `.py`, `.js`, `.json`, `.xml`, `.html`, etc.
+The built-in viewer decides like this:
 
-2. **Content Analysis**: Reads file content to detect encoding
-   - Checks for valid UTF-8 or ASCII encoding
-   - Detects binary content patterns
+1. **Try to decode** the file as `utf-8`, then `latin-1`, then `cp1252`
+2. **If none decode**, read the raw bytes and look for a NUL byte in the first
+   1024 — a NUL means binary, and the placeholder is shown
+3. **Otherwise** fall back to `latin-1` with replacement characters
 
-3. **Size Limits**: Very large files may be skipped for performance
+Content search applies the same idea more cheaply: a NUL byte in the first 1024
+bytes means "skip this file". The rule of thumb across TFM is **detect
+capability from the bytes; configure preference by extension**. Extensions
+decide *which application you prefer* (see
+[File Associations](FILE_ASSOCIATIONS_FEATURE.md)) — never whether a file is
+readable as text.
 
 ## Comparison with Other Actions
 
@@ -215,5 +225,4 @@ To prevent viewing certain files, add explicit None:
 ## Related Documentation
 
 - File Associations: `doc/FILE_ASSOCIATIONS_FEATURE.md`
-- Usage Guide: `doc/FILE_ASSOCIATIONS_USAGE.md`
 - Text Viewer: `doc/dev/TEXT_VIEWER_SYSTEM.md`

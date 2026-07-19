@@ -860,195 +860,143 @@ def get_file_associations():
     return config.FILE_ASSOCIATIONS
 
 
-def _expand_association_entry(entry):
-    """
-    Expand a compact association entry into individual pattern-action mappings.
-    
-    Args:
-        entry: Dictionary with 'pattern' key and action keys
-    
-    Returns:
-        List of (pattern, action, command) tuples
+#: Built-in handlers selectable via the ``enter`` action -- the casual open
+#: that stays inside TFM. Unlike the external actions (``open``/``view``/
+#: ``edit``), whose values are command lines, these name a handler TFM
+#: implements itself:
+#:   'viewer'   -- the built-in text/markdown viewer
+#:   'navigate' -- browse the file as an archive (jar, whl, ... )
+BUILTIN_HANDLERS = ('viewer', 'navigate')
+
+#: Entry keys that configure the entry itself rather than naming an action.
+#: 'terminal' is obsolete -- whether to hand over the display follows from
+#: the backend, not the config -- but stays reserved so a leftover key in a
+#: hand-written config is inert instead of becoming a phantom action name.
+_RESERVED_KEYS = ('pattern', 'terminal')
+
+
+def _entry_matches(filename_lower, entry):
+    """Whether one FILE_ASSOCIATIONS entry's pattern(s) match a filename.
+
+    A malformed entry simply does not match, so a single bad entry in a user's
+    config degrades that one rule rather than breaking lookup for every file.
     """
     if not isinstance(entry, dict) or 'pattern' not in entry:
-        return []
-    
-    # Get patterns as a list
+        return False
+
     patterns = entry['pattern']
     if isinstance(patterns, str):
         patterns = [patterns]
     elif not isinstance(patterns, list):
-        return []
-    
-    # Expand action keys (handle 'open|view' format)
-    expanded = []
-    for key, command in entry.items():
-        if key == 'pattern':
-            continue
-        
-        # Split combined action keys like 'open|view'
-        actions = key.split('|')
-        
-        # Add mapping for each pattern and action combination
-        for pattern in patterns:
-            for action in actions:
-                expanded.append((pattern, action.strip(), command))
-    
-    return expanded
+        return False
+
+    return any(fnmatch.fnmatch(filename_lower, str(p).lower()) for p in patterns)
 
 
-def get_program_for_file(filename, action='open'):
-    """
-    Get the program command for a specific file and action.
-    
-    Checks FILE_ASSOCIATIONS entries in order from top to bottom.
-    For each entry:
-    1. Check if filename matches the pattern
-    2. If pattern matches, check if the action exists in that entry
-    3. If action exists, return the command (even if None)
-    4. If pattern doesn't match OR action doesn't exist, continue to next entry
-    
+def _lookup_action(filename, action):
+    """Resolve one action for one file against FILE_ASSOCIATIONS.
+
+    Entries are checked top to bottom. The first entry that both matches the
+    filename *and* defines the action wins. A matching entry that does not
+    mention the action falls through to later entries -- that is what lets a
+    general rule supply an action a more specific rule deliberately left out.
+
     Args:
-        filename: The filename to check (e.g., 'document.pdf')
-        action: The action to perform ('open', 'view', or 'edit')
-    
+        filename: The filename to match (patterns are case-insensitive).
+        action: Action name, e.g. 'enter', 'open', 'view', 'edit'.
+
     Returns:
-        Command list if found, None otherwise
+        ``(found, value, entry)``. ``found`` is what separates "explicitly
+        configured as None" from "not configured at all" -- indistinguishable
+        by ``value`` alone, and they mean opposite things to a caller.
     """
     associations = get_file_associations()
     if not associations:
-        return None
-    
-    # Convert filename to lowercase for case-insensitive matching
+        return (False, None, None)
+
     filename_lower = filename.lower()
-    
-    # Check each entry in order from top to bottom
+
     for entry in associations:
-        if not isinstance(entry, dict) or 'pattern' not in entry:
+        if not _entry_matches(filename_lower, entry):
             continue
-        
-        # Get patterns as a list
-        patterns = entry['pattern']
-        if isinstance(patterns, str):
-            patterns = [patterns]
-        elif not isinstance(patterns, list):
-            continue
-        
-        # Check if filename matches any pattern in this entry
-        pattern_matches = False
-        for pattern in patterns:
-            if fnmatch.fnmatch(filename_lower, pattern.lower()):
-                pattern_matches = True
-                break
-        
-        # If pattern doesn't match, continue to next entry
-        if not pattern_matches:
-            continue
-        
-        # Pattern matches - now check if action exists in this entry
-        # Look for the action in both simple and combined formats
-        action_found = False
-        command = None
-        
+
         for key, value in entry.items():
-            if key == 'pattern':
+            if key in _RESERVED_KEYS:
                 continue
-            
-            # Check if this key contains our action (handle 'open|view' format)
-            actions_in_key = [a.strip() for a in key.split('|')]
-            if action in actions_in_key:
-                action_found = True
-                command = value
-                break
-        
-        # If action is found in this entry, return the command
-        if action_found:
-            # Convert string commands to list format
-            if isinstance(command, str):
-                return command.split()
-            elif isinstance(command, list):
-                return command
-            elif command is None:
-                return None
-        
-        # Pattern matched but action not in this entry - continue to next entry
-    
-    # No matching entry found
+            # A key may combine actions, as in 'open|view'.
+            if action in (a.strip() for a in str(key).split('|')):
+                return (True, value, entry)
+
+    return (False, None, None)
+
+
+def get_program_for_file(filename, action='open'):
+    """The external command configured for a file and action.
+
+    Args:
+        filename: The filename to check (e.g., 'document.pdf').
+        action: The action to perform ('open', 'view', or 'edit').
+
+    Returns:
+        Command as a list, or None if no command is configured. Note that None
+        is also what an explicit ``None`` in the config produces -- use
+        :func:`has_explicit_association` when the difference matters.
+    """
+    _found, value, _entry = _lookup_action(filename, action)
+
+    if isinstance(value, str):
+        return value.split()
+    if isinstance(value, list):
+        return value
     return None
 
 
 def has_action_for_file(filename, action='open'):
+    """Whether a runnable program is configured for a file and action.
+
+    An explicitly-``None`` association reads False here: there is no program to
+    run. That is deliberately *not* the same as "unconfigured" -- see
+    :func:`has_explicit_association`.
     """
-    Check if a specific action is available for a file.
-    
-    Args:
-        filename: The filename to check
-        action: The action to check ('open', 'view', or 'edit')
-    
-    Returns:
-        True if the action is available, False otherwise
-    """
-    program = get_program_for_file(filename, action)
-    return program is not None
+    return get_program_for_file(filename, action) is not None
 
 
 def has_explicit_association(filename, action='open'):
+    """Whether the config mentions this action for this file *at all*.
+
+    True even when the configured value is ``None``, which is how a user says
+    "handle this with the built-in viewer rather than an external program".
     """
-    Check if a file has an explicit association (including None) for an action.
-    
-    This differs from has_action_for_file in that it returns True even when
-    the association is explicitly set to None, which indicates "use built-in viewer".
-    
-    Checks FILE_ASSOCIATIONS entries in order from top to bottom.
-    
-    Args:
-        filename: The filename to check
-        action: The action to check ('open', 'view', or 'edit')
-    
+    found, _value, _entry = _lookup_action(filename, action)
+    return found
+
+
+def get_builtin_handler_for_file(filename, action='enter'):
+    """The built-in handler configured for the casual (Enter) open.
+
+    This is the inside-TFM tier: the value names a handler TFM implements, not
+    a program to launch. Kept separate from :func:`get_program_for_file`
+    because that function coerces bare strings into command lists, which would
+    silently turn the handler name 'viewer' into the command ``['viewer']``.
+
     Returns:
-        True if an explicit association exists (even if None), False if no association
+        ``(configured, handler)``. ``configured`` False means no rule matched,
+        so the caller should apply its own default dispatch; ``(True, None)``
+        means a rule explicitly asked for nothing to happen. An unrecognised
+        handler name is warned about and treated as unconfigured, so a typo
+        falls back to sensible behavior instead of silently doing nothing.
     """
-    associations = get_file_associations()
-    if not associations:
-        return False
-    
-    # Convert filename to lowercase for case-insensitive matching
-    filename_lower = filename.lower()
-    
-    # Check each entry in order from top to bottom
-    for entry in associations:
-        if not isinstance(entry, dict) or 'pattern' not in entry:
-            continue
-        
-        # Get patterns as a list
-        patterns = entry['pattern']
-        if isinstance(patterns, str):
-            patterns = [patterns]
-        elif not isinstance(patterns, list):
-            continue
-        
-        # Check if filename matches any pattern in this entry
-        pattern_matches = False
-        for pattern in patterns:
-            if fnmatch.fnmatch(filename_lower, pattern.lower()):
-                pattern_matches = True
-                break
-        
-        # If pattern doesn't match, continue to next entry
-        if not pattern_matches:
-            continue
-        
-        # Pattern matches - check if action exists in this entry
-        for key in entry.keys():
-            if key == 'pattern':
-                continue
-            
-            # Check if this key contains our action
-            actions_in_key = [a.strip() for a in key.split('|')]
-            if action in actions_in_key:
-                # Found an explicit association (even if value is None)
-                return True
-        
-        # Pattern matched but action not in this entry - continue to next entry
-    
-    return False
+    found, value, _entry = _lookup_action(filename, action)
+    if not found:
+        return (False, None)
+    if value is None:
+        return (True, None)
+
+    handler = str(value).strip().lower()
+    if handler not in BUILTIN_HANDLERS:
+        logger.warning(
+            f"Unknown '{action}' handler {value!r} for {filename!r}; "
+            f"expected one of {', '.join(BUILTIN_HANDLERS)} or None"
+        )
+        return (False, None)
+    return (True, handler)

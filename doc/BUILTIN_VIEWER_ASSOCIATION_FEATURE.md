@@ -11,7 +11,14 @@ TFM's file association system supports using `None` as a special value to explic
 When you set an action to `None` in FILE_ASSOCIATIONS:
 - It explicitly tells TFM to use the built-in text viewer
 - It's different from having no association at all
-- It only works for text files (checked via `is_text_file()`)
+- Binary files still open in the viewer, which detects them by inspecting the
+  bytes and shows `[Binary file — cannot display as text]` rather than garbage
+
+Note that for the **view** action, `None` and "no rule at all" reach the same
+place — the built-in viewer. The distinction matters for **open** and **edit**,
+where `None` means "this action is unavailable for this file type" and stops
+the fallback (see
+[File Associations](FILE_ASSOCIATIONS_FEATURE.md#command-formats)).
 
 ### Example
 

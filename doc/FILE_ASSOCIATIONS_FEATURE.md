@@ -63,11 +63,42 @@ FILE_ASSOCIATIONS = [
 
 ### Actions
 
-Each file extension can have up to three actions configured:
+Each file pattern can configure up to four actions:
 
-- **open**: Default action for opening the file (typically with the system default application)
-- **view**: Action for viewing the file (typically read-only or quick preview)
-- **edit**: Action for editing the file (typically with a specialized editor)
+| Action | Key | What it does | Value |
+|---|---|---|---|
+| **enter** | `Enter` | Casual open — handled **inside TFM** | A built-in handler name |
+| **open** | `Cmd/Ctrl-Enter` | Deliberate open — hands off to another app | A command |
+| **view** | `V` | View the file | A command |
+| **edit** | `E` | Edit the file | A command |
+
+#### Two tiers of "open"
+
+`Enter` and `Cmd/Ctrl-Enter` are deliberately different gestures:
+
+- **`Enter` never leaves TFM.** It enters directories, browses archives, and
+  opens files in the built-in viewer. It is safe to lean on — it will not
+  launch an application or steal focus.
+- **`Cmd/Ctrl-Enter` hands the file to a real application.** Use it when you
+  actually want Preview, an IDE, or the OS default app.
+
+Because the `enter` tier stays inside TFM, its value names a **built-in
+handler** rather than a program to launch:
+
+| Value | Effect |
+|---|---|
+| `'viewer'` | Open in the built-in text/markdown viewer |
+| `'navigate'` | Browse the file as an archive (useful for `*.jar`, `*.whl`) |
+| `None` | Do nothing |
+| *(no rule)* | TFM's default: enter directories and archives, view files |
+
+```python
+{
+    'pattern': '*.csv',
+    'enter': 'viewer',                    # Enter -> built-in viewer
+    'open':  ['open', '-a', 'Numbers'],   # Cmd-Enter -> Numbers
+}
+```
 
 ### Command Formats
 
@@ -87,6 +118,40 @@ Programs can be specified in two formats:
    ```python
    'edit': None  # No editor configured for this file type
    ```
+
+   For `view`, `None` means something more specific: **use the built-in
+   viewer**. See [Text Files](#text-files---built-in-viewer-for-view-action).
+
+### Terminal Programs
+
+**You do not declare this.** Whether TFM hands over the display is a property of
+the backend you are running, not of the program you configured:
+
+| Mode | What happens when a program launches |
+|---|---|
+| Terminal (`--backend tui`) | TFM suspends, the program owns the terminal, TFM restores and repaints when it exits |
+| Desktop (`--backend gui`) | There is no terminal to hand over, so the program is detached and TFM stays responsive |
+
+So `'view': ['less']` simply works in terminal mode — no flag needed:
+
+```python
+{
+    'pattern': '*.log',
+    'view': ['less'],      # terminal mode hands the display over and waits
+    'edit': ['code'],      # a GUI editor in the same entry is fine
+}
+```
+
+The practical consequence is the same one that governs `TEXT_EDITOR`: **pick
+programs that suit the mode you run in.** A terminal program configured while
+running in desktop mode has no terminal to draw on and will not appear; a GUI
+launcher used in terminal mode works, with a brief repaint as TFM resumes.
+
+> Earlier drafts of this feature had a per-entry `'terminal': True` flag. It was
+> removed: it duplicated a decision TFM can already make, could not express one
+> entry mixing a terminal viewer with a GUI editor, and failed unsafely —
+> forgetting it on `less` corrupted the terminal. A leftover `terminal` key in a
+> hand-written config is ignored.
 
 ### Compact Format Features
 
@@ -245,14 +310,35 @@ Once configured, TFM will use these associations when you:
 
 ### Key Bindings
 
-#### Enter Key - Open File
-When you press Enter on a file, TFM uses the **open** action from file associations.
+#### Enter - Open Inside TFM
+Enter uses the **enter** action. It never launches an external program.
 
 **Behavior**:
-1. Checks file associations for 'open' action
-2. If found, launches the configured program
-3. If not found, falls back to built-in text viewer for text files
-4. Otherwise, shows file info dialog
+1. Directories are entered and recognized archives are browsed — always, and
+   not configurable; this is what Enter means structurally
+2. For a plain file, checks associations for an 'enter' handler
+3. `'viewer'` opens the built-in viewer; `'navigate'` browses the file as an
+   archive; `None` does nothing
+4. With no rule, opens the built-in viewer
+5. Unless TFM has no built-in way to show the file — a PNG, say — in which case
+   it logs a warning naming the key bound to `open_with_os`, rather than
+   opening a viewer on content it cannot render
+
+Step 5 is why images currently report *"No built-in viewer for photo.png —
+press Command-ENTER to open it in an external program"*. Setting
+`'enter': 'viewer'` on such a pattern overrides this and opens the viewer
+anyway, which shows a binary placeholder.
+
+#### Cmd/Ctrl-Enter - Open Externally
+Cmd-Enter (Ctrl-Enter on Windows) uses the **open** action.
+
+**Behavior**:
+1. Checks associations for an 'open' command
+2. If found, launches it — handing over the display first in terminal mode,
+   detaching it in desktop mode (see [Terminal Programs](#terminal-programs))
+3. If explicitly `None`, nothing is launched (this is how you stop a file type
+   from ever being handed to the OS)
+4. Otherwise falls back to the OS default app (`open` / `xdg-open` / `start`)
 
 #### V Key - View File
 When you press V on a file, TFM uses the **view** action from file associations.
@@ -260,9 +346,11 @@ When you press V on a file, TFM uses the **view** action from file associations.
 **Behavior**:
 1. Checks file associations for 'view' action
 2. If found, launches the configured viewer
-3. If not found, checks if file is a text file using `is_text_file()`
-4. If it's a text file, opens built-in text viewer
-5. Otherwise, shows "No viewer configured" message
+3. If explicitly `None`, opens the built-in text viewer
+4. If not found, opens the built-in text viewer (binaries show a placeholder)
+
+Remote and in-archive files always use the built-in viewer — an external
+program has no path on disk it could open.
 
 #### E Key - Edit File
 When you press E on a file, TFM uses the **edit** action from file associations.
@@ -270,8 +358,10 @@ When you press E on a file, TFM uses the **edit** action from file associations.
 **Behavior**:
 1. Checks file associations for 'edit' action
 2. If found, launches the configured editor
-3. If not found, falls back to TEXT_EDITOR config setting
-4. Shows error if no editor is configured
+3. If explicitly `None`, reports that no editor is configured and stops
+4. If not found, falls back to the `TEXT_EDITOR` config setting
+
+Local files only; remote and in-archive paths are skipped.
 
 ### Usage Examples
 

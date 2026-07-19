@@ -243,13 +243,35 @@ view_text_file(stdscr, s3_path)
 ```
 
 ### Text File Detection
-```python
-from tfm_text_viewer import is_text_file
 
-# Works for both local and remote files
-if is_text_file(file_path):
-    view_text_file(stdscr, file_path)
+There is no `is_text_file()` predicate to call ahead of time, and no list of
+text extensions — **the viewer decides from the file's bytes as it reads it**:
+
+```python
+from tfm_text_viewer import looks_binary
+
+looks_binary(path)                    # NUL byte in the first 1024 bytes
+lines, is_error = _read_lines(path)   # placeholder line when binary
 ```
+
+`_read_lines()` sniffs with `looks_binary()` **before** attempting any decode,
+then tries `utf-8`, `latin-1`, `cp1252` for everything else.
+
+> **The ordering is load-bearing, not stylistic.** `latin-1` maps all 256 byte
+> values, so it never raises `UnicodeDecodeError` — any decode loop containing
+> it always succeeds. This code originally sniffed only *after* the loop, in an
+> "if nothing decoded" branch that could therefore never run: the placeholder
+> was unreachable and a PNG rendered as ~45,000 lines of mojibake. If you
+> reorder this, `test/test_binary_file_handling.py` will fail.
+
+Content search needs a cheaper, standalone check and has its own:
+`TfmApp._looks_textual(path)` in `tfm.py`. It differs deliberately — an empty
+file is "nothing to grep" (False) but is perfectly viewable (not binary).
+
+The principle: **detect capability from the bytes, configure preference by
+extension.** Extension lists belong in FILE_ASSOCIATIONS (which application the
+user prefers), never in text detection — they get files with no extension, an
+unknown one, or a misleading one wrong, and sniffing gets all three right.
 
 ### Example File Types
 

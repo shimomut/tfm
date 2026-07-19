@@ -238,9 +238,35 @@ def _syntax_fg(token_type, palette: dict) -> tuple[int, int, int] | None:
     return None  # default text color
 
 
+def looks_binary(path, sample_size: int = 1024) -> bool:
+    """Whether ``path`` holds binary content, judged by a NUL byte in its first
+    ``sample_size`` bytes.
+
+    Returns False when the file cannot be sampled at all — "unreadable" is not
+    "binary", and the caller's own error handling gives a better message than a
+    misleading binary verdict would.
+
+    This is deliberately a content check: TFM keeps no list of binary
+    extensions, because any such list is wrong for a file with no extension, an
+    unknown one, or a misleading one.
+    """
+    try:
+        with path.open("rb") as f:
+            chunk = f.read(sample_size)
+    except Exception:
+        return False
+    return b"\x00" in chunk
+
+
 def _read_lines(path) -> tuple[list[str], bool]:
     """Read ``path`` into display lines (tabs expanded). Returns ``(lines,
     is_error)``; a binary file yields a one-line placeholder with error=True."""
+    # Sniff *before* decoding, not after. latin-1 maps all 256 byte values and
+    # so never raises UnicodeDecodeError — any decode loop containing it always
+    # succeeds, which previously left this placeholder unreachable and rendered
+    # binaries as thousands of lines of mojibake.
+    if looks_binary(path):
+        return ["[Binary file — cannot display as text]"], True
     content = None
     for encoding in ("utf-8", "latin-1", "cp1252"):
         try:
@@ -251,13 +277,7 @@ def _read_lines(path) -> tuple[list[str], bool]:
         except (FileNotFoundError, OSError) as exc:
             return [f"Error reading file: {exc}"], True
     if content is None:
-        try:
-            raw = path.read_bytes()
-        except OSError as exc:
-            return [f"Error reading file: {exc}"], True
-        if b"\x00" in raw[:1024]:
-            return ["[Binary file — cannot display as text]"], True
-        content = raw.decode("latin-1", errors="replace")
+        return ["[Binary file — cannot display as text]"], True
     return [_expand_tabs(line) for line in content.splitlines()], False
 
 
