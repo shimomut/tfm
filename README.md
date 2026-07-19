@@ -44,7 +44,10 @@ TFM's UI runs on **[PuiKit](https://github.com/crftwr/puikit)**, a separate
 framework that is not yet published to PyPI. The simplest setup checks out PuiKit
 next to TFM and lets the Makefile wire everything into a virtualenv.
 
-1. Ensure you have Python 3.9+ installed.
+1. Install Python 3.10 or later. On macOS, Homebrew is the easiest route:
+   ```bash
+   brew install python@3.14
+   ```
 2. Clone TFM and PuiKit side by side:
    ```bash
    git clone https://github.com/crftwr/puikit.git
@@ -53,21 +56,27 @@ next to TFM and lets the Makefile wire everything into a virtualenv.
    ```
 3. Create the environment and run (installs base deps **plus PuiKit editable**):
    ```bash
-   make venv        # expects PuiKit at ../puikit; override with PUIKIT_DIR=/path/to/puikit
+   make venv        # creates .venv using the newest python3 in PATH
+                    # expects PuiKit at ../puikit; override with PUIKIT_DIR=/path/to/puikit
    make run         # launch TFM
    ```
 
-   Prefer to manage the environment yourself? Install the dependencies and PuiKit
-   manually instead:
+   `make venv` creates and populates `.venv/`, and every other `make` target runs
+   through that interpreter — so you never need to activate it yourself.
+
+   Prefer to manage the environment yourself? Create and activate a virtualenv
+   first, then install the dependencies and PuiKit manually:
    ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate         # Windows: .venv\Scripts\activate
    pip install -r requirements.txt
    pip install -e ../puikit          # PuiKit (editable) — required
    python3 tfm.py
    ```
 
-   **Desktop Mode** (macOS only) additionally needs PyObjC:
+   **Desktop Mode** (macOS only) needs PyObjC, which `requirements.txt` already
+   installs automatically on macOS. Just pick the backend:
    ```bash
-   pip install pyobjc                # or: pip install -e .[macos]
    python3 tfm.py --backend gui
    ```
 
@@ -233,14 +242,14 @@ See the [User Guide](doc/TFM_USER_GUIDE.md#desktop-mode-macos) for detailed desk
 - [PuiKit](https://github.com/crftwr/puikit) — TFM's UI framework, installed editable from a sibling `../puikit` checkout (`make venv` / `make install-puikit`). Not on PyPI.
 
 **Terminal Mode** (all platforms):
-- Python 3.9+ with curses library (built-in on macOS/Linux, 3.13 supported)
-- Windows: `pip install windows-curses` (automatically installed via setup.py)
+- Python 3.10+ with curses library (built-in on macOS/Linux, 3.14 supported)
+- Windows: `pip install windows-curses` (installed automatically via `requirements.txt`)
 - Terminal with curses support
 
 **Desktop Mode** (macOS only):
-- Python 3.9+ (3.13 supported)
+- Python 3.10+ (3.14 supported)
 - macOS 10.13 (High Sierra) or later
-- PyObjC framework (see installation below)
+- PyObjC framework (installed automatically on macOS via `requirements.txt`)
 
 ### Dependencies
 
@@ -249,29 +258,29 @@ See the [User Guide](doc/TFM_USER_GUIDE.md#desktop-mode-macos) for detailed desk
 pip install -e ../puikit   # or: make install-puikit  (PUIKIT_DIR=../puikit by default)
 ```
 
-**Base dependencies** (installed via `requirements.txt`):
+**Base dependencies** — `requirements.txt` is the single source of truth and is
+installed in one shot:
 ```bash
-pip install pygments  # Enhanced syntax highlighting (20+ file formats)
-pip install boto3     # AWS S3 support (cloud storage operations)
-pip install watchdog  # Automatic directory-listing reload on file changes
+pip install -r requirements.txt
 ```
+It pulls in:
+- `pygments` — enhanced syntax highlighting (20+ file formats)
+- `boto3` — AWS S3 support (cloud storage operations)
+- `watchdog` — automatic directory-listing reload on file changes
+- `pyobjc` — macOS desktop mode (selected automatically on macOS)
+- `windows-curses` — curses support (selected automatically on Windows)
 
-**macOS Desktop Mode** (optional):
-```bash
-# Option 1: Install pyobjc directly
-pip install pyobjc
-
-# Option 2: Install with the macos extra
-pip install -e .[macos]
-
-# Option 3: Install from PyPI with macos extra (when published)
-pip install tfm[macos]
-```
+The last two use environment markers, so the platform-specific dependency for the
+machine you are on is installed for you. There is no `[macos]` extra to request.
 
 ### Installation Options
 
 #### Option 1: Run Directly (No Installation)
 ```bash
+# Create and activate a virtualenv
+python3 -m venv .venv
+source .venv/bin/activate         # Windows: .venv\Scripts\activate
+
 # Install dependencies + PuiKit (editable, from a sibling ../puikit checkout)
 pip install -r requirements.txt
 pip install -e ../puikit
@@ -279,8 +288,7 @@ pip install -e ../puikit
 # Terminal mode (all platforms)
 python3 tfm.py
 
-# Desktop mode (macOS only - requires pyobjc)
-pip install pyobjc
+# Desktop mode (macOS only - pyobjc came from requirements.txt)
 python3 tfm.py --backend gui
 ```
 
@@ -292,15 +300,11 @@ cd tfm
 # PuiKit is required and not on PyPI — install it (editable) first
 pip install -e ../puikit
 
-# Terminal mode only
 pip install .
-
-# With macOS desktop mode support
-pip install .[macos]
 
 # Run from anywhere (installs a `tfm` console command)
 tfm                # Terminal mode
-tfm --backend gui      # Desktop mode (macOS only, if installed with [macos])
+tfm --backend gui  # Desktop mode (macOS only)
 ```
 
 #### Option 3: Development Installation
@@ -311,11 +315,7 @@ cd tfm
 # PuiKit is required and not on PyPI — install it (editable) first
 pip install -e ../puikit
 
-# Terminal mode only
 pip install -e .
-
-# With macOS desktop mode support
-pip install -e .[macos]
 
 # Run from anywhere
 tfm
@@ -353,9 +353,9 @@ tfm/
 ## Troubleshooting
 
 **Installation Issues:**
-- Ensure Python 3.9+ is installed
+- Ensure Python 3.10+ is installed (PuiKit, TFM's UI framework, requires 3.10+)
 - Check terminal compatibility with curses library (terminal mode)
-- Install PyObjC for desktop mode: `pip install pyobjc` or `pip install .[macos]`
+- PyObjC (desktop mode) installs automatically on macOS via `pip install -r requirements.txt`
 
 **Desktop Mode Issues:**
 - Desktop mode only works on macOS

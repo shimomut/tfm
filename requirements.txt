@@ -1,4 +1,4 @@
-# Python 3.9+ required for modern language features and security
+# Python 3.10+ required (PuiKit, TFM's UI framework, requires 3.10+)
 # pygments for syntax highlighting (will fallback gracefully if not available)
 # boto3 for AWS S3 support
 # watchdog for automatic file list reloading

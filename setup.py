@@ -49,7 +49,8 @@ setup(
         ],
     },
     install_requires=requirements,
-    python_requires=">=3.9",
+    # PuiKit, TFM's UI framework, requires Python 3.10+, so TFM cannot claim 3.9.
+    python_requires=">=3.10",
     classifiers=[
         "Development Status :: 4 - Beta",
         "Environment :: Console :: Curses",
@@ -57,11 +58,11 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: POSIX",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
         "Programming Language :: Python :: 3.13",
+        "Programming Language :: Python :: 3.14",
         "Topic :: System :: Filesystems",
         "Topic :: Utilities",
     ],
