@@ -113,6 +113,21 @@ def draw_status_bar(ctx, y: float, text: str, *, font=None, pad_x: float = 0.0,
 VIEWER_PAD_PX = 4.0
 
 
+def viewer_layer_hints(sw: float, sh: float) -> dict:
+    """Layer hints shared by the three full-window modal viewers (text / file diff /
+    directory diff), so all three sit on the background the same way.
+
+    ``cover`` replaces the file manager beneath rather than floating over it.
+    ``surface: content`` names the surface they paint — the Panel resolves the color
+    and hands it down the draw context (text inheritance, auto-ink) even though
+    ``self_paint`` leaves the painting to the viewer, which owns the fallback for a
+    theme without the role. That combination is what lets a viewer drop its page fill
+    over an animated background (``ctx.wallpaper``) and show the scene at full
+    strength, exactly as the file panes do — see :meth:`TextViewer.draw`."""
+    return {"x": 0, "y": 0, "w": sw, "h": sh,
+            "cover": True, "surface": "content", "self_paint": True}
+
+
 def viewer_pad(ctx) -> tuple[float, float]:
     """The (x, y) content inset for a modal viewer, in base units: ``VIEWER_PAD_PX``
     device pixels on a vector backend, zero on a character grid. The bars keep
@@ -673,7 +688,14 @@ class TextViewer(Widget):
         # and carries no position, so the geometry needs no un-insetting.
         pad_x, pad_y = viewer_pad(ctx)
         bg = _content_bg(theme)  # sit on TFM's own pane background, not popup_bg
-        ctx.fill_rect(0, 0, wu, hu, Style(bg=bg))
+        # Over an animated / image background the page fill is dropped entirely so
+        # the scene reads at full strength — the file panes it replaces do the same
+        # (``reveal_mode="transparent"``), and painting it here would dim the scene to
+        # the theme's surface opacity, so the animation faded the moment a viewer
+        # opened. ``bg`` still describes the surface the chrome and text sit on (the
+        # draw context carries it for inheritance / auto-ink), it just isn't painted.
+        if not ctx.wallpaper:
+            ctx.fill_rect(0, 0, wu, hu, Style(bg=bg))
 
         text_fg = theme.text if theme is not None else (212, 212, 212)
         muted = theme.muted_text if theme is not None else (150, 150, 150)
@@ -1184,7 +1206,7 @@ def show_text_viewer(panel: Any, path, z: int = 80, state_manager=None) -> TextV
     sw, sh = panel.backend.size_units
     viewer._panel = panel
     viewer._child_z = z + 10  # help overlay stacks above the viewer's own layer
-    panel.push_layer(viewer, z=z, hints={"x": 0, "y": 0, "w": sw, "h": sh, "cover": True},
+    panel.push_layer(viewer, z=z, hints=viewer_layer_hints(sw, sh),
                      reflow=lambda sw, sh: Rect(0, 0, sw, sh))
     animate_open(panel, viewer, OPEN_MS_VIEWER)
     return viewer

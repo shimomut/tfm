@@ -35,7 +35,8 @@ from tfm_isearch_bar import ViewerISearch
 from tfm_text_dialog import keys_markdown, show_markdown
 from tfm_text_viewer import (MONO, _ScrollBody, _content_bg, _header_bg, _highlight,
                              _is_light, _match_bg, _read_lines, _syntax_palette,
-                             draw_hscrollbar, draw_status_bar, viewer_pad)
+                             draw_hscrollbar, draw_status_bar, viewer_layer_hints,
+                             viewer_pad)
 
 #: Semantic diff hues. The whole-row tints and the stronger changed-character
 #: tints are the theme's *content background* blended toward these, so a diff
@@ -450,7 +451,10 @@ class DiffViewer(Widget):
         pad_x, pad_y = viewer_pad(ctx)
         self._pad = (pad_x, pad_y)
         bg = _content_bg(theme)  # sit on TFM's own pane background, not popup_bg
-        ctx.fill_rect(0, 0, wu, hu, Style(bg=bg))
+        # Dropped over a wallpaper so the scene shows at full strength — see
+        # TextViewer.draw for why the page fill is the one surface that goes.
+        if not ctx.wallpaper:
+            ctx.fill_rect(0, 0, wu, hu, Style(bg=bg))
         # A distinct 'header' surface band across the top (reaching the top edge);
         # each pane draws its filename onto it (see _DiffPane.draw).
         ctx.fill_rect(0, 0, wu, 1.0 + pad_y, Style(bg=_header_bg(theme)))
@@ -589,7 +593,7 @@ def show_diff_viewer(panel: Any, path1, path2, z: int = 80) -> DiffViewer:
     sw, sh = panel.backend.size_units
     viewer._panel = panel
     viewer._child_z = z + 10  # help overlay stacks above the viewer's own layer
-    panel.push_layer(viewer, z=z, hints={"x": 0, "y": 0, "w": sw, "h": sh, "cover": True},
+    panel.push_layer(viewer, z=z, hints=viewer_layer_hints(sw, sh),
                      reflow=lambda sw, sh: Rect(0, 0, sw, sh))
     animate_open(panel, viewer, OPEN_MS_VIEWER)
     return viewer

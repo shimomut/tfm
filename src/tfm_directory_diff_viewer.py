@@ -46,7 +46,8 @@ from puikit.widgets.base import Widget
 
 from tfm_path import Path
 from tfm_str_format import format_size
-from tfm_text_viewer import MONO, _ScrollBody, _header_bg, draw_status_bar, viewer_pad
+from tfm_text_viewer import (MONO, _ScrollBody, _header_bg, draw_status_bar,
+                             viewer_layer_hints, viewer_pad)
 from tfm_dialog_geometry import OPEN_MS_VIEWER, animate_open
 from tfm_diff_viewer import show_diff_viewer
 from tfm_text_dialog import keys_markdown, show_markdown
@@ -1121,7 +1122,11 @@ class DirectoryDiffView(Widget):
         self._sel_inactive = getattr(theme, "selection_inactive_bg", muted) if theme else muted
         # Chrome surfaces fill the window edge to edge; text/columns inset over them.
         header_bg = _header_bg(theme)   # the main window's 'header' role, distinct
-        ctx.fill_rect(0, 0, wu, hu, Style(bg=content_bg))
+        # The page fill is dropped over a wallpaper so the scene reads at full
+        # strength (see TextViewer.draw); the bars and row tints below still paint,
+        # dissolving at the theme's surface opacity like the main window's chrome.
+        if not ctx.wallpaper:
+            ctx.fill_rect(0, 0, wu, hu, Style(bg=content_bg))
         ctx.fill_rect(0, 0, wu, head_h, Style(bg=header_bg))    # header bar
         ctx.fill_rect(0, det_y, wu, 1.0, Style(bg=chrome_bg))   # details bar
         # (the footer row below the details is painted as the themed status bar)
@@ -1596,7 +1601,7 @@ def show_directory_diff_viewer(panel: Any, left_path: Path, right_path: Path,
     viewer._child_z = z + 10
     sw, sh = panel.backend.size_units
     viewer._panel = panel
-    panel.push_layer(viewer, z=z, hints={"x": 0, "y": 0, "w": sw, "h": sh, "cover": True},
+    panel.push_layer(viewer, z=z, hints=viewer_layer_hints(sw, sh),
                      reflow=lambda sw, sh: Rect(0, 0, sw, sh))
     panel.request_animation_ticks(viewer._tick)
     animate_open(panel, viewer, OPEN_MS_VIEWER)

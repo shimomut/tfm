@@ -54,6 +54,7 @@ class _GuiCtx:
 
     vector_shapes = True
     base_size = (8, 16)
+    wallpaper = False   # no animated/image background: the viewer fills its page
 
     def __init__(self, w, h):
         self.size_units = (w, h)
@@ -165,6 +166,44 @@ def test_all_viewers_paint_a_distinct_header_band():
         viewer.draw(ctx)
         band = _header_band_bg(ctx)
         assert band == _HEADER, f"{type(viewer).__name__}: header band {band} != {_HEADER}"
+
+
+class _WallpaperCtx(_GuiCtx):
+    """A GUI context over an animated / image background (ctx.wallpaper)."""
+
+    wallpaper = True
+
+
+def _page_fills(ctx):
+    """Fills covering the whole window in the content surface — the viewer's page."""
+    return [f for f in ctx.styled_fills
+            if f[:4] == (0.0, 0.0, 200.0, 100.0) and f[4] == _CONTENT]
+
+
+def test_viewers_drop_the_page_fill_over_a_wallpaper():
+    # A full-window viewer replaces the file panes, which are transparent over a
+    # wallpaper — so it must be too, or the background animation dims to the theme's
+    # surface opacity the moment a viewer opens. Same viewer, two contexts: only the
+    # wallpaper decides. Without one the page is filled as before.
+    d = tempfile.mkdtemp()
+    p = Path(d) / "f.txt"; p.write_text("x\ny\n")
+    a = Path(d) / "a.txt"; a.write_text("a\nb\n")
+    bb = Path(d) / "b.txt"; bb.write_text("a\nc\n")
+    ld = Path(d) / "L"; ld.mkdir()
+    rd = Path(d) / "R"; rd.mkdir()
+    for viewer in (TextViewer(p), DiffViewer(a, bb),
+                   DirectoryDiffView(ld, rd, background=False)):
+        name = type(viewer).__name__
+        plain = _GuiCtx(200.0, 100.0); plain.theme = _FakeTheme()
+        viewer.draw(plain)
+        assert len(_page_fills(plain)) == 1, f"{name}: no wallpaper -> fills its page"
+
+        over_bg = _WallpaperCtx(200.0, 100.0); over_bg.theme = _FakeTheme()
+        viewer.draw(over_bg)
+        assert _page_fills(over_bg) == [], f"{name}: over a wallpaper -> transparent"
+        # Only the page goes: the chrome bands still paint (they dissolve at the
+        # theme's surface opacity, like the main window's header / status bars).
+        assert _header_band_bg(over_bg) == _HEADER, f"{name}: header band dropped too"
 
 
 def test_text_viewer_draws_rows_to_cover_fractional_bottom():
