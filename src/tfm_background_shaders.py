@@ -34,9 +34,11 @@ compares the two sets of constants to catch exactly that.
 is asked, for one pixel at a time, "what covers you?" — so every scene here needs a
 way to answer that without visiting everything. The recurring device is a *grid*: an
 object's identity comes from hashing its cell index, so a pixel can compute which
-cells could possibly reach it and consult only those. The wave visits particle cells
-across depth layers, the rain its own column and two neighbours, the starfield cells
-along a depth ray, the constellation a 5x5 block of nodes. Where a scene needs
+cells could possibly reach it and consult only those. The rain visits its own column
+and two neighbours, the starfield cells along a depth ray, the constellation a 5x5
+block of nodes. The wave takes the idea furthest: it *texture-maps* its cells rather
+than walking them, sampling a procedural dot field in the sheet's own plane, which
+decouples its particle count from its per-pixel cost entirely. Where a scene needs
 per-object randomness it hashes the cell index rather than calling anything
 time-varying, so an object keeps a fixed identity across frames and all motion comes
 from ``time``.
@@ -47,11 +49,23 @@ from __future__ import annotations
 #: A flowing sheet of particles — a wave surface rendered as a point cloud.
 #:
 #: Structure: the surface is a sum of travelling sine trains, sampled at a stack of
-#: depth layers. Each layer is a row of particles whose lateral spacing is measured
-#: in *world* units, so perspective packs the far rows tighter on screen and the
-#: sheet reads as receding. For each pixel the shader visits the few particle cells
-#: that could overlap it, at each layer, and accumulates a soft splat — which is
-#: how a per-pixel program draws what is conceptually a particle system.
+#: depth layers. Rather than *placing* particles, each layer **texture-maps** them:
+#: a procedural dot field is sampled in the sheet's own (x, z) plane, and the layer
+#: keeps whatever dots sit at the height that projects onto this pixel. That
+#: inversion is what makes the particle count free — density is the texture's
+#: frequency, not a loop bound — and it is why this scene draws several times the
+#: particles of the cell-walking version it replaces at slightly *less* cost.
+#:
+#: There is no texture *asset*: puikit's background shaders take uniforms and bind
+#: no images (see puikit ``SHADER_PRELUDE``), so the dot field is generated in
+#: place. That is the better trade anyway — a procedural field is infinite, tiles
+#: without a seam, and can be sampled at any frequency, so nothing has to be
+#: uploaded or kept resident to make the sheet denser.
+#:
+#: Three octaves of that field are sampled per layer, each **rotating** in the
+#: plane at its own slow rate. Rotation is what turns a fixed lattice into drifting
+#: particles, and because the rates are mutually incommensurate the octaves never
+#: re-align — the sheet churns instead of sliding, and never visibly repeats.
 #:
 #: The colour is the part the CPU renderer could never do: hue shifts along the
 #: sheet and toward the crests, so the wave runs cool in its troughs and pales to
@@ -59,35 +73,32 @@ from __future__ import annotations
 #: theme's ``ink`` so it still belongs to the palette rather than ignoring it.
 WAVE_MSL = """
 // --- tunables ---------------------------------------------------------------
-// LAYERS x 3 cells is the per-pixel iteration count and the dominant cost, so it
-// is kept as low as the look allows; everything inside that loop is deliberately
-// transcendental-free except the surface itself.
-constant int   LAYERS      = 12;     // depth rows sampled per pixel
+// LAYERS x 3 octaves is the per-pixel iteration count and the dominant cost. Each
+// octave is a single texture lookup -- the neighbouring-cell visits the previous
+// version needed are gone (see `splat`), which is what buys the extra octaves and
+// the doubled layer count. Everything in the loop is transcendental-free except
+// the surface and the per-octave rotation.
+constant int   LAYERS      = 24;     // depth slabs sampled per pixel
 constant float Z_NEAR      = 1.5;    // nearest / furthest sheet depth
 constant float Z_FAR       = 5.2;
 constant float CAM_H       = 0.62;   // camera height above the sheet
 constant float HORIZON     = 0.36;   // sheet's vanishing line, fraction of height
 constant float FOCAL       = 0.85;   // focal length in view-height units
-constant float PPU         = 44.0;   // particles per world unit, across the sheet
-constant float DOT         = 0.0034; // particle radius in view-height units
+constant float FREQ        = 24.0;   // texture cells per world unit
+constant float DOT_FRAC    = 0.18;   // dot radius as a fraction of a cell
 constant float SPRAY       = 0.34;   // how far a lofted particle rises
-constant float GAIN        = 1.5;    // overall brightness of the accumulation
+constant float GAIN        = 10.0;   // overall brightness of the accumulation
+constant float THICK       = 1.0;    // band half-thickness, in dot radii
 
-// Particle jitter and brightness must be fixed per particle, so they come from its
-// (cell, layer) index rather than anything time-varying -- otherwise every particle
-// would reshuffle each frame. These are the arithmetic-only variety on purpose:
-// the usual fract(sin(n)*43758.0) idiom costs a transcendental, and at 48 cells per
-// pixel that alone was a third of the frame.
-static inline float hash11(float n) {
-    n = fract(n * 0.1031);
-    n *= n + 33.33;
-    n *= n + n;
-    return fract(n);
-}
-static inline float2 hash21(float2 p) {
+// Particle jitter, loft and brightness must be fixed per particle, so they come
+// from its cell index rather than anything time-varying -- otherwise every particle
+// would reshuffle each frame. This is the arithmetic-only variety on purpose: the
+// usual fract(sin(n)*43758.0) idiom costs a transcendental, and at 72 lookups per
+// pixel that alone would be a third of the frame.
+static inline float3 hash33(float2 p) {
     float3 v = fract(float3(p.xyx) * float3(0.1031, 0.1030, 0.0973));
     v += dot(v, v.yzx + 33.33);
-    return fract((v.xx + v.yz) * v.zy);
+    return fract((v.xxy + v.yzz) * v.zyx);
 }
 
 // The surface: three travelling sine trains at unrelated angles and wavelengths,
@@ -96,6 +107,39 @@ static inline float surface(float x, float z, float t) {
     return 0.32 * sin(1.30 * x + 0.55 * z + 0.55 * t)
          + 0.18 * sin(-0.85 * x + 1.30 * z + 0.41 * t)
          + 0.10 * sin(2.40 * x - 0.90 * z + 0.72 * t);
+}
+
+// One octave of the particle texture. Rotates the plane by `ang`, lands in a cell,
+// and measures the distance to that cell's jittered dot; `dy` is how far this pixel
+// sits above the sheet, so the dot only registers if its height projects here.
+// Returns the density contribution in .x and coverage in .y (for crest colouring).
+static inline float2 splat(float2 p, float freq, float ang, float lodPix, float dy) {
+    float s = sin(ang), c = cos(ang);
+    float2 q = float2(c * p.x - s * p.y, s * p.x + c * p.y) * freq;
+    float2 cell = floor(q);
+    float2 f = q - cell;
+    float3 rnd = hash33(cell);
+    // Jitter is bounded so the dot cannot cross a cell edge. That is the whole
+    // trick: one lookup is then *exact*, with none of the neighbouring-cell visits
+    // the placed-particle version needed to avoid seams -- and it only holds while
+    // the dots stay small, so finer dots make this scene cheaper, not dearer.
+    float2 center = float2(0.5) + (rnd.xy - 0.5) * 0.62;
+    float d = length(f - center);
+    // Widen the dot to the pixel footprint once the cell goes subpixel, so distant
+    // layers dissolve toward their average instead of aliasing into crawling noise.
+    float r = max(DOT_FRAC, lodPix * freq);
+    float cov = max(0.0, 1.0 - d / r);
+    cov = cov * cov * (DOT_FRAC / r);      // conserve energy as it widens
+    // Half-thickness comes from *this* octave's radius, so a dot is as tall as it
+    // is wide at every frequency. Deriving it from one shared frequency instead
+    // stretches the finer octaves into vertical dashes.
+    float rw = r / freq * THICK;
+    float loft = rnd.z * rnd.z * rnd.z;    // most on the sheet, a few lofted high
+    float band = max(0.0, 1.0 - abs(dy - loft * SPRAY) / rw);
+    // A second, independent value out of the same hash. Without it every dot peaks
+    // at one brightness and the sheet reads as uniform grain rather than particles.
+    float bright = (0.55 + 0.45 * fract(rnd.z * 13.7)) * (1.0 - 0.7 * loft);
+    return float2(cov * band * band * bright, cov * band);
 }
 
 fragment float4 puikit_bg_fragment(float4 pos [[position]],
@@ -116,37 +160,25 @@ fragment float4 puikit_bg_fragment(float4 pos [[position]],
         float z = 1.0 / mix(1.0 / Z_NEAR, 1.0 / Z_FAR, fi);
         float layerFade = 1.0 - 0.55 * fi;
 
-        // This pixel's position on the sheet, in world units at this depth.
+        // The projection, run backwards. Instead of placing a particle and asking
+        // where it lands, ask what this pixel is looking at: at this depth the ray
+        // crosses the sheet at wx, and only a particle at height py projects here.
         float wx = px * z / FOCAL;
-        float cell = floor(wx * PPU);
+        float py = CAM_H - (uv.y - HORIZON) * z / FOCAL;
+        float h = surface(wx, z, t);
 
-        // Visit the neighbouring cells too: a particle whose centre is in the next
-        // cell can still overlap this pixel, and skipping them leaves seams.
-        for (int c = -1; c <= 1; ++c) {
-            float id = cell + float(c);
-            float2 rnd = hash21(float2(id, float(i)));
-            float pwx = (id + 0.5 + (rnd.x - 0.5) * 0.9) / PPU;
+        // One pixel's width in world units at this depth, for the LOD widening.
+        float lodPix = (z / FOCAL) / u.resolution.y;
 
-            float loft = rnd.y * rnd.y * rnd.y;   // most on the surface, a few high
-            float h = surface(pwx, z, t);
-            float py = h + loft * SPRAY;
+        // Three octaves at unrelated frequencies, each rotating at its own rate.
+        float2 p = float2(wx, z);
+        float dy = py - h;
+        float2 a = splat(p, FREQ,         0.050 * t,         lodPix, dy);
+        float2 b = splat(p, FREQ * 1.70, -0.037 * t + 2.1,   lodPix, dy);
+        float2 c = splat(p, FREQ * 2.60,  0.021 * t + 4.7,   lodPix, dy);
 
-            // Project the particle: x back to screen, y through the camera.
-            float sx = FOCAL * pwx / z;
-            float sy = HORIZON + FOCAL * (CAM_H - py) / z;
-
-            float2 d = float2(px - sx, uv.y - sy);
-            float r = DOT * (1.0 + 2.2 / z);      // nearer particles are larger
-            // Polynomial falloff rather than a gaussian: exp() at 48 cells per
-            // pixel is expensive, and squaring a clamped (1 - d^2/r^2) gives the
-            // same soft round dot with a finite support the compiler can skip.
-            float q = max(0.0, 1.0 - dot(d, d) / (r * r));
-            float splat = q * q;
-
-            float bright = layerFade * (1.0 - 0.7 * loft) * (0.55 + 0.45 * hash11(id + float(i) * 37.0));
-            density += splat * bright;
-            crest = max(crest, splat * (0.5 + 0.5 * h / 0.6));
-        }
+        density += (a.x * 1.00 + b.x * 0.80 + c.x * 0.60) * layerFade;
+        crest = max(crest, (a.y + b.y) * (0.5 + 0.5 * h / 0.6));
     }
 
     density = 1.0 - exp(-density * GAIN);   // saturating, so dense areas read solid
@@ -180,32 +212,46 @@ fragment float4 puikit_bg_fragment(float4 pos [[position]],
 #: ``[[buffer(0)]]`` parameter). Keep the two in sync when tuning the scene.
 WAVE_HLSL = """
 // --- tunables (see WAVE_MSL for the rationale of each) -------------------
-static const int   LAYERS  = 12;
-static const float Z_NEAR  = 1.5;
-static const float Z_FAR   = 5.2;
-static const float CAM_H   = 0.62;
-static const float HORIZON = 0.36;
-static const float FOCAL   = 0.85;
-static const float PPU     = 44.0;
-static const float DOT     = 0.0034;
-static const float SPRAY   = 0.34;
-static const float GAIN    = 1.5;
+static const int   LAYERS   = 24;
+static const float Z_NEAR   = 1.5;
+static const float Z_FAR    = 5.2;
+static const float CAM_H    = 0.62;
+static const float HORIZON  = 0.36;
+static const float FOCAL    = 0.85;
+static const float FREQ     = 24.0;
+static const float DOT_FRAC = 0.18;
+static const float SPRAY    = 0.34;
+static const float GAIN     = 10.0;
+static const float THICK    = 1.0;
 
-float hash11(float n) {
-    n = frac(n * 0.1031);
-    n *= n + 33.33;
-    n *= n + n;
-    return frac(n);
-}
-float2 hash21(float2 p) {
+float3 hash33(float2 p) {
     float3 v = frac(float3(p.xyx) * float3(0.1031, 0.1030, 0.0973));
     v += dot(v, v.yzx + 33.33);
-    return frac((v.xx + v.yz) * v.zy);
+    return frac((v.xxy + v.yzz) * v.zyx);
 }
 float surface(float x, float z, float t) {
     return 0.32 * sin(1.30 * x + 0.55 * z + 0.55 * t)
          + 0.18 * sin(-0.85 * x + 1.30 * z + 0.41 * t)
          + 0.10 * sin(2.40 * x - 0.90 * z + 0.72 * t);
+}
+
+// One octave of the particle texture -- see the MSL twin for what each step is for.
+float2 splat(float2 p, float freq, float ang, float lodPix, float dy) {
+    float s = sin(ang), c = cos(ang);
+    float2 q = float2(c * p.x - s * p.y, s * p.x + c * p.y) * freq;
+    float2 cell = floor(q);
+    float2 f = q - cell;
+    float3 rnd = hash33(cell);
+    float2 center = float2(0.5, 0.5) + (rnd.xy - 0.5) * 0.62;
+    float d = length(f - center);
+    float r = max(DOT_FRAC, lodPix * freq);
+    float cov = max(0.0, 1.0 - d / r);
+    cov = cov * cov * (DOT_FRAC / r);
+    float rw = r / freq * THICK;
+    float loft = rnd.z * rnd.z * rnd.z;
+    float band = max(0.0, 1.0 - abs(dy - loft * SPRAY) / rw);
+    float bright = (0.55 + 0.45 * frac(rnd.z * 13.7)) * (1.0 - 0.7 * loft);
+    return float2(cov * band * band * bright, cov * band);
 }
 
 float4 puikit_bg_fragment(float4 pos : SV_Position) : SV_Target {
@@ -223,29 +269,19 @@ float4 puikit_bg_fragment(float4 pos : SV_Position) : SV_Target {
         float layerFade = 1.0 - 0.55 * fi;
 
         float wx = px * z / FOCAL;
-        float cell = floor(wx * PPU);
+        float py = CAM_H - (uv.y - HORIZON) * z / FOCAL;
+        float h = surface(wx, z, t);
 
-        for (int c = -1; c <= 1; ++c) {
-            float id = cell + float(c);
-            float2 rnd = hash21(float2(id, float(i)));
-            float pwx = (id + 0.5 + (rnd.x - 0.5) * 0.9) / PPU;
+        float lodPix = (z / FOCAL) / resolution.y;
 
-            float loft = rnd.y * rnd.y * rnd.y;
-            float h = surface(pwx, z, t);
-            float py = h + loft * SPRAY;
+        float2 p = float2(wx, z);
+        float dy = py - h;
+        float2 a = splat(p, FREQ,         0.050 * t,         lodPix, dy);
+        float2 b = splat(p, FREQ * 1.70, -0.037 * t + 2.1,   lodPix, dy);
+        float2 c = splat(p, FREQ * 2.60,  0.021 * t + 4.7,   lodPix, dy);
 
-            float sx = FOCAL * pwx / z;
-            float sy = HORIZON + FOCAL * (CAM_H - py) / z;
-
-            float2 d = float2(px - sx, uv.y - sy);
-            float r = DOT * (1.0 + 2.2 / z);
-            float q = max(0.0, 1.0 - dot(d, d) / (r * r));
-            float splat = q * q;
-
-            float bright = layerFade * (1.0 - 0.7 * loft) * (0.55 + 0.45 * hash11(id + float(i) * 37.0));
-            density += splat * bright;
-            crest = max(crest, splat * (0.5 + 0.5 * h / 0.6));
-        }
+        density += (a.x * 1.00 + b.x * 0.80 + c.x * 0.60) * layerFade;
+        crest = max(crest, (a.y + b.y) * (0.5 + 0.5 * h / 0.6));
     }
 
     density = 1.0 - exp(-density * GAIN);
@@ -1064,10 +1100,13 @@ float4 puikit_bg_fragment(float4 pos : SV_Position) : SV_Target {
 #: typo in a theme costs the scene rather than startup.
 #:
 #: ``resolution_scale`` is per scene because only the scene knows how much sharpness
-#: it can give up. The wave is diffuse grain — indistinguishable at half resolution
-#: and four times cheaper there, which is what keeps it affordable on a Retina
-#: display. Every other scene here is thin bright lines, where halving the scale and
-#: upscaling would trade away the crispness that is the point of drawing them.
+#: it can give up. The wave is diffuse grain, and at half resolution it is four times
+#: cheaper — which is what keeps it affordable on a Retina display, and it needs to
+#: be: the texture-mapped sheet samples three octaves across 24 depth slabs. The
+#: upscale does soften its dots, and that is a deliberate trade rather than a free
+#: one; 0.75 renders them visibly crisper for a little over twice the cost. Every
+#: other scene here is thin bright lines, where halving the scale and upscaling would
+#: trade away the crispness that is the point of drawing them.
 SHADER_KINDS: dict[str, dict] = {
     "wave": {"source": WAVE_MSL, "source_hlsl": WAVE_HLSL, "resolution_scale": 0.5},
     # Rain renders at full resolution: it is thin bright lines, and at half scale the
