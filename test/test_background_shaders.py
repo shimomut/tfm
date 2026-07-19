@@ -49,7 +49,7 @@ class Registry(unittest.TestCase):
     def test_expected_shaders_are_offered(self):
         self.assertEqual(set(SHADER_KINDS),
                          {"wave", "rain", "starfield", "grid", "constellation",
-                          "datastream", "hologram", "earth"})
+                          "datastream", "hologram"})
 
     def test_each_entry_is_valid_shader_kwargs(self):
         # The dict is splatted straight into Shader(...), so a stray key would

@@ -26,7 +26,6 @@ on-palette whichever theme (or custom palette) you use.
 | `grid` | Flying down a wireframe corridor — floor, ceiling and both walls gridded, converging on a vanishing point that wanders as the camera slowly drifts and turns. |
 | `wave` | A dense field of particles flowing over a rolling wave surface, with a colour gradient sweeping along it. |
 | `datastream` | Horizontal telemetry traffic: layered rows of dashes streaming past at different rates, mostly short with the occasional long streak, each leading with a bright head and some ending in a small upright tick. Busy and quiet regions drift across the field. |
-| `earth` | The planet seen from orbit, turning slowly. Dark glossy oceans that mirror the sun where it strikes them, matte continents banded between green and desert and shaded by their own terrain, a cloud deck riding above the surface — so it slides over the ground toward the limb and casts shadows that lengthen as the sun sinks — polar caps, and an atmosphere that runs from blue overhead to gold at the terminator, flaring where that gold band meets the edge. Clustered city lights come up on the night side. Stars behind it. |
 | `hologram` | A depth of holographic panels drifting toward you, each a small flat readout — pseudo-text that types itself out left to right, bar and line charts, progress bars, ring gauges, wireframe meshes — struck here and there with a warm accent. Panels fade up, hold and vanish on their own clock as the field flies slowly past, with a fine haze of distant ones behind, a few thick speed streaks raking outward from the vanishing point, soft out-of-focus dots and strokes drifting slowly across it all, and bright traffic — barcode bursts, dashes and dots — running fast along horizontal lanes. |
 
 The UI toolkit's own `cube` (a spinning wireframe) also works. It exists as a
@@ -47,8 +46,8 @@ with no usable GPU shader support.
 ## Turning one on
 
 Animations are chosen per theme. Among the built-in themes, **Sci-Fi** ships with
-the starfield, **Cyber** with the hologram, **Shinagawa** with the wave and **Earth**
-with the planet; select one from **View → Theme** or cycle themes with `T`.
+the starfield, **Cyber** with the hologram and **Shinagawa** with the wave; select
+one from **View → Theme** or cycle themes with `T`.
 
 To use one in your own theme, add an `animation` key to a theme in the `THEMES`
 dict in `~/.tfm/config.py`:
