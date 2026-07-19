@@ -80,6 +80,34 @@ a 8× view and arrive at something closer to 5×. The test
 The pan step is divided by the zoom (`_pan_by`), so one keypress always covers
 the same share of the *visible* extent rather than of the whole image.
 
+### The pan center must be clamped to its *reachable* range
+
+The visible window is a fraction `w = 1/zoom` of the image, and its center can
+only travel within `[w/2, 1 - w/2]` — past that the window is already flush
+against an edge. `_clamp_center` clamps `cx`/`cy` to exactly that range, **not**
+the full `0..1`.
+
+Clamping to `0..1` was a bug: panning past a border kept incrementing an
+unreachable center (e.g. `cx` climbing to `1.0` while the window stopped moving
+at `cx = 0.75`), so reversing direction moved *nothing* until the value wound
+back into range — several dead keypresses. `_clamp_center` also runs after a
+zoom, because zooming out shrinks the reachable range and can strand a center
+that was valid at higher zoom; at the fit level the range collapses to a point,
+so it doubles as the re-center.
+
+## The post-effect is suspended while a picture is up
+
+On a CRT / Pip-Boy theme the post-effect is a full-view Core Image content
+filter (see `MacOSBackend._apply_post_effect`), so it would tint the image and
+lay scanlines over it — the picture would not be shown faithfully. Per-region
+exemption is not feasible with a whole-layer filter, so `TfmApp._open_viewer`
+**suspends** the effect (`set_post_effect(None)`) when it opens a picture and
+restores it on close through the viewer's `on_close` hook
+(`_restore_post_effect`). It is a no-op for themes without an effect and on
+terminals (where `set_post_effect` no-ops), so it never branches on the backend.
+The modal swallows the theme-toggle key, so the effect can't change while the
+viewer is up and a plain save/restore is safe.
+
 ## Images in a terminal
 
 A character grid has no pixels, and TFM's curses backend has a hard **256
@@ -134,6 +162,41 @@ overrides in both directions (a protocol name, or `none`).
 When a protocol is found the backend flips `images: True` in its capability
 profile, so `Panel.draw_image` stops substituting the alt glyph and the same
 widget code renders pictures on curses and GUI alike.
+
+### Escapes must reach the real terminal, not a redirected `sys.stdout`
+
+The first reason images never appeared in iTerm2: **TFM replaces `sys.stdout`**
+with a `LogCapture` shim (`tfm_log_manager`) that routes writes to its log pane
+and *never forwards them to the tty*. An image escape has no newline, so the
+shim's line-buffer holds it forever — the picture simply never renders (and the
+same swallowing hit kitty, sixel, OSC 52 clipboard, and OSC 22 pointer).
+
+So `CursesBackend` writes every out-of-band escape (mouse tracking, pointer
+shape, clipboard, **images**) through `self._raw_out`, captured once at
+construction from `sys.__stdout__` — the interpreter's original stream, which no
+host reassigns — not the live `sys.stdout`. `test_terminal_graphics.py`'s
+`test_images_go_to_the_real_terminal_not_a_redirected_stdout` pins it: with a
+swallowing shim installed as `sys.stdout`, the image still reaches the terminal.
+
+This is the diagnostic hook's main use, too: `PUIKIT_TERM_GRAPHICS_DEBUG=<file>`
+traces detection → each placement → each emission with byte counts, and
+`tools/diagnose_terminal_graphics.py` emits the protocol directly (bypassing
+curses) to separate an encoding problem from an integration one.
+
+### Cursor drift (why iTerm2 showed nothing)
+
+kitty keeps the cursor put (`C=1`); iTerm2 and sixel have no such option and
+**advance the cursor when they draw**. Left unchecked, an image low on the
+screen scrolls the alternate screen and pushes the picture out of view — which
+presents as "no image appears at all." So `_present_images` brackets the whole
+batch in DECSC/DECRC (`\x1b7` … `\x1b8`): save the cursor curses positioned,
+draw, restore it. Each image is addressed absolutely (`\x1b[row;colH`), so one
+image's drift never offsets the next and a single save/restore covers the batch.
+
+Do **not** send `doNotMoveCursor=1` to iTerm2 — it is not a real `File` argument
+(it was a mistaken port of kitty's `C=1`), and sending it stopped iTerm2
+rendering the image entirely. Only the documented args go out: `inline`, `size`,
+`width`, `height`, `preserveAspectRatio`.
 
 ### Sixel
 

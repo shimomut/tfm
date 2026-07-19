@@ -3308,10 +3308,27 @@ class TfmApp:
             siblings = [f for f in (pane or {}).get("files", []) if is_image_file(f)]
             if entry not in siblings:  # a pane we were not given, or a stale list
                 siblings = [entry]
+            # Suspend the theme's post-effect while a picture is up: on a
+            # CRT/Pip-Boy theme the effect is a full-view Core Image filter, so it
+            # would tint the image and lay scanlines over it. Show the real
+            # pixels instead; _restore_post_effect puts the effect back on close.
+            # A no-op on themes without an effect and on terminals (set_post_effect
+            # is a no-op there), so this never branches on the backend.
+            theme = self.themes[self._theme_index][1]
+            has_effect = theme.extras.get("post_effect") is not None
+            if has_effect:
+                self.backend.set_post_effect(None)
             show_image_viewer(self.panel, entry, siblings=siblings,
-                              index=siblings.index(entry))
+                              index=siblings.index(entry),
+                              on_close=self._restore_post_effect if has_effect else None)
         else:
             show_text_viewer(self.panel, entry, state_manager=self.state_manager)
+        self.panel.render()
+
+    def _restore_post_effect(self) -> None:
+        """Re-apply the active theme's post-effect and repaint — the close hook
+        for the image viewer, which suspends it for a faithful picture."""
+        self._apply_post_effect(self.themes[self._theme_index][1])
         self.panel.render()
 
     def view_file(self) -> None:

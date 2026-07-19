@@ -24,6 +24,7 @@ sys.path.insert(0, os.path.join(_HERE, ".."))  # the app entry point, tfm.py
 from puikit import Event, EventType, Panel, PROFILE_GUI_DESKTOP, PROFILE_TUI
 from puikit.backends.memory_backend import MemoryBackend
 from puikit.image import zoom_window
+from puikit.widgets.base import Widget
 
 from tfm_image_viewer import (IMAGE_SUFFIXES, MAX_ZOOM, MIN_ZOOM, PAN_STEP,
                               ZOOM_STEP, ImageViewer, is_image_file,
@@ -198,19 +199,48 @@ def test_pan_moves_the_center_by_a_share_of_the_visible_extent(images):
     assert viewer.cy == pytest.approx(0.5 + PAN_STEP / 2.0)
 
 
-def test_pan_center_is_clamped_to_the_image(images):
+def test_pan_center_clamps_to_the_reachable_range(images):
+    # The center only travels within [w/2, 1 - w/2] (w = 1/zoom = 0.5 here). It
+    # must NOT accumulate to 0/1: parking off the edge is the bug that made
+    # reversing direction move nothing for several presses.
     viewer = ImageViewer(images[0])
     viewer.zoom = 2.0
     for _ in range(50):
         viewer.handle_event(_key(key="right"))
         viewer.handle_event(_key(key="down"))
-    assert viewer.cx == pytest.approx(1.0)
-    assert viewer.cy == pytest.approx(1.0)
+    assert viewer.cx == pytest.approx(0.75)
+    assert viewer.cy == pytest.approx(0.75)
     for _ in range(100):
         viewer.handle_event(_key(key="left"))
         viewer.handle_event(_key(key="up"))
-    assert viewer.cx == pytest.approx(0.0)
-    assert viewer.cy == pytest.approx(0.0)
+    assert viewer.cx == pytest.approx(0.25)
+    assert viewer.cy == pytest.approx(0.25)
+
+
+def test_reversing_pan_moves_immediately_at_the_edge(images):
+    # Regression: one reverse press must move the window straight back off the
+    # edge, because the center was never allowed past what the window can reach.
+    viewer = ImageViewer(images[0])
+    viewer.zoom = 2.0
+    for _ in range(20):  # jam against the right edge
+        viewer.handle_event(_key(key="right"))
+    x_edge, _, _, _ = viewer._source()
+    viewer.handle_event(_key(key="left"))  # a single reverse press
+    x_after, _, _, _ = viewer._source()
+    assert x_after < x_edge  # the window actually moved left
+
+
+def test_zooming_out_pulls_the_center_back_into_range(images):
+    # Zoom in at a corner, then zoom out: the reachable range shrinks, so the
+    # center must be pulled back in rather than left stranded off the edge.
+    viewer = ImageViewer(images[0])
+    viewer.zoom = 8.0
+    for _ in range(30):
+        viewer.handle_event(_key(key="right"))
+    assert viewer.cx > 0.8
+    viewer.zoom = 2.0
+    viewer._clamp_center()
+    assert viewer.cx == pytest.approx(0.75)  # 1 - (0.5 / 2)
 
 
 def test_pan_at_an_edge_preserves_the_zoom_level(images):
@@ -410,6 +440,28 @@ def test_viewer_swallows_unhandled_events(images):
     assert viewer.handle_event(Event(type=EventType.RESIZE, hints={})) is True
 
 
+def test_on_close_fires_once_when_closed(images):
+    backend = MemoryBackend(width=60, height=20, capabilities=PROFILE_GUI_DESKTOP)
+    panel = Panel(backend)
+    calls = []
+    viewer = show_image_viewer(panel, images[0], on_close=lambda: calls.append(1))
+    panel.render()
+    viewer.handle_event(_key(key="escape"))
+    assert calls == [1]  # exactly once, and only after the layer was popped
+
+
+def test_on_close_does_not_fire_if_not_top_layer(images):
+    # The guard: a stray close on a viewer buried under another layer must not
+    # fire the restore hook (which would put the effect back too early).
+    backend = MemoryBackend(width=60, height=20, capabilities=PROFILE_GUI_DESKTOP)
+    panel = Panel(backend)
+    calls = []
+    viewer = show_image_viewer(panel, images[0], on_close=lambda: calls.append(1))
+    panel.push_layer(Widget(), z=200, hints={"x": 0, "y": 0, "w": 10, "h": 10})
+    viewer._close()  # viewer is no longer the top layer
+    assert calls == []
+
+
 def test_show_image_viewer_stacks_help_above_itself(images):
     backend = MemoryBackend(width=60, height=20, capabilities=PROFILE_GUI_DESKTOP)
     panel = Panel(backend)
@@ -420,15 +472,21 @@ def test_show_image_viewer_stacks_help_above_itself(images):
 # --- app dispatch ------------------------------------------------------------
 
 
-def _app_open(images, focus, pane_files):
+def _app_open(images, focus, pane_files, backend=None):
     """Drive TfmApp._open_viewer directly with a synthetic pane, so the routing
     is tested without depending on the live config's FILE_ASSOCIATIONS (which
     decide only whether an *external* program pre-empts the built-in viewer)."""
     app = tfm.TfmApp.__new__(tfm.TfmApp)  # no curses / no file monitor
-    panel = Panel(MemoryBackend(width=60, height=20,
-                                capabilities=PROFILE_GUI_DESKTOP))
+    backend = backend or MemoryBackend(width=60, height=20,
+                                       capabilities=PROFILE_GUI_DESKTOP)
+    panel = Panel(backend)
     app.panel = panel
+    app.backend = backend
     app.state_manager = None
+    # _open_viewer reads the active theme to decide whether to suspend a
+    # post-effect; the auto-derived theme carries none.
+    app.themes = [("Test", panel.theme)]
+    app._theme_index = 0
     app._open_viewer(focus, {"files": pane_files})
     return panel._layers[-1].widget
 
@@ -460,6 +518,59 @@ def test_open_viewer_without_a_pane_falls_back_to_a_single_image(images):
     widget = _app_open(images, images[0], [])
     assert isinstance(widget, ImageViewer)
     assert [p.name for p in widget.paths] == ["a.png"]
+
+
+class _EffectBackend(MemoryBackend):
+    """A GUI backend that records set_post_effect calls, so a test can see the
+    effect suspended for the image and restored on close."""
+
+    def __init__(self):
+        super().__init__(width=60, height=20, capabilities=PROFILE_GUI_DESKTOP)
+        self.effect_calls = []
+
+    def set_post_effect(self, effect):
+        self.effect_calls.append(effect)
+
+
+def test_post_effect_is_suspended_for_the_image_and_restored_on_close(images):
+    from puikit import PostEffect
+
+    backend = _EffectBackend()
+    app = tfm.TfmApp.__new__(tfm.TfmApp)
+    panel = Panel(backend)
+    app.panel = panel
+    app.backend = backend
+    app.state_manager = None
+    # A theme carrying a CRT-style effect: the viewer must not filter the picture.
+    theme = panel.theme
+    theme.extras["post_effect"] = PostEffect(bloom=0.4)
+    app.themes = [("CRT", theme)]
+    app._theme_index = 0
+
+    app._open_viewer(images[0], {"files": list(images)})
+    assert backend.effect_calls == [None]  # suspended on open
+
+    panel._layers[-1].widget.handle_event(_key(key="escape"))
+    # Restored on close (the theme's effect pushed back).
+    assert len(backend.effect_calls) == 2
+    assert backend.effect_calls[1] is theme.extras["post_effect"]
+
+
+def test_post_effect_untouched_when_theme_has_none(images):
+    backend = _EffectBackend()
+    app = tfm.TfmApp.__new__(tfm.TfmApp)
+    panel = Panel(backend)
+    app.panel = panel
+    app.backend = backend
+    app.state_manager = None
+    theme = panel.theme
+    theme.extras.pop("post_effect", None)  # a theme that recommends no effect
+    app.themes = [("Plain", theme)]
+    app._theme_index = 0
+
+    app._open_viewer(images[0], {"files": list(images)})
+    panel._layers[-1].widget.handle_event(_key(key="escape"))
+    assert backend.effect_calls == []  # nothing to suspend, nothing to restore
 
 
 # --- remote / in-archive files ----------------------------------------------

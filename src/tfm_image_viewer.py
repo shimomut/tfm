@@ -108,7 +108,8 @@ class ImageViewer(Widget):
 
     focusable = True
 
-    def __init__(self, path, siblings: Sequence | None = None, index: int = 0):
+    def __init__(self, path, siblings: Sequence | None = None, index: int = 0,
+                 on_close=None):
         # The sibling list is a snapshot taken at open time, never a live
         # reference to the pane's list: the file monitor mutates that in place on
         # refresh, which would shift the index out from under the viewer.
@@ -122,6 +123,10 @@ class ImageViewer(Widget):
             self.index = index  # trust the caller's index when it agrees
         self.zoom = MIN_ZOOM
         self.cx = self.cy = 0.5  # pan center, normalized image coordinates
+        # Called once when the viewer closes. The app uses it to restore the
+        # theme's post-effect, which it suspends while a picture is up so the
+        # real pixels show instead of a CRT/scanline-filtered version of them.
+        self._on_close = on_close
         self._panel: Any = None
         self._child_z = 90
         # Local filesystem path for the current image (a temp copy for a remote
@@ -209,20 +214,35 @@ class ImageViewer(Widget):
         self._resolve()
 
     def _zoom_by(self, factor: float) -> None:
-        """Multiply the zoom by ``factor``, clamped to the allowed range. At the
-        fit level the pan center returns to the middle, because a fitted image
-        has nowhere to pan to and a stale center would jump the next zoom-in."""
+        """Multiply the zoom by ``factor``, clamped to the allowed range, then
+        re-clamp the pan center — zooming out shrinks the reachable range, so a
+        center parked near an edge has to come back in. At the fit level
+        ``_clamp_center`` pins it to the middle (there is nowhere to pan)."""
         self.zoom = max(MIN_ZOOM, min(MAX_ZOOM, self.zoom * factor))
-        if self.zoom <= MIN_ZOOM:
-            self.cx = self.cy = 0.5
+        self._clamp_center()
 
     def _pan_by(self, dx: float, dy: float) -> None:
         """Move the pan center by ``(dx, dy)`` in fractions of the *visible*
         extent. Dividing by the zoom is what makes one keypress cover the same
-        share of the screen at 2x and at 20x. The center is clamped to 0..1;
-        zoom_window then slides the window fully inside the image."""
-        self.cx = min(1.0, max(0.0, self.cx + dx / self.zoom))
-        self.cy = min(1.0, max(0.0, self.cy + dy / self.zoom))
+        share of the screen at 2x and at 20x."""
+        self.cx += dx / self.zoom
+        self.cy += dy / self.zoom
+        self._clamp_center()
+
+    def _clamp_center(self) -> None:
+        """Clamp the pan center to the range it can actually *reach*.
+
+        The visible window is a fraction ``w = 1/zoom`` of the image, and its
+        center can only travel within ``[w/2, 1 - w/2]`` — past that the window
+        is already flush against an edge. Clamping ``cx``/``cy`` to that range
+        (not the full ``0..1``) is what stops the center accumulating off the
+        edge: otherwise panning past a border keeps incrementing an unreachable
+        value, and reversing direction moves nothing until it winds back in.
+        At the fit level (``zoom == 1``) the range collapses to a point, so this
+        also re-centers a fitted image."""
+        half = 0.5 / self.zoom
+        self.cx = min(1.0 - half, max(half, self.cx))
+        self.cy = min(1.0 - half, max(half, self.cy))
 
     def _source(self) -> tuple[float, float, float, float] | None:
         """The crop the backend should sample — the ``src`` hint, as normalized
@@ -426,6 +446,11 @@ class ImageViewer(Widget):
         self._release_temp()
         if panel is not None and panel.has_layers and panel._layers[-1].widget is self:
             panel.pop_layer()
+            # Only after we actually popped: the callback restores the theme's
+            # post-effect the app suspended while the picture was up. Guarded so a
+            # stray close on a viewer that is not the top layer cannot fire it.
+            if self._on_close is not None:
+                self._on_close()
 
     def _show_help(self) -> None:
         if self._panel is None:
@@ -453,15 +478,17 @@ class ImageViewer(Widget):
 
 
 def show_image_viewer(panel: Any, path, siblings: Sequence | None = None,
-                      index: int = 0, z: int = 80) -> ImageViewer:
+                      index: int = 0, z: int = 80, on_close=None) -> ImageViewer:
     """Push a full-window modal :class:`ImageViewer` over ``panel``.
 
     ``siblings`` is the image files from the pane the viewer was opened from, in
     the order the user sees them, so prev/next walks that list; ``index`` is
     ``path``'s position in it. Omit both to view a single image with navigation
-    disabled. Like the other viewers, ``reflow`` re-derives the layer rect from
-    the live window size each render, so it follows resizes."""
-    viewer = ImageViewer(path, siblings=siblings, index=index)
+    disabled. ``on_close`` runs once when the viewer closes (the app restores the
+    post-effect it suspended for a faithful picture). Like the other viewers,
+    ``reflow`` re-derives the layer rect from the live window size each render, so
+    it follows resizes."""
+    viewer = ImageViewer(path, siblings=siblings, index=index, on_close=on_close)
     sw, sh = panel.backend.size_units
     viewer._panel = panel
     viewer._child_z = z + 10  # help overlay stacks above the viewer's own layer

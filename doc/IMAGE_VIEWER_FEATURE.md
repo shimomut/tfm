@@ -46,6 +46,12 @@ non-image files are skipped. The list wraps at both ends.
 The list is fixed when the viewer opens, so a background directory refresh
 cannot shift it under you. Close and reopen to pick up new files.
 
+## CRT / Pip-Boy themes
+
+On a theme with a screen post-effect (glow, scanlines, bloom), the effect is
+suspended while an image is open so you see the real pixels rather than a
+filtered version of them. It returns automatically when you close the viewer.
+
 ## Terminal support
 
 Terminals do not all display images. TFM uses whichever inline-image protocol
