@@ -24,7 +24,7 @@ TFM supports different color schemes to look good in different terminal environm
 ### Retro themes with screen effects
 
 Beyond the standard palettes (Dark+, Light+, Monokai, Dracula, Nord, Solarized,
-Gruvbox), TFM ships four **screen** themes, each pairing a palette with a
+Gruvbox), TFM ships five **screen** themes, each pairing a palette with a
 recommended *screen effect*:
 
 - **Sci-Fi** — a tactical-HUD look: soft cyan-white text on a deep navy, cool cyan
@@ -46,6 +46,13 @@ recommended *screen effect*:
   so the file list stays sortable at a glance against the moving water. Its only
   effect is a soft drop shadow on the text, which lifts the glyphs clear of the
   background. Text appears instantly; the water is the only thing that moves.
+- **Earth** — the view from orbit: near-black space, ocean blue for the chrome, and
+  the warm gold of sunlit continents for directories and i-search, with the
+  [`earth`](BACKGROUND_ANIMATIONS_FEATURE.md) globe turning slowly behind the panes.
+  Like Shinagawa its only effect is a soft drop shadow on the text, and nothing else
+  moves — but because the background is one bright object in an otherwise empty sky
+  rather than a field filling the window, the panes are left more opaque and the
+  planet is composited harder.
 
 Select any of them from **View → Theme** or by cycling with `T`.
 

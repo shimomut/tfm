@@ -562,6 +562,58 @@ _THEME_SPECS: list[tuple[str, dict]] = [
     # NB: no ``text_effect`` — text arrives instantly here. Water is the thing that
     # moves in this theme; having the filenames type themselves in as well would put
     # two independent animations on screen competing for the same attention.
+    #
+    # Earth: the view from orbit — the blue marble turning in the dark, over the
+    # ``earth`` scene (see tfm_background_shaders). The palette is the photograph:
+    # near-black space, ocean blue for the chrome, and the warm gold of sunlit
+    # continents and city lights for everything that has to be found.
+    #
+    # The one theme whose background is a *single object* rather than a field, and
+    # that is what sets its numbers. Every other scene here fills the window, so its
+    # opacity trades off against the text everywhere at once; this one is a bright
+    # disc over an otherwise empty sky, so it can be composited harder (0.5, twice
+    # Cyber's) and still leave most of the window at the plain backdrop. The chrome is
+    # a little more opaque than Shinagawa's for the same reason: what shows through
+    # the panes is mostly empty space, so the panes can afford to be more solid
+    # without hiding the thing worth seeing.
+    ("Earth", dict(bg=(9, 15, 28), fg=(230, 239, 250), muted=(120, 142, 174),
+                   accent=(92, 160, 226), surface=(19, 30, 50), selection=(34, 72, 120),
+                   # The warm gold is the planet's own daylight side, and it plays the
+                   # role the orange plays in Shinagawa: the hue held apart from the
+                   # blue chrome for the things you are looking for.
+                   accent2=(255, 184, 104),
+                   status=lambda p: mix(p["bg"], p["accent"], 0.20),
+                   footer=lambda p: mix(p["bg"], p["accent"], 0.20),
+                   file_types={"directory": (255, 184, 104),   # sunlit continent
+                               "link": (120, 226, 206)},        # turquoise shallows
+                   # Near-white, not gold: the cursor frames whichever row you are on
+                   # and half of those are gold directory names, so a warm frame around
+                   # a warm name is the one place the cue could vanish (the same trap
+                   # Shinagawa's cursor avoids).
+                   cursor={"active": (226, 240, 255), "inactive": (104, 132, 170)},
+                   syntax={"keyword": (198, 148, 255),   # violet
+                           "string": (158, 232, 138),    # green
+                           "comment": (112, 138, 176),   # slate — recedes
+                           "number": (255, 190, 116),    # amber
+                           "operator": (255, 142, 180),  # pink
+                           "builtin": (108, 224, 240)},  # cyan
+                   # Text shadow only, for Shinagawa's reason: the background moves, and
+                   # a shadow is what lifts the glyphs clear of it. No bloom or glow —
+                   # the UI here is a lit panel in front of a window, not an emissive
+                   # screen, and the only thing that should look emissive is the planet.
+                   post_effect={"drop_shadow": 0.5},
+                   # The scene's ink is a pale ice blue, and it is doing more work in
+                   # this scene than in any other: the shader permutes its channels to
+                   # get the whole planet out of one colour — the ocean from the blue
+                   # itself, the deserts from red-and-blue swapped, the vegetation from
+                   # a third rotation, the city lights from the warm one again. A blue
+                   # is therefore not a stylistic choice here but the thing that makes
+                   # the continents land-coloured; a green ink would give a coherent
+                   # planet, just not this one.
+                   animation={"type": "earth", "color": (150, 205, 255),
+                              "opacity": 0.5},
+                   opacity=0.76)),  # chrome at 76% — see the note above
+    # NB: no ``text_effect``, for Shinagawa's reason — the planet is what moves.
 ]
 
 THEMES: list[tuple[str, Theme]] = [(name, _theme(**spec)) for name, spec in _THEME_SPECS]
