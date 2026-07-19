@@ -220,7 +220,8 @@ def _theme(bg, fg, muted, accent, surface, selection, *, accent2=None,
            status=None, footer=None, directory=None, isearch_match=None,
            syntax=None, file_types=None, cursor=None, selection_fill=None,
            post_effect=None, animation=None, wallpaper=None, opacity=1.0,
-           pane_frame=None, pane_dim=None, text_effect=None) -> Theme:
+           pane_frame=None, pane_dim=None, text_effect=None,
+           dialog_effect=None) -> Theme:
     ac2 = accent if accent2 is None else accent2
     p = {"bg": bg, "fg": fg, "muted": muted, "accent": accent, "accent2": ac2,
          "surface": surface}
@@ -257,6 +258,11 @@ def _theme(bg, fg, muted, accent, surface, selection, *, accent2=None,
     # than raising — themes are data, often hand-written in a user's config.py.
     if text_effect is not None:
         extras["text_effect"] = text_effect
+    # Whether modals play the app-wide entrance (see tfm_dialog_geometry). Every
+    # theme wants it except one whose metaphor has no growing box, so this is an
+    # opt-*out* flag: ``dialog_effect=False`` and dialogs simply appear.
+    if dialog_effect is not None:
+        extras["dialog_effect"] = bool(dialog_effect)
     if isearch_match is not None:
         extras["isearch_match"] = isearch_match(p) if callable(isearch_match) else isearch_match
     # A pinned file-pane selection fill: used verbatim as the selected-row bg
@@ -481,7 +487,15 @@ _THEME_SPECS: list[tuple[str, dict]] = [
                          syntax={"keyword": (22, 32, 22), "string": (58, 82, 48),
                                  "comment": (110, 128, 92), "number": (22, 32, 22),
                                  "operator": (72, 90, 58), "builtin": (22, 32, 22)},
-                         post_effect={"drop_shadow": 0.6})),
+                         post_effect={"drop_shadow": 0.6},
+                         # The one theme with no modal entrance. Every other look
+                         # has a surface that can plausibly move — a window, a
+                         # projection, a tube. This one is a fixed sheet of glass
+                         # with fixed segments behind it, and the only thing such a
+                         # display can do is switch them on. A box that grows from
+                         # 92% and fades in is the one gesture the metaphor cannot
+                         # produce, so dialogs here appear whole, instantly.
+                         dialog_effect=False)),
 ]
 
 THEMES: list[tuple[str, Theme]] = [(name, _theme(**spec)) for name, spec in _THEME_SPECS]
@@ -500,7 +514,7 @@ _THEME_OVERRIDE_MAP = {
     # resting one. Both pure data — a theme (or a user's config) turns them on
     # without a line of app code.
     "pane_frame": "pane_frame", "pane_dim": "pane_dim",
-    "text_effect": "text_effect",
+    "text_effect": "text_effect", "dialog_effect": "dialog_effect",
     # NB: config ``background`` is the base *color* (→ bg, above). The content behind
     # the UI is a separate choice — ``animation`` (a type / params) or ``wallpaper``
     # (an image path / params) — so it never collides with the color key.

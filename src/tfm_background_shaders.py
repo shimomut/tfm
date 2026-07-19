@@ -371,10 +371,13 @@ fragment float4 puikit_bg_fragment(float4 pos [[position]],
 
         for (int d = 0; d < DROPS; ++d) {
             float phase = rnd(ci, 4u + uint(d));
-            // Travel 0->1 walks the head from just above the view to the bottom
-            // edge, so a streak enters already fully formed.
+            // Travel 0->1 walks the head from a streak's length above the view to
+            // a streak's length below it, so the streak both enters already fully
+            // formed and stays until its tail has cleared the bottom edge. Stopping
+            // the head at H would wrap the drop while the tail still covered the
+            // last streakLen of the screen, and the drop would blink out early.
             float travel = fract(u.time * RATE * fall + phase);
-            float hy = travel * (H + streakLen) - streakLen;
+            float hy = travel * (H + 2.0 * streakLen) - streakLen;
             // Place this pixel along the streak: 0 at the head, 1 at the tail end.
             float k = (hy - pos.y) / streakLen;
             if (k < 0.0 || k > 1.0) { continue; }
@@ -446,7 +449,7 @@ float4 puikit_bg_fragment(float4 pos : SV_Position) : SV_Target {
         for (int d = 0; d < DROPS; ++d) {
             float phase = rnd(ci, 4 + (uint)d);
             float travel = frac(time * RATE * fall + phase);
-            float hy = travel * (H + streakLen) - streakLen;
+            float hy = travel * (H + 2.0 * streakLen) - streakLen;
             float k = (hy - pos.y) / streakLen;
             if (k < 0.0 || k > 1.0) { continue; }
             float a = pow(1.0 - k, TAIL_GAMMA) * bright * prof;
@@ -663,6 +666,7 @@ constant float RATE_YAW     = 0.023; // and 53s -- so the motion never reads as
 constant float RATE_PITCH   = 0.019; // a loop
 constant float LINE_PX      = 1.1;   // grid line width, in pixels
 constant float NEAR_GLOW    = 0.35;  // how far near geometry pales toward white
+constant float BRIGHTNESS   = 0.5;   // how far a lit line gets toward full ink
 constant float TAU          = 6.283185307;
 
 // A grid line as coverage rather than a hit test. `p` is a coordinate that reaches
@@ -744,7 +748,7 @@ fragment float4 puikit_bg_fragment(float4 pos [[position]],
 
     float3 rgb = mix(u.ink.rgb, float3(1.0),
                      clamp(1.0 - depth / Z_FAR, 0.0, 1.0) * NEAR_GLOW);
-    rgb = mix(u.backdrop.rgb, rgb, clamp(lit, 0.0, 1.0) * u.opacity);
+    rgb = mix(u.backdrop.rgb, rgb, clamp(lit, 0.0, 1.0) * BRIGHTNESS * u.opacity);
     return float4(rgb, 1.0);
 }
 """
@@ -771,6 +775,7 @@ static const float RATE_YAW     = 0.023;
 static const float RATE_PITCH   = 0.019;
 static const float LINE_PX      = 1.1;
 static const float NEAR_GLOW    = 0.35;
+static const float BRIGHTNESS   = 0.5;
 static const float TAU          = 6.283185307;
 
 float grid_line(float p) {
@@ -831,7 +836,7 @@ float4 puikit_bg_fragment(float4 pos : SV_Position) : SV_Target {
 
     float3 rgb = lerp(ink.rgb, float3(1.0, 1.0, 1.0),
                       saturate(1.0 - depth / Z_FAR) * NEAR_GLOW);
-    rgb = lerp(backdrop.rgb, rgb, saturate(lit) * opacity);
+    rgb = lerp(backdrop.rgb, rgb, saturate(lit) * BRIGHTNESS * opacity);
     return float4(rgb, 1.0);
 }
 """

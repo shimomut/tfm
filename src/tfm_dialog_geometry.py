@@ -54,10 +54,20 @@ OPEN_MS_VIEWER = 140
 def animate_open(panel: Any, widget: Any, duration_ms: int = OPEN_MS_DIALOG) -> bool:
     """Play the standard TFM modal entrance for ``widget`` on ``panel``.
 
+    A theme may opt out of the entrance entirely with ``dialog_effect=False``
+    (carried in ``Theme.extras``) — for a look whose physical metaphor has no
+    room for a box that grows, such as Segment LCD, where a modal simply
+    switches on. Reading it here rather than at the nine call sites keeps the
+    per-theme choice a data change, matching ``text_effect``.
+
     Returns whether a transition was actually scheduled — ``False`` on a still
-    backend or under reduced motion, where the widget is simply already in its
-    final state on the next render.
+    backend, under reduced motion, or when the theme opted out, where the widget
+    is simply already in its final state on the next render.
     """
+    theme = getattr(panel, "theme", None)
+    extras = getattr(theme, "extras", None) if theme is not None else None
+    if extras is not None and not extras.get("dialog_effect", True):
+        return False
     return panel.animate(widget, hints={**_OPEN_TRANSITION, "duration_ms": duration_ms})
 
 
