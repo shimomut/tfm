@@ -81,7 +81,7 @@ from tfm_isearch_bar import ISearchBar  # noqa: E402
 from tfm_pane_manager import PaneManager  # noqa: E402
 from tfm_path import Path  # noqa: E402
 from tfm_state_manager import get_state_manager  # noqa: E402
-from tfm_str_format import format_size  # noqa: E402
+from tfm_str_format import abbreviate_path, format_size  # noqa: E402
 from tfm_batch_rename_dialog import show_batch_rename  # noqa: E402
 from tfm_compare_dialog import show_compare_select  # noqa: E402
 from tfm_compare_selection import compute_compare_selection  # noqa: E402
@@ -720,9 +720,11 @@ class PaneHeader(Widget):
         elif self.app._is_archive(pane["path"]):
             # A browsed archive: show [archive.zip]/sub rather than the raw URI.
             label = _archive_header_label(str(pane["path"]))
-            text = elide(label, avail, where="middle", measure=ctx.measure_text)
+            text = abbreviate_path(label, avail, measure=ctx.measure_text)
         else:
-            text = elide(str(pane["path"]), avail, where="middle", measure=ctx.measure_text)
+            # Drop whole directory components rather than cutting mid-name, so
+            # every name still on screen is one the user can actually read.
+            text = abbreviate_path(str(pane["path"]), avail, measure=ctx.measure_text)
         fg = ctx.theme.accent if active else ctx.theme.text
         ctx.draw_text(pad_x, pad_y, text, Style(fg=fg, attr=TextAttribute.BOLD))
 

@@ -45,7 +45,7 @@ from puikit.widgets import DragBar, show_message_box
 from puikit.widgets.base import Widget
 
 from tfm_path import Path
-from tfm_str_format import format_size
+from tfm_str_format import abbreviate_path, format_size
 from tfm_text_viewer import (MONO, _ScrollBody, _header_bg, draw_status_bar,
                              viewer_layer_hints, viewer_pad)
 from tfm_dialog_geometry import OPEN_MS_VIEWER, animate_open
@@ -1169,10 +1169,14 @@ class DirectoryDiffView(Widget):
                           attr=TextAttribute.BOLD)
         right_head = Style(fg=accent if self.active == "right" else self._text_fg, bg=header_bg,
                            attr=TextAttribute.BOLD)
+        # Abbreviate by whole path components: a plain truncation silently drops
+        # the tail, which is exactly the part that says which directory this is.
         ctx.draw_text(self._left_x, pad_y,
-                      truncate_to_width(str(self.left_path), int(self._left_w)), left_head)
+                      abbreviate_path(str(self.left_path), self._left_w,
+                                      measure=ctx.measure_text), left_head)
         ctx.draw_text(self._right_x, pad_y,
-                      truncate_to_width(str(self.right_path), int(self._right_w)), right_head)
+                      abbreviate_path(str(self.right_path), self._right_w,
+                                      measure=ctx.measure_text), right_head)
 
         self._clamp_scroll()
 
