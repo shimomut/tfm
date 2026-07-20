@@ -7,8 +7,8 @@ This package contains all the core modules for the TFM file manager.
 import sys
 import os
 
-# Version information
-__version__ = "0.99"
+# The version is single-sourced from tfm.py's ``_VERSION`` (surfaced to packaging
+# via pyproject.toml). Not duplicated here to avoid drift.
 __author__ = "Tomonori Shimomura"
 
 # Add the package directory to sys.path to support relative imports

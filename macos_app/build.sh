@@ -100,8 +100,13 @@ LDFLAGS="-rpath @executable_path/../Frameworks"
 # Code signing (optional - set to enable signing)
 CODESIGN_IDENTITY="${CODESIGN_IDENTITY:-}"
 
-# Version number (can be overridden by environment variable)
-VERSION="${VERSION:-0.99}"
+# Version number (can be overridden by environment variable). Defaults to the
+# single source of truth: tfm.py's _VERSION literal (same string the Windows
+# build reads), so the bundle version never drifts from the app's --version.
+if [ -z "${VERSION:-}" ]; then
+    VERSION="$(sed -nE 's/^_VERSION[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' "${PROJECT_ROOT}/tfm.py" | head -1)"
+    VERSION="${VERSION:-0.0.0}"
+fi
 
 # ============================================================================
 # Build Script Entry Point

@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+# NOTE: the plain "tfm" name is already taken on PyPI, so the distribution is
+# published as "tfm-file-manager". The import module and the installed console
+# command stay "tfm" (see [project.scripts]); only `pip install <name>` differs.
+name = "tfm-file-manager"
+description = "TFM — a dual-pane terminal file manager (TUI) with optional native desktop backends"
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "Tomonori Shimomura" }]
+requires-python = ">=3.10"
+keywords = ["file manager", "terminal", "curses", "tui", "dual-pane"]
+# version  -> single-sourced from tfm.py's _VERSION literal (see [tool.setuptools.dynamic]).
+# dependencies -> single-sourced from requirements.txt (shared with `make venv`).
+dynamic = ["version", "dependencies"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console :: Curses",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: POSIX",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: System :: Filesystems",
+    "Topic :: Utilities",
+]
+
+[project.scripts]
+tfm = "tfm:main"
+
+[project.urls]
+Homepage = "https://github.com/shimomut/tfm"
+Repository = "https://github.com/shimomut/tfm"
+Issues = "https://github.com/shimomut/tfm/issues"
+
+# The application is the top-level ``tfm.py`` at the repo root; its flat
+# ``tfm_*`` modules live in ``src/`` and ship as the ``tfm_modules`` package dir.
+# ``tfm.py`` puts that dir on sys.path at import time (see its header), so
+# ``from tfm_* import`` resolves once installed.
+#
+# NOT declared here: PuiKit, TFM's UI framework. It is not yet on PyPI, so it is
+# installed separately (``pip install -e ../puikit``). Once PuiKit is published,
+# add it to requirements.txt so it flows into the dynamic dependencies below.
+[tool.setuptools]
+py-modules = ["tfm"]
+packages = ["tfm_modules"]
+package-dir = { tfm_modules = "src" }
+
+[tool.setuptools.package-data]
+# End-user external programs invoked by TFM (src/tools/*). The ``_config.py``
+# template ships automatically as a package .py module.
+tfm_modules = ["tools/*"]
+
+[tool.setuptools.dynamic]
+version = { attr = "tfm._VERSION" }
+dependencies = { file = ["requirements.txt"] }
