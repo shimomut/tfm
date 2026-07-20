@@ -1,20 +1,22 @@
 # TFM - TUI File Manager
 
-A powerful file manager that runs both in the terminal and as a native desktop application. Navigate your filesystem with keyboard shortcuts in a clean, intuitive dual-pane interface with comprehensive file operations, advanced text editing, and professional-grade features.
+A powerful file manager that runs both in the terminal and as a native desktop application on **macOS and Windows**. Navigate your filesystem with keyboard shortcuts in a clean, intuitive dual-pane interface with comprehensive file operations, rich built-in viewers, themeable visual effects, and professional-grade features.
 
 ![title](doc/images/tfm-page-title.jpg)
 
 ## Key Features
 
+- **Cross-platform** - Runs in any terminal, or as a native desktop app on **macOS and Windows**
 - **Dual-pane interface** with independent navigation and cross-pane operations
 - **Archive browsing** - Navigate ZIP, TAR, and compressed archives as virtual directories
 - **SFTP support** - Browse and manage remote servers via SSH with optimized performance
+- **AWS S3 support** for cloud storage operations
 - **Advanced search** with real-time filtering and background processing  
 - **Multi-selection** with bulk operations and progress tracking
-- **Built-in text viewer** with syntax highlighting for 20+ file formats
+- **Rich built-in viewers** - Syntax-highlighted text, images, Markdown, JSON, and CSV/TSV
+- **Themes & visual effects** - A dozen built-in themes; desktop mode adds GPU background animations, CRT/phosphor screen effects, and text-reveal animations
 - **External program integration** with configurable launchers
-- **AWS S3 support** for cloud storage operations
-- **Customizable interface** with multiple color schemes and key bindings
+- **Customizable** - Fully configurable key bindings and settings
 
 ## Development with Kiro
 
@@ -58,10 +60,11 @@ next to TFM and lets the Makefile wire everything into a virtualenv.
    python3 tfm.py
    ```
 
-   **Desktop Mode** (macOS only) needs PyObjC, which `requirements.txt` already
-   installs automatically on macOS. Just pick the backend:
+   **Desktop Mode** runs on macOS and Windows. The platform-specific dependency
+   (PyObjC on macOS) is installed automatically by `requirements.txt`; the Windows
+   GUI backend is pure Python and needs nothing extra. Just pick the backend:
    ```bash
-   python3 tfm.py --backend gui
+   python3 tfm.py --backend gui   # native desktop window on macOS or Windows
    ```
 
 ### Essential Controls
@@ -82,6 +85,10 @@ For comprehensive information about TFM's features and usage:
 ### User Documentation
 - **[Complete User Guide](doc/TFM_USER_GUIDE.md)** - Comprehensive guide covering all features, configuration, and usage
 - **[Configuration](doc/CONFIGURATION_FEATURE.md)** - Complete configuration reference and customization guide
+- **[Desktop Mode](doc/DESKTOP_MODE_GUIDE.md)** - Native macOS / Windows desktop app setup and options
+- **[Background Animations](doc/BACKGROUND_ANIMATIONS_FEATURE.md)** - Themeable GPU background scenes and screen effects
+- **[Image Viewer](doc/IMAGE_VIEWER_FEATURE.md)** - Built-in zoom / pan image viewer
+- **[Markdown Viewer](doc/MARKDOWN_VIEWER_FEATURE.md)** & **[JSON / CSV Viewers](doc/JSON_CSV_VIEWERS_FEATURE.md)** - Rendered structured-file views
 - **[SFTP Support](doc/SFTP_SUPPORT_FEATURE.md)** - Remote server access via SSH with file operations and search
 - **[AWS S3 Support](doc/S3_SUPPORT_FEATURE.md)** - Cloud storage integration and S3 bucket management
 - **[Archive Virtual Directory Browsing](doc/ARCHIVE_VIRTUAL_DIRECTORY_FEATURE.md)** - Browse archives as directories
@@ -103,12 +110,13 @@ All key bindings are fully customizable through the configuration system. For co
 - **Selection:** Space to select files, `A` for all files, `Shift-A` for all items
 - **Search:** `F` for incremental search, `Shift-F` for filename search, `Shift-G` for content search
 - **Archives:** `P` to create archives, `U` to extract, Enter to browse contents
-- **Text Viewer:** `V` to view files with syntax highlighting (works inside archives)
+- **File Viewers:** `V` to view the selected file — text (syntax-highlighted), images, Markdown, JSON, and CSV/TSV (works inside archives); `M` toggles rendered/raw in the viewer
 
 ### Advanced Features
 - **Favorite Directories:** `J` for quick access to bookmarked locations
 - **External Programs:** `X` for custom program integration
 - **Sub-shell Mode:** `Shift-X` to enter shell with TFM environment variables
+- **Themes:** `T` to cycle themes; more display options under `Z` (view options) and `Shift-Z` (settings)
 - **Configuration:** `Shift-Z` for settings menu (`Z` opens view options)
 - **SFTP Support:** Navigate remote servers using `ssh://hostname/path` syntax
 - **AWS S3 Support:** Navigate S3 buckets using `s3://bucket/path` syntax
@@ -142,20 +150,66 @@ TFM lets you browse archive files as if they were regular directories - no extra
 
 See [Archive Virtual Directory Feature](doc/ARCHIVE_VIRTUAL_DIRECTORY_FEATURE.md) for complete documentation.
 
-## Built-in Text Viewer
+## Built-in File Viewers
 
-TFM includes a powerful text viewer with syntax highlighting for 20+ file formats. Press `Enter` on text files or use `v` to open the viewer. Works seamlessly with files inside archives!
+Press `V` (or `Enter`) to view the selected file. TFM picks the right viewer for the file type — all of them work seamlessly on local files, inside archives, and on remote SFTP / S3 paths without extraction or download.
 
-**Features:**
+### Text viewer
+
+A powerful text viewer with syntax highlighting for 20+ file formats.
+
+![Text viewer](doc/images/text-viewer.jpg)
+
 - Syntax highlighting for Python, JavaScript, JSON, Markdown, YAML, and more
-- Line numbers, horizontal scrolling, search functionality
+- Line numbers, horizontal scrolling, line wrapping (`W`), and in-file search
 - Multiple encoding support (UTF-8, Latin-1, CP1252)
-- View files directly from archives without extraction
 
-**Enhanced highlighting:** Install `pygments` for full syntax support:
-```bash
-pip install pygments
-```
+**Enhanced highlighting:** `pygments` (installed via `requirements.txt`) enables full syntax support.
+
+### Rich viewers — Markdown, JSON, CSV/TSV
+
+For structured files, the viewer offers a *rendered* view in addition to the raw text. Press `M` inside the viewer to toggle between the formatted and raw views.
+
+| Markdown | JSON / JSONL | CSV / TSV |
+|:---:|:---:|:---:|
+| <img src="doc/images/markdown-viewer.jpg" width="280"> | <img src="doc/images/json-viewer.jpg" width="280"> | <img src="doc/images/csv-viewer.jpg" width="280"> |
+| Rendered headings, lists, code, and links | Collapsible, syntax-colored tree (`.json`, `.jsonl`, `.ndjson`) | Column-aligned table grid (`.csv`, `.tsv`) |
+
+### Image viewer
+
+A modal image viewer with zoom, pan, and prev/next navigation through the sibling images in the current pane.
+
+![Image viewer](doc/images/image-viewer.jpg)
+
+- Supports PNG, JPEG, GIF, BMP, WebP, TIFF, ICO, and more (via Pillow)
+- Renders inline in graphics-capable terminals (iTerm2, kitty, sixel) and in desktop mode; falls back to a metadata card (format / dimensions / size) elsewhere
+- Zoom with `+` / `-`, pan with the arrow keys or a mouse drag, step through images with prev/next
+
+Image decoding needs `pillow` (installed via `requirements.txt`).
+
+## Themes & Visual Effects
+
+TFM ships a dozen built-in themes. Press `T` to cycle to the next theme, or pick one from the **View → Theme** menu — your choice is remembered across restarts. Define your own in `~/.tfm/config.py` and they appear in the picker alongside the built-ins.
+
+| | | |
+|:---:|:---:|:---:|
+| <img src="doc/images/theme-dark.jpg" width="260"><br>**Dark+** | <img src="doc/images/theme-monokai.jpg" width="260"><br>**Monokai** | <img src="doc/images/theme-dracula.jpg" width="260"><br>**Dracula** |
+| <img src="doc/images/theme-nord.jpg" width="260"><br>**Nord** | <img src="doc/images/theme-solarized.jpg" width="260"><br>**Solarized** | <img src="doc/images/theme-gruvbox.jpg" width="260"><br>**Gruvbox Dark** |
+| <img src="doc/images/theme-light.jpg" width="260"><br>**Light+** | <img src="doc/images/theme-solarized-light.jpg" width="260"><br>**Solarized Light** | <img src="doc/images/theme-sci-fi.jpg" width="260"><br>**Sci-Fi** |
+| <img src="doc/images/theme-cyber.jpg" width="260"><br>**Cyber** | <img src="doc/images/theme-segment-lcd.jpg" width="260"><br>**Segment LCD** | <img src="doc/images/theme-shinagawa.jpg" width="260"><br>**Shinagawa** |
+
+The default config also includes a **Phosphor** sample theme — a monochrome phosphor-green CRT terminal — as a starting point for your own.
+
+### Visual effects (desktop mode)
+
+In desktop mode (`--backend gui`), a theme can carry visual effects that the GPU renders behind and over the interface. Terminal mode simply shows the theme's colors and ignores these.
+
+- **Background animations** — a slow, on-palette scene drawn behind the panes, rendered as a GPU fragment shader: `starfield`, `rain`, `hologram`, `wave`, `grid`, `constellation`, and `datastream`.
+- **Screen post-effects** — a full-frame CRT / phosphor look composited over the UI: bloom, glow, scanlines, vignette, and drop shadows.
+- **Text-reveal animations** — filenames and labels *arrive* rather than appear, decoding or typing into place on a directory change (used by Sci-Fi and Cyber).
+- **Translucent surfaces** — panels and chrome can sit at reduced opacity so the animated background reads through.
+
+Effects are pure theme data — each is a combination of parameters attached to a theme, so a custom theme can mix and match them without any application code.
 
 ## Sub-shell Mode
 
@@ -170,13 +224,16 @@ Type `exit` to return to TFM.
 
 ## Advanced Features
 
+- **Native Desktop App:** Run in a real window on macOS and Windows (`--backend gui`) with GPU rendering, or in any terminal — same keyboard-driven interface
 - **Archive Virtual Directories:** Browse ZIP, TAR, and compressed archives as if they were directories - navigate, search, view files, and copy contents without extraction
 - **SFTP Support:** Access remote servers via SSH with full file operations, search, and optimized performance through connection multiplexing and bulk operations
+- **AWS S3 Support:** Navigate and manage S3 buckets with seamless local/remote operations
+- **Rich Viewers:** Built-in viewers for text (syntax-highlighted), images (zoom/pan), Markdown, JSON, and CSV/TSV — plus text and directory diff viewers
+- **Themes & Effects:** A dozen built-in themes with GPU background animations, CRT/phosphor screen effects, and text-reveal animations in desktop mode
 - **Batch Rename:** Regex-based renaming with capture groups and macros
 - **Threaded Search:** Non-blocking filename and content search with progress tracking (works inside archives and on remote servers)
 - **Pane Management:** Resizable layout, directory sync, state persistence
 - **External Integration:** VSCode, Beyond Compare, and custom program support
-- **AWS S3 Support:** Navigate and manage S3 buckets with seamless local/remote operations
 
 For detailed information on all features, see the [User Guide](doc/TFM_USER_GUIDE.md).
 
@@ -186,7 +243,7 @@ For detailed information on all features, see the [User Guide](doc/TFM_USER_GUID
 # Run in terminal mode (default)
 python3 tfm.py
 
-# Run in desktop mode (macOS only, requires PyObjC)
+# Run in desktop mode (native window on macOS or Windows)
 python3 tfm.py --backend gui
 
 # Specify startup directories
@@ -200,7 +257,7 @@ python3 tfm.py --help
 python3 tfm.py --version
 ```
 
-The full flag set is just `--backend {tui,curses,gui,macos}`, `--left DIR`,
+The full flag set is just `--backend {tui,curses,gui,macos,windows}`, `--left DIR`,
 `--right DIR`, `--version`, and `--help`.
 
 ### Backend Selection
@@ -208,15 +265,15 @@ The full flag set is just `--backend {tui,curses,gui,macos}`, `--left DIR`,
 TFM supports two rendering backends, chosen with `--backend`:
 
 - **Terminal Mode** (`--backend tui`, alias `curses`): traditional terminal interface, works on all platforms — the default
-- **Desktop Mode** (`--backend gui`, alias `macos`): native macOS application (requires PyObjC)
+- **Desktop Mode** (`--backend gui`): native desktop window on **macOS** (CoreGraphics, via PyObjC) or **Windows** (Direct2D/DirectWrite). The `gui` alias resolves to the right backend for the current platform; `macos` / `windows` name them explicitly.
 
 Desktop mode provides:
-- Native macOS window with resizing and full-screen support
+- Native window with resizing and full-screen support
 - Customizable fonts (`MONO_FONT_NAME` / `UI_FONT_NAME` / `FONT_SIZE`)
 - Window size and position remembered automatically across runs
-- Better color accuracy with true RGB colors
+- Better color accuracy with true RGB colors, plus GPU-rendered theme background animations and screen effects
 
-See the [User Guide](doc/TFM_USER_GUIDE.md#desktop-mode-macos) for detailed desktop mode configuration.
+See the [Desktop Mode Guide](doc/DESKTOP_MODE_GUIDE.md) for detailed desktop mode configuration.
 
 ## Installation
 
@@ -230,10 +287,10 @@ See the [User Guide](doc/TFM_USER_GUIDE.md#desktop-mode-macos) for detailed desk
 - Windows: `pip install windows-curses` (installed automatically via `requirements.txt`)
 - Terminal with curses support
 
-**Desktop Mode** (macOS only):
+**Desktop Mode** (macOS or Windows):
 - Python 3.10+ (3.14 supported)
-- macOS 10.13 (High Sierra) or later
-- PyObjC framework (installed automatically on macOS via `requirements.txt`)
+- macOS: 10.13 (High Sierra) or later — PyObjC (installed automatically via `requirements.txt`)
+- Windows: 10 or later — the GUI backend is pure Python (Direct2D/DirectWrite), no extra dependency to install
 
 ### Dependencies
 
@@ -249,13 +306,15 @@ pip install -r requirements.txt
 ```
 It pulls in:
 - `pygments` — enhanced syntax highlighting (20+ file formats)
+- `pillow` — the built-in image viewer (decode / crop / scale; also enables inline terminal images)
 - `boto3` — AWS S3 support (cloud storage operations)
 - `watchdog` — automatic directory-listing reload on file changes
 - `pyobjc` — macOS desktop mode (selected automatically on macOS)
-- `windows-curses` — curses support (selected automatically on Windows)
+- `windows-curses` — terminal-mode curses support on Windows (selected automatically on Windows)
 
 The last two use environment markers, so the platform-specific dependency for the
 machine you are on is installed for you. There is no `[macos]` extra to request.
+(The Windows desktop backend itself is pure Python and needs no build step.)
 
 ### Installation Options
 
@@ -272,7 +331,7 @@ pip install -e ../puikit
 # Terminal mode (all platforms)
 python3 tfm.py
 
-# Desktop mode (macOS only - pyobjc came from requirements.txt)
+# Desktop mode (native window on macOS or Windows)
 python3 tfm.py --backend gui
 ```
 
@@ -288,7 +347,7 @@ pip install .
 
 # Run from anywhere (installs a `tfm` console command)
 tfm                # Terminal mode
-tfm --backend gui  # Desktop mode (macOS only)
+tfm --backend gui  # Desktop mode (macOS / Windows)
 ```
 
 #### Option 3: Development Installation
@@ -310,9 +369,9 @@ tfm
 TFM is highly configurable through `~/.tfm/config.py`. Access configuration via the Settings menu (`Shift-Z` key) or edit manually.
 
 **Key areas:**
-- Color schemes and display preferences
+- Themes, color schemes, and visual effects (including custom themes)
 - Key bindings (fully customizable)
-- External programs and text editor
+- External programs, file associations, and text editor
 - Favorite directories and startup paths
 - Performance and behavior settings
 
@@ -342,8 +401,8 @@ tfm/
 - PyObjC (desktop mode) installs automatically on macOS via `pip install -r requirements.txt`
 
 **Desktop Mode Issues:**
-- Desktop mode only works on macOS
-- If PyObjC is missing, TFM automatically falls back to terminal mode
+- Desktop mode runs on macOS and Windows; on other platforms use terminal mode
+- On macOS, if PyObjC is missing TFM automatically falls back to terminal mode
 - Check console output for backend initialization messages
 - See [Desktop Mode Guide](doc/DESKTOP_MODE_GUIDE.md) for detailed setup
 
