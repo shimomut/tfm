@@ -32,6 +32,22 @@ VERSION="${VERSION:-0.99}"
 # CODESIGN_IDENTITY signs the finished DMG; NOTARY_PROFILE (a notarytool
 # keychain profile) additionally notarizes and staples it. Leave both unset for
 # an unsigned development DMG.
+#
+# Both are loaded from the gitignored macos_app/signing.env if present (same
+# file build.sh uses), so you don't have to re-export them. Environment values
+# take precedence over the file.
+SIGNING_ENV_FILE="${SCRIPT_DIR}/signing.env"
+if [ -f "${SIGNING_ENV_FILE}" ]; then
+    # log_info is defined further down; use echo (same format) here.
+    echo "[INFO] Loading signing config from ${SIGNING_ENV_FILE}"
+    _env_codesign="${CODESIGN_IDENTITY:-}"
+    _env_notary="${NOTARY_PROFILE:-}"
+    # shellcheck source=/dev/null
+    . "${SIGNING_ENV_FILE}"
+    [ -n "${_env_codesign}" ] && CODESIGN_IDENTITY="${_env_codesign}"
+    [ -n "${_env_notary}" ] && NOTARY_PROFILE="${_env_notary}"
+fi
+
 CODESIGN_IDENTITY="${CODESIGN_IDENTITY:-}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-}"
 

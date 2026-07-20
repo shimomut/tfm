@@ -28,6 +28,9 @@ venv/
 ENV/
 env/
 
+# Local macOS signing config (non-secret, but per-machine; use signing.env.example)
+macos_app/signing.env
+
 # IDE
 .vscode/
 .idea/

@@ -263,6 +263,22 @@ Application certificate installed in the login keychain.
 With neither set the build is unsigned. `NOTARY_PROFILE` without
 `CODESIGN_IDENTITY` is a hard error — you cannot notarize an unsigned app.
 
+Rather than re-exporting these every session, drop them in a local
+`macos_app/signing.env`, which `build.sh` and `create_dmg.sh` source
+automatically:
+
+```bash
+cd macos_app
+cp signing.env.example signing.env   # then edit signing.env
+./build.sh                           # picks up the values, no export needed
+```
+
+`signing.env` is gitignored. Neither value is a secret — `CODESIGN_IDENTITY` is
+just the certificate's display name (the private key stays in the keychain) and
+`NOTARY_PROFILE` is just a keychain-profile name — but it is per-machine, so it
+stays out of the repo. Values exported in the environment still override the
+file, so CI can pass them in the usual way.
+
 ### One-time setup
 
 ```bash

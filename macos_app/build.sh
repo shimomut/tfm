@@ -97,6 +97,23 @@ fi
 CFLAGS="${CFLAGS} -lpython${PYTHON_VERSION}"
 LDFLAGS="-rpath @executable_path/../Frameworks"
 
+# Local signing configuration (optional, gitignored). CODESIGN_IDENTITY and
+# NOTARY_PROFILE are both non-secret (the certificate's private key and the
+# notary app-specific password live in the macOS keychain), so they can be kept
+# in macos_app/signing.env to avoid re-exporting them every session. Copy
+# signing.env.example to signing.env to start. Values already set in the
+# environment take precedence over the file.
+SIGNING_ENV_FILE="${SCRIPT_DIR}/signing.env"
+if [ -f "${SIGNING_ENV_FILE}" ]; then
+    log_info "Loading signing config from ${SIGNING_ENV_FILE}"
+    _env_codesign="${CODESIGN_IDENTITY:-}"
+    _env_notary="${NOTARY_PROFILE:-}"
+    # shellcheck source=/dev/null
+    . "${SIGNING_ENV_FILE}"
+    [ -n "${_env_codesign}" ] && CODESIGN_IDENTITY="${_env_codesign}"
+    [ -n "${_env_notary}" ] && NOTARY_PROFILE="${_env_notary}"
+fi
+
 # Code signing (optional). Set to a "Developer ID Application" identity to sign
 # the bundle for distribution, e.g.
 #   CODESIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)"
