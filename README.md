@@ -2,7 +2,7 @@
 
 A powerful file manager that runs both in the terminal and as a native desktop application. Navigate your filesystem with keyboard shortcuts in a clean, intuitive dual-pane interface with comprehensive file operations, advanced text editing, and professional-grade features.
 
-**Run in Terminal Mode** (all platforms) or **Desktop Mode** (macOS native app with GPU acceleration).
+![title](doc/images/tfm-page-title.jpg)
 
 ## Key Features
 
@@ -19,22 +19,6 @@ A powerful file manager that runs both in the terminal and as a native desktop a
 ## Development with Kiro
 
 This application was developed using [Kiro](https://kiro.dev/) heavily - an AI-powered development assistant. Approximately 99% of the code was auto-generated from natural language based interactive chat sessions, demonstrating the power of AI-assisted development for creating complex, feature-rich applications.
-
-## Screenshots
-
-![main screen](doc/images/main-screen.png)
-
-<div align="center">
-<img src="doc/images/incremental-search.png" alt="incremental search" width="250">
-<img src="doc/images/favorite-directories.png" alt="favorite directories" width="250">
-<img src="doc/images/grep-dialog.png" alt="grep dialog" width="250">
-<img src="doc/images/search-dialog.png" alt="search dialog" width="250">
-<img src="doc/images/batch-rename.png" alt="batch rename" width="250">
-<img src="doc/images/text-viewer.png" alt="built-in text viewer" width="250">
-<img src="doc/images/external-programs.png" alt="external programs" width="250">
-<img src="doc/images/color-schemes.png" alt="color schemes" width="250">
-</div>
-
 
 ## Quick Start
 
