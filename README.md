@@ -1,12 +1,12 @@
 # TFM - TUI File Manager
 
-A powerful file manager that runs both in the terminal and as a native desktop application on **macOS and Windows**. Navigate your filesystem with keyboard shortcuts in a clean, intuitive dual-pane interface with comprehensive file operations, rich built-in viewers, themeable visual effects, and professional-grade features.
+A powerful file manager that runs as a native desktop application on **Windows and macOS**, and in the terminal on **all platforms — Windows, macOS, and Linux**. Navigate your filesystem with keyboard shortcuts in a clean, intuitive dual-pane interface with comprehensive file operations, rich built-in viewers, themeable visual effects, and professional-grade features.
 
 ![title](doc/images/tfm-page-title.jpg)
 
 ## Key Features
 
-- **Cross-platform** - Runs in any terminal, or as a native desktop app on **macOS and Windows**
+- **Cross-platform** - Native desktop app on **Windows and macOS**; terminal (TUI) app on **Windows, macOS, and Linux**
 - **Dual-pane interface** with independent navigation and cross-pane operations
 - **Archive browsing** - Navigate ZIP, TAR, and compressed archives as virtual directories
 - **SFTP support** - Browse and manage remote servers via SSH with optimized performance
@@ -18,13 +18,16 @@ A powerful file manager that runs both in the terminal and as a native desktop a
 - **External program integration** with configurable launchers
 - **Customizable** - Fully configurable key bindings and settings
 
-## Development with Kiro
-
-This application was developed using [Kiro](https://kiro.dev/) heavily - an AI-powered development assistant. Approximately 99% of the code was auto-generated from natural language based interactive chat sessions, demonstrating the power of AI-assisted development for creating complex, feature-rich applications.
-
 ## Quick Start
 
 ### Installation
+
+> **Want the desktop app?** The easiest way to run TFM in desktop mode is to
+> download and install a prebuilt application package — a self-contained
+> `TFM.exe` folder on Windows or a native `.app` on macOS, with Python and every
+> dependency bundled in (no source checkout, no virtualenv). These packages are
+> **not yet uploaded to GitHub Releases** — until then, use the from-source setup
+> below (which also covers terminal mode on Windows, macOS, and Linux).
 
 TFM's UI runs on **[PuiKit](https://github.com/crftwr/puikit)**, a separate
 framework that is not yet published to PyPI. The simplest setup checks out PuiKit
@@ -60,11 +63,11 @@ next to TFM and lets the Makefile wire everything into a virtualenv.
    python3 tfm.py
    ```
 
-   **Desktop Mode** runs on macOS and Windows. The platform-specific dependency
-   (PyObjC on macOS) is installed automatically by `requirements.txt`; the Windows
-   GUI backend is pure Python and needs nothing extra. Just pick the backend:
+   **Desktop Mode** runs on Windows and macOS. The Windows GUI backend is pure
+   Python and needs nothing extra; the macOS one uses PyObjC, installed
+   automatically by `requirements.txt`. Just pick the backend:
    ```bash
-   python3 tfm.py --backend gui   # native desktop window on macOS or Windows
+   python3 tfm.py --backend gui   # native desktop window on Windows or macOS
    ```
 
 ### Essential Controls
@@ -85,7 +88,7 @@ For comprehensive information about TFM's features and usage:
 ### User Documentation
 - **[Complete User Guide](doc/TFM_USER_GUIDE.md)** - Comprehensive guide covering all features, configuration, and usage
 - **[Configuration](doc/CONFIGURATION_FEATURE.md)** - Complete configuration reference and customization guide
-- **[Desktop Mode](doc/DESKTOP_MODE_GUIDE.md)** - Native macOS / Windows desktop app setup and options
+- **[Desktop Mode](doc/DESKTOP_MODE_GUIDE.md)** - Native Windows / macOS desktop app setup and options
 - **[Background Animations](doc/BACKGROUND_ANIMATIONS_FEATURE.md)** - Themeable GPU background scenes and screen effects
 - **[Image Viewer](doc/IMAGE_VIEWER_FEATURE.md)** - Built-in zoom / pan image viewer
 - **[Markdown Viewer](doc/MARKDOWN_VIEWER_FEATURE.md)** & **[JSON / CSV Viewers](doc/JSON_CSV_VIEWERS_FEATURE.md)** - Rendered structured-file views
@@ -224,7 +227,7 @@ Type `exit` to return to TFM.
 
 ## Advanced Features
 
-- **Native Desktop App:** Run in a real window on macOS and Windows (`--backend gui`) with GPU rendering, or in any terminal — same keyboard-driven interface
+- **Native Desktop App:** Run in a real window on Windows and macOS (`--backend gui`) with GPU rendering, or in any terminal — same keyboard-driven interface
 - **Archive Virtual Directories:** Browse ZIP, TAR, and compressed archives as if they were directories - navigate, search, view files, and copy contents without extraction
 - **SFTP Support:** Access remote servers via SSH with full file operations, search, and optimized performance through connection multiplexing and bulk operations
 - **AWS S3 Support:** Navigate and manage S3 buckets with seamless local/remote operations
@@ -243,7 +246,7 @@ For detailed information on all features, see the [User Guide](doc/TFM_USER_GUID
 # Run in terminal mode (default)
 python3 tfm.py
 
-# Run in desktop mode (native window on macOS or Windows)
+# Run in desktop mode (native window on Windows or macOS)
 python3 tfm.py --backend gui
 
 # Specify startup directories
@@ -264,8 +267,8 @@ The full flag set is just `--backend {tui,curses,gui,macos,windows}`, `--left DI
 
 TFM supports two rendering backends, chosen with `--backend`:
 
-- **Terminal Mode** (`--backend tui`, alias `curses`): traditional terminal interface, works on all platforms — the default
-- **Desktop Mode** (`--backend gui`): native desktop window on **macOS** (CoreGraphics, via PyObjC) or **Windows** (Direct2D/DirectWrite). The `gui` alias resolves to the right backend for the current platform; `macos` / `windows` name them explicitly.
+- **Terminal Mode** (`--backend tui`, alias `curses`): traditional terminal interface, works on all platforms (**Windows, macOS, Linux**) — the default
+- **Desktop Mode** (`--backend gui`): native desktop window on **Windows** (Direct2D/DirectWrite) or **macOS** (CoreGraphics, via PyObjC). The `gui` alias resolves to the right backend for the current platform; `windows` / `macos` name them explicitly.
 
 Desktop mode provides:
 - Native window with resizing and full-screen support
@@ -282,15 +285,15 @@ See the [Desktop Mode Guide](doc/DESKTOP_MODE_GUIDE.md) for detailed desktop mod
 **All modes:**
 - [PuiKit](https://github.com/crftwr/puikit) — TFM's UI framework, installed editable from a sibling `../puikit` checkout (`make venv` / `make install-puikit`). Not on PyPI.
 
-**Terminal Mode** (all platforms):
+**Terminal Mode** (all platforms — Windows, macOS, Linux):
 - Python 3.10+ with curses library (built-in on macOS/Linux, 3.14 supported)
 - Windows: `pip install windows-curses` (installed automatically via `requirements.txt`)
-- Terminal with curses support
+- Terminal with curses support (Linux is terminal-mode only — desktop mode is Windows/macOS)
 
-**Desktop Mode** (macOS or Windows):
+**Desktop Mode** (Windows or macOS):
 - Python 3.10+ (3.14 supported)
-- macOS: 10.13 (High Sierra) or later — PyObjC (installed automatically via `requirements.txt`)
 - Windows: 10 or later — the GUI backend is pure Python (Direct2D/DirectWrite), no extra dependency to install
+- macOS: 10.13 (High Sierra) or later — PyObjC (installed automatically via `requirements.txt`)
 
 ### Dependencies
 
@@ -331,7 +334,7 @@ pip install -e ../puikit
 # Terminal mode (all platforms)
 python3 tfm.py
 
-# Desktop mode (native window on macOS or Windows)
+# Desktop mode (native window on Windows or macOS)
 python3 tfm.py --backend gui
 ```
 
@@ -347,7 +350,7 @@ pip install .
 
 # Run from anywhere (installs a `tfm` console command)
 tfm                # Terminal mode
-tfm --backend gui  # Desktop mode (macOS / Windows)
+tfm --backend gui  # Desktop mode (Windows / macOS)
 ```
 
 #### Option 3: Development Installation
@@ -401,7 +404,7 @@ tfm/
 - PyObjC (desktop mode) installs automatically on macOS via `pip install -r requirements.txt`
 
 **Desktop Mode Issues:**
-- Desktop mode runs on macOS and Windows; on other platforms use terminal mode
+- Desktop mode runs on Windows and macOS; on other platforms use terminal mode
 - On macOS, if PyObjC is missing TFM automatically falls back to terminal mode
 - Check console output for backend initialization messages
 - See [Desktop Mode Guide](doc/DESKTOP_MODE_GUIDE.md) for detailed setup
