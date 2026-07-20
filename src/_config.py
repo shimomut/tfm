@@ -185,8 +185,9 @@ class Config:
             'accent2':    (124, 255, 168),   # pale mint (i-search match base)
             'surface':    (11, 38, 20),      # raised panels (header / popup)
             'selection':  (24, 105, 54),     # active selection fill
-            'status':     (9, 30, 16),       # status bar (dark green panel)
-            'footer':     (9, 30, 16),       # per-pane info bar
+            'status':     (12, 40, 22),      # status bar (dark green panel)
+            'footer':     (22, 68, 40),      # per-pane info bar (lighter, so the
+                                             # footer/status boundary reads on TUI)
             'file_types': {
                 'directory': (150, 255, 150),  # directories (brightest green)
                 'link':      (124, 255, 168),  # symlinks (pale mint)
