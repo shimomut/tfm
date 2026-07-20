@@ -244,6 +244,122 @@ make macos-app-install
 make macos-dmg
 ```
 
+## Code Signing & Notarization
+
+Distribution builds must be signed with a **Developer ID Application** certificate
+and notarized by Apple, or macOS Gatekeeper refuses to open the app on other
+machines ("unidentified developer" / "damaged and can't be opened"). Both steps
+are optional and **off by default** — an unsigned build is fine for local
+development. They require a paid Apple Developer account with a Developer ID
+Application certificate installed in the login keychain.
+
+### Environment variables
+
+| Variable | Effect | Used by |
+|----------|--------|---------|
+| `CODESIGN_IDENTITY` | Signs the `.app` and the DMG. e.g. `"Developer ID Application: Your Name (TEAMID)"` | `build.sh`, `create_dmg.sh` |
+| `NOTARY_PROFILE` | Notarizes + staples the `.app` and DMG. Requires `CODESIGN_IDENTITY`. | `build.sh`, `create_dmg.sh` |
+
+With neither set the build is unsigned. `NOTARY_PROFILE` without
+`CODESIGN_IDENTITY` is a hard error — you cannot notarize an unsigned app.
+
+### One-time setup
+
+```bash
+# Find the Developer ID Application identity to use for CODESIGN_IDENTITY
+security find-identity -v -p codesigning
+
+# Store notary credentials in the keychain as a reusable profile.
+# The password is an app-specific password from https://account.apple.com
+# (Sign-In and Security > App-Specific Passwords), NOT your Apple ID password.
+xcrun notarytool store-credentials "TFM-Notary" \
+    --apple-id you@example.com \
+    --team-id TEAMID \
+    --password <app-specific-password>
+```
+
+### Building a signed, notarized release
+
+```bash
+export CODESIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)"
+export NOTARY_PROFILE="TFM-Notary"
+
+./build.sh        # Step 6 signs the .app; Step 7 notarizes & staples it
+./create_dmg.sh   # signs, notarizes & staples the DMG
+```
+
+### How signing works (`build.sh`, Step 6)
+
+Signing a `.app` for notarization is not a single `codesign` call. Every Mach-O
+binary inside the bundle must be signed with a secure timestamp (`--timestamp`)
+and the Hardened Runtime (`--options runtime`), from the **inside out** —
+signing an outer container first would invalidate the inner signatures:
+
+1. Nested `.so` / `.dylib` — extension modules, the vendored `.dylibs/` produced
+   by delocate, and any dylibs shipped inside pip packages
+2. The embedded interpreter executables (`bin/pythonX.Y`)
+3. `Python.framework` (framework build path only; the standard-Python path ships
+   `libpythonX.Y.dylib`, already signed in step 1)
+4. The main executable (`Contents/MacOS/TFM`)
+5. The `.app` bundle last — the outermost seal over everything above
+
+It then verifies strictly with `codesign --verify --deep --strict`.
+
+**Entitlements.** The embedded CPython interpreter needs the Hardened Runtime
+relaxations in `resources/entitlements.plist`:
+
+- `com.apple.security.cs.disable-library-validation` — lets the interpreter
+  `dlopen()` the bundled C extensions and dylibs, which we sign ourselves rather
+  than embedding in the main binary's signature. Without it, importing any C
+  extension aborts under the Hardened Runtime.
+- `com.apple.security.cs.allow-unsigned-executable-memory` /
+  `com.apple.security.cs.allow-jit` — ctypes/libffi allocate executable
+  trampolines for callbacks. Safe default for a general-purpose interpreter;
+  trim if a build proves it never exercises ctypes callbacks.
+
+**Framework Info.plist.** The Python-embedding step (Step 4) strips the
+framework's `Resources/` directory, which removes the `Info.plist` that
+`codesign` needs to seal `Python.framework` as a nested bundle. Step 6
+synthesizes a minimal one before signing so `codesign --verify --deep` accepts
+the framework as valid nested code.
+
+### How notarization works (`build.sh` Step 7, `create_dmg.sh`)
+
+`build.sh` zips the signed `.app` with `ditto -c -k --keepParent` (notarytool
+takes a `.zip`/`.dmg`/`.pkg`, not a raw `.app`), submits it with
+`xcrun notarytool submit --wait`, then staples the returned ticket with
+`xcrun stapler staple`. `create_dmg.sh` signs the finished DMG and, when
+`NOTARY_PROFILE` is set, notarizes + staples it too. Stapling both the app and
+the DMG means a downloaded installer opens without warnings even offline.
+
+### Verifying
+
+```bash
+# Signature is valid under strict (Gatekeeper-style) rules
+codesign --verify --deep --strict --verbose=2 build/TFM.app
+
+# Gatekeeper will accept it (only passes once notarized)
+spctl -a -vvv --type exec build/TFM.app
+
+# Notarization tickets are stapled
+xcrun stapler validate build/TFM.app
+xcrun stapler validate build/TFM-<version>.dmg
+```
+
+### Troubleshooting notarization
+
+If `notarytool submit` reports `Invalid`, fetch the per-issue log — it names the
+exact binary and reason (unsigned, missing timestamp, missing Hardened Runtime):
+
+```bash
+xcrun notarytool log <submission-id> --keychain-profile "TFM-Notary"
+```
+
+Common causes: a Mach-O the inside-out sign loop missed (add it to Step 6), a
+signature made without `--options runtime`, or a certificate that is not a
+*Developer ID Application* type (Apple Development / Mac Developer certs cannot
+be notarized).
+
 ## Benefits
 
 ### 1. Consistency
@@ -326,7 +442,9 @@ The `install_name_tool` command updates dynamic library references in the TFM ex
 - `tools/collect_dependencies.py` - Dependency collection script (shared with the Windows build)
 - `macos_app/src/main.m` - Objective-C entry point
 - `macos_app/src/TFMAppDelegate.m` - Application delegate
+- `macos_app/create_dmg.sh` - DMG packaging, signing, and notarization
 - `macos_app/resources/Info.plist.template` - Bundle metadata template
+- `macos_app/resources/entitlements.plist` - Hardened Runtime entitlements for signing
 - `macos_app/resources/sitecustomize.py` - Disables user site-packages
 - `src/tfm_external_programs.py` - Defines `tfm_python` variable
 - `Makefile` - Build system integration

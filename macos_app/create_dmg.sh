@@ -28,6 +28,13 @@ VOLUME_NAME="TFM Installer"
 # Version number (can be overridden by environment variable)
 VERSION="${VERSION:-0.99}"
 
+# Code signing / notarization (optional; same variables as build.sh).
+# CODESIGN_IDENTITY signs the finished DMG; NOTARY_PROFILE (a notarytool
+# keychain profile) additionally notarizes and staples it. Leave both unset for
+# an unsigned development DMG.
+CODESIGN_IDENTITY="${CODESIGN_IDENTITY:-}"
+NOTARY_PROFILE="${NOTARY_PROFILE:-}"
+
 # ============================================================================
 # Helper Functions
 # ============================================================================
@@ -187,10 +194,43 @@ main() {
     log_info "Cleaning up temporary directory"
     rm -rf "${DMG_TEMP_DIR}"
     
+    # Sign and (optionally) notarize the DMG. The .app inside is already signed
+    # by build.sh (and, if NOTARY_PROFILE was set then, notarized + stapled).
+    # Signing the DMG lets Gatekeeper validate the container; notarizing +
+    # stapling the DMG makes a downloaded installer open without warnings even
+    # offline.
+    if [ -n "${CODESIGN_IDENTITY}" ]; then
+        log_info "Signing DMG..."
+        codesign --force --timestamp --sign "${CODESIGN_IDENTITY}" "${DMG_PATH}"
+        if ! codesign --verify --verbose=2 "${DMG_PATH}"; then
+            log_error "DMG signature verification failed"
+            exit 1
+        fi
+        log_info "DMG signed"
+
+        if [ -n "${NOTARY_PROFILE}" ]; then
+            log_info "Notarizing DMG (this can take a few minutes)..."
+            if xcrun notarytool submit "${DMG_PATH}" \
+                    --keychain-profile "${NOTARY_PROFILE}" --wait; then
+                xcrun stapler staple "${DMG_PATH}"
+                xcrun stapler validate "${DMG_PATH}"
+                log_info "DMG notarized and stapled"
+            else
+                log_error "DMG notarization failed. Inspect the log with:"
+                log_error "  xcrun notarytool log <submission-id> --keychain-profile \"${NOTARY_PROFILE}\""
+                exit 1
+            fi
+        else
+            log_info "NOTARY_PROFILE not set; DMG signed but not notarized"
+        fi
+    else
+        log_info "CODESIGN_IDENTITY not set; DMG left unsigned (development build)"
+    fi
+
     # Success
     log_info "DMG created successfully: ${DMG_PATH}"
     log_info "Size: $(du -h "${DMG_PATH}" | cut -f1)"
-    
+
     echo ""
     echo "✓ DMG installer created: ${DMG_FILENAME}"
     echo "  Location: ${DMG_PATH}"

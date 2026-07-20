@@ -182,9 +182,11 @@ The main build script that creates the complete app bundle.
    - Substitutes version number from template
    - Validates XML structure
 
-6. **Code signing (optional)**
-   - Signs frameworks, executable, and bundle
-   - Only if `CODESIGN_IDENTITY` is set
+6. **Code signing & notarization (optional)**
+   - Signs (and optionally notarizes + staples) the bundle for distribution
+   - Gated on `CODESIGN_IDENTITY` and `NOTARY_PROFILE`; unset for local builds
+   - Full setup and design notes:
+     [Code Signing & Notarization](../doc/dev/MACOS_APP_BUILD_SYSTEM.md#code-signing--notarization)
 
 **Usage:**
 
@@ -195,12 +197,13 @@ The main build script that creates the complete app bundle.
 # Build with specific Python version
 PYTHON_VERSION=3.11 ./build.sh
 
-# Build with code signing
-CODESIGN_IDENTITY="Developer ID Application: Your Name" ./build.sh
-
 # Build with custom version
 VERSION=1.0.0 ./build.sh
 ```
+
+> **Signing a release build?** The signing/notarization variables and the
+> one-time keychain setup are documented in
+> [Code Signing & Notarization](../doc/dev/MACOS_APP_BUILD_SYSTEM.md#code-signing--notarization).
 
 ### tools/collect_dependencies.py
 
@@ -473,12 +476,17 @@ open build/TFM.app
 
 ### Release Process
 
-1. Update version number in `resources/Info.plist.template`
-2. Build the app: `./build.sh`
-3. Test the app thoroughly (see Testing Guide)
-4. Create DMG: `./create_dmg.sh`
-5. (Optional) Code sign: `CODESIGN_IDENTITY="..." ./build.sh`
+1. Update the version (single source of truth is `tfm.py`'s `_VERSION`; the
+   build reads it automatically)
+2. Export signing credentials — see
+   [Code Signing & Notarization](../doc/dev/MACOS_APP_BUILD_SYSTEM.md#code-signing--notarization)
+3. Build + sign + notarize the app: `./build.sh`
+4. Test the app thoroughly (see Testing Guide)
+5. Create + sign + notarize the DMG: `./create_dmg.sh`
 6. Distribute `TFM-{version}.dmg`
+
+For a quick local build, skip step 2 — the app is unsigned but runnable on your
+own machine.
 
 ## Quick Links
 

@@ -97,8 +97,19 @@ fi
 CFLAGS="${CFLAGS} -lpython${PYTHON_VERSION}"
 LDFLAGS="-rpath @executable_path/../Frameworks"
 
-# Code signing (optional - set to enable signing)
+# Code signing (optional). Set to a "Developer ID Application" identity to sign
+# the bundle for distribution, e.g.
+#   CODESIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)"
+# List the identities in your keychain with: security find-identity -v -p codesigning
 CODESIGN_IDENTITY="${CODESIGN_IDENTITY:-}"
+
+# Notarization (optional; requires CODESIGN_IDENTITY). Set to the name of a
+# notarytool keychain profile to submit the signed .app to Apple's notary
+# service and staple the ticket. Create the profile once with:
+#   xcrun notarytool store-credentials "TFM-Notary" \
+#       --apple-id you@example.com --team-id TEAMID --password <app-specific-pw>
+# then build with: NOTARY_PROFILE="TFM-Notary"
+NOTARY_PROFILE="${NOTARY_PROFILE:-}"
 
 # Version number (can be overridden by environment variable). Defaults to the
 # single source of truth: tfm.py's _VERSION literal (same string the Windows
@@ -751,33 +762,148 @@ fi
 log_success "Info.plist generated and validated"
 
 # ============================================================================
-# Step 6: Code Signing (Optional)
+# Step 6: Code Signing (optional; required for notarized distribution)
 # ============================================================================
+#
+# Signing is skipped unless CODESIGN_IDENTITY is set. Signing the .app alone is
+# not enough for Gatekeeper / notarization: every Mach-O binary inside it must
+# be signed with a secure timestamp and the Hardened Runtime, from the inside
+# out (nested libraries first, the .app last). The embedded CPython interpreter
+# loads C-extension modules (.so) and vendored dylibs at runtime, so it also
+# needs the entitlements in resources/entitlements.plist.
 
 if [ -n "${CODESIGN_IDENTITY}" ]; then
-    log_info "Step 6: Code signing bundle..."
-    
-    # Sign frameworks
-    log_info "Signing Python.framework..."
-    codesign --force --sign "${CODESIGN_IDENTITY}" "${FRAMEWORKS_DIR}/Python.framework"
-    
-    # Sign executable
-    log_info "Signing executable..."
-    codesign --force --sign "${CODESIGN_IDENTITY}" "${MACOS_DIR}/${APP_NAME}"
-    
-    # Sign bundle
-    log_info "Signing app bundle..."
-    codesign --force --sign "${CODESIGN_IDENTITY}" "${APP_BUNDLE}"
-    
-    # Verify signature
-    if codesign -v "${APP_BUNDLE}" 2>&1; then
+    log_info "Step 6: Code signing bundle (inside-out, Hardened Runtime)..."
+
+    ENTITLEMENTS_FILE="${RESOURCES_DIR}/entitlements.plist"
+    if [ ! -f "${ENTITLEMENTS_FILE}" ]; then
+        log_error "Entitlements file not found at ${ENTITLEMENTS_FILE}"
+        exit 1
+    fi
+
+    # Common codesign invocation: replace any existing signature, embed a
+    # secure timestamp, opt into the Hardened Runtime, and apply the embedded
+    # interpreter entitlements.
+    SIGN=(codesign --force --timestamp --options runtime \
+          --entitlements "${ENTITLEMENTS_FILE}" --sign "${CODESIGN_IDENTITY}")
+
+    # The Python-embedding step above strips the framework's Resources/ dir,
+    # which removes the Info.plist codesign needs to seal Python.framework as a
+    # nested bundle. Synthesize a minimal one so the framework signs cleanly and
+    # `codesign --verify --deep` accepts it as valid nested code.
+    FRAMEWORK_VERSION_DIR="${FRAMEWORKS_DIR}/Python.framework/Versions/${PYTHON_VERSION}"
+    if [ -d "${FRAMEWORK_VERSION_DIR}" ] && [ ! -f "${FRAMEWORK_VERSION_DIR}/Resources/Info.plist" ]; then
+        log_info "  Writing minimal Python.framework Info.plist for signing..."
+        mkdir -p "${FRAMEWORK_VERSION_DIR}/Resources"
+        cat > "${FRAMEWORK_VERSION_DIR}/Resources/Info.plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key><string>org.python.python</string>
+    <key>CFBundleName</key><string>Python</string>
+    <key>CFBundleExecutable</key><string>Python</string>
+    <key>CFBundlePackageType</key><string>FMWK</string>
+    <key>CFBundleShortVersionString</key><string>${PYTHON_VERSION}</string>
+    <key>CFBundleVersion</key><string>${PYTHON_VERSION}</string>
+</dict>
+</plist>
+PLIST
+    fi
+
+    # 1. Nested Mach-O libraries: extension modules (.so) and dylibs, including
+    #    the vendored .dylibs/ from delocate and any shipped inside pip packages.
+    log_info "  Signing nested libraries (.so / .dylib)..."
+    while IFS= read -r -d '' lib; do
+        "${SIGN[@]}" "${lib}" || { log_error "Failed to sign ${lib}"; exit 1; }
+    done < <(find "${APP_BUNDLE}" -type f \( -name "*.so" -o -name "*.dylib" \) -print0)
+
+    # 2. Standalone Mach-O executables inside the framework's bin/ (e.g.
+    #    pythonX.Y). Skip symlinks and non-Mach-O helper scripts.
+    log_info "  Signing embedded interpreter executables..."
+    FRAMEWORK_BIN_DIR="${FRAMEWORK_VERSION_DIR}/bin"
+    if [ -d "${FRAMEWORK_BIN_DIR}" ]; then
+        while IFS= read -r -d '' exe; do
+            if file "${exe}" | grep -q "Mach-O"; then
+                "${SIGN[@]}" "${exe}" || { log_error "Failed to sign ${exe}"; exit 1; }
+            fi
+        done < <(find "${FRAMEWORK_BIN_DIR}" -type f -print0)
+    fi
+
+    # 3. Python.framework itself (seals its versioned contents as nested code).
+    #    Present only in the Python.framework build path; the standard-Python
+    #    path ships libpythonX.Y.dylib instead, already signed in step 1.
+    if [ -f "${FRAMEWORK_VERSION_DIR}/Python" ]; then
+        log_info "  Signing Python.framework..."
+        "${SIGN[@]}" "${FRAMEWORKS_DIR}/Python.framework" \
+            || { log_error "Failed to sign Python.framework"; exit 1; }
+    fi
+
+    # 4. The main executable.
+    log_info "  Signing main executable..."
+    "${SIGN[@]}" "${MACOS_DIR}/${APP_NAME}" \
+        || { log_error "Failed to sign ${APP_NAME}"; exit 1; }
+
+    # 5. The .app bundle last: the outermost seal over everything above.
+    log_info "  Signing app bundle..."
+    "${SIGN[@]}" "${APP_BUNDLE}" \
+        || { log_error "Failed to sign ${APP_BUNDLE}"; exit 1; }
+
+    # Verify the whole static code tree strictly (as Gatekeeper would).
+    log_info "  Verifying signature..."
+    if codesign --verify --deep --strict --verbose=2 "${APP_BUNDLE}"; then
         log_success "Code signing completed and verified"
     else
         log_error "Code signing verification failed"
         exit 1
     fi
+    log_info "  (After notarization, confirm Gatekeeper acceptance with:"
+    log_info "     spctl -a -vvv --type exec \"${APP_BUNDLE}\")"
 else
-    log_info "Step 6: Skipping code signing (no identity provided)"
+    log_info "Step 6: Skipping code signing (CODESIGN_IDENTITY not set)"
+fi
+
+# ============================================================================
+# Step 7: Notarization (optional; requires signing)
+# ============================================================================
+#
+# Submits the signed .app to Apple's notary service and staples the resulting
+# ticket, so the app launches without Gatekeeper warnings even offline. Skipped
+# unless NOTARY_PROFILE names a notarytool keychain profile (see the config
+# section above for how to create one). create_dmg.sh notarizes the DMG too.
+
+if [ -n "${NOTARY_PROFILE}" ]; then
+    if [ -z "${CODESIGN_IDENTITY}" ]; then
+        log_error "NOTARY_PROFILE is set but CODESIGN_IDENTITY is not."
+        log_error "A notarized app must be signed first; set CODESIGN_IDENTITY and rebuild."
+        exit 1
+    fi
+
+    log_info "Step 7: Notarizing app bundle..."
+
+    # notarytool accepts a .zip/.dmg/.pkg, not a raw .app; ditto preserves the
+    # bundle's symlinks and signatures inside the zip.
+    NOTARIZE_ZIP="${BUILD_DIR}/${APP_NAME}-notarize.zip"
+    rm -f "${NOTARIZE_ZIP}"
+    log_info "  Packaging app for submission..."
+    /usr/bin/ditto -c -k --keepParent "${APP_BUNDLE}" "${NOTARIZE_ZIP}"
+
+    log_info "  Submitting to Apple notary service (this can take a few minutes)..."
+    if xcrun notarytool submit "${NOTARIZE_ZIP}" \
+            --keychain-profile "${NOTARY_PROFILE}" --wait; then
+        log_info "  Stapling notarization ticket to the app..."
+        xcrun stapler staple "${APP_BUNDLE}"
+        xcrun stapler validate "${APP_BUNDLE}"
+        rm -f "${NOTARIZE_ZIP}"
+        log_success "Notarization completed and stapled"
+    else
+        log_error "Notarization failed. Inspect the full log with:"
+        log_error "  xcrun notarytool log <submission-id> --keychain-profile \"${NOTARY_PROFILE}\""
+        rm -f "${NOTARIZE_ZIP}"
+        exit 1
+    fi
+else
+    log_info "Step 7: Skipping notarization (NOTARY_PROFILE not set)"
 fi
 
 # ============================================================================
