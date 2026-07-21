@@ -2,382 +2,111 @@
 
 ## Overview
 
-This document provides detailed architecture diagrams for the file operations system in TFM. The architecture has been refactored to achieve clean separation of concerns with four distinct layers.
+Copy, move, duplicate, and delete are provided by a single class, `FileOperationService` (`tfm_file_operations.py`). It confirms the operation on the main thread, then runs the actual work as a background **task** (see [Task Framework](TASK_FRAMEWORK_IMPLEMENTATION.md)) whose body is one **linear** function — prepare → resolve conflicts → count → execute, top to bottom. There is no state machine and no separate UI / executor / list-manager split; the earlier four-layer design was removed in the PuiKit port.
 
-## Class Diagram
+The same service instance serves any view. `TfmApp` owns one (`self._fileops = FileOperationService(config, self.tasks)`); a full-window modal such as the directory-diff viewer can construct its own and pass a higher `z` so its dialogs stack above itself.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         FileManager                              │
-│                                                                  │
-│  Responsibilities:                                               │
-│  - Task management (current_task, start_task, cancel_task)      │
-│  - Component initialization and wiring                           │
-│  - UI coordination                                               │
-│                                                                  │
-│  Components:                                                     │
-│  - file_list_manager: FileListManager                            │
-│  - file_operations_executor: FileOperationsExecutor              │
-│  - file_operations_ui: FileOperationsUI                          │
-│  - current_task: Optional[BaseTask]                              │
-└──────────────────────────┬───────────────────────────────────────┘
-                           │
-                           │ creates and manages
-                           ↓
-        ┌──────────────────────────────────────────┐
-        │                                          │
-        ↓                                          ↓
-┌────────────────────┐                  ┌──────────────────────┐
-│ FileListManager    │                  │ FileOperationsExecutor│
-│                    │                  │                       │
-│ Layer 1:           │                  │ Layer 4:              │
-│ File List Mgmt     │                  │ I/O Operations        │
-│                    │                  │                       │
-│ - refresh_files()  │                  │ - perform_copy()      │
-│ - sort_entries()   │                  │ - perform_move()      │
-│ - toggle_selection()│                 │ - perform_delete()    │
-│ - apply_filter()   │                  │ - progress tracking   │
-│ - get_file_info()  │                  │ - error handling      │
-└────────────────────┘                  └──────────────────────┘
-        ↑                                          ↑
-        │                                          │
-        │ uses                                     │ uses
-        │                                          │
-┌────────────────────────────────────────────────────────────────┐
-│                    FileOperationsUI                             │
-│                                                                 │
-│ Layer 2: UI Interactions                                        │
-│                                                                 │
-│ Entry Points:                    UI Methods:                   │
-│ - copy_selected_files()          - show_confirmation_dialog()  │
-│ - move_selected_files()          - show_conflict_dialog()      │
-│ - delete_selected_files()        - show_rename_dialog()        │
-│                                                                 │
-│ Creates:                                                        │
-│ - FileOperationTask(ui=self, executor=executor)                │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │
-                           │ creates
-                           ↓
-┌─────────────────────────────────────────────────────────────────┐
-│                    FileOperationTask                             │
-│                                                                  │
-│ Layer 3: Orchestration (State Machine)                          │
-│                                                                  │
-│ Dependencies:                                                    │
-│ - ui: FileOperationsUI (for UI interactions)                    │
-│ - executor: FileOperationsExecutor (for I/O operations)         │
-│                                                                  │
-│ States:                                                          │
-│ IDLE → CONFIRMING → CHECKING_CONFLICTS → RESOLVING_CONFLICT    │
-│      → EXECUTING → COMPLETED → IDLE                             │
-│                                                                  │
-│ Methods:                                                         │
-│ - start_operation()                                              │
-│ - on_confirmed()                                                 │
-│ - on_conflict_resolved()                                         │
-│ - on_renamed()                                                   │
-│ - _check_conflicts()                                             │
-│ - _execute_operation()                                           │
-└─────────────────────────────────────────────────────────────────┘
+## Copy operation — end to end
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as User
+    participant App as TfmApp
+    participant Svc as FileOperationService
+    participant Mgr as TaskManager + ProgressDialog
+    participant W as worker thread — _run()
+
+    U->>App: press C (copy)
+    App->>Svc: copy(panel, targets, dest_dir, on_complete)
+    Svc->>U: CONFIRM_COPY message box (if enabled)
+    U-->>Svc: confirm
+    Svc->>Mgr: submit(task, run=_run)
+    Mgr->>U: show ProgressDialog (modal)
+    Mgr->>W: spawn worker
+    W->>W: _resolve() — build plan of survivors
+    loop each colliding destination
+        W->>U: ask() → ConflictDialog (via pump)
+        U-->>W: Overwrite / Skip / Keep both / Cancel
+    end
+    W->>W: _count() → set progress total
+    loop each planned target
+        W->>W: checkpoint(); _execute_one(); update progress
+    end
+    W-->>Mgr: result {done, skipped, failed, items, errors, cancelled}
+    Mgr->>U: close dialog
+    Mgr->>App: on_complete(result) → summary in the log
 ```
 
-## Dependency Diagram
+## Public API
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         FileManager                              │
-│                                                                  │
-│  Creates and owns all components                                 │
-└──────────────────────────┬───────────────────────────────────────┘
-                           │
-                           │
-        ┌──────────────────┼──────────────────┐
-        │                  │                  │
-        ↓                  ↓                  ↓
-┌────────────────┐  ┌──────────────────┐  ┌──────────────────────┐
-│FileListManager │  │FileOperationsUI  │  │FileOperationsExecutor│
-│                │  │                  │  │                      │
-│ No dependencies│  │ Depends on:      │  │ Depends on:          │
-│                │  │ - FileManager    │  │ - FileManager        │
-│                │  │ - FileListMgr    │  │   (for progress,     │
-│                │  │                  │  │    cache)            │
-└────────────────┘  └────────┬─────────┘  └──────────────────────┘
-                             │                       ↑
-                             │ creates               │
-                             ↓                       │
-                    ┌──────────────────┐            │
-                    │FileOperationTask │            │
-                    │                  │            │
-                    │ Depends on:      │            │
-                    │ - FileManager    │            │
-                    │ - ui (UI layer)  │────────────┘
-                    │ - executor (I/O) │────────────┐
-                    └──────────────────┘            │
-                                                    │
-                                                    ↓
-                                          (delegates I/O)
-
-Dependency Flow: One-way, no circular dependencies
-FileManager → Components → Task → UI/Executor
+```python
+FileOperationService(config, tasks: TaskManager | None = None)
 ```
 
-## Sequence Diagram: Copy Operation
+Each entry point takes the `panel` to draw on plus keyword options (`on_complete`, `log`, `z`, `background`):
 
-```
-User          FileOperationsUI    FileOperationTask    FileOperationsExecutor
- │                   │                    │                      │
- │ Press C (copy)    │                    │                      │
- ├──────────────────>│                    │                      │
- │                   │                    │                      │
- │                   │ create task        │                      │
- │                   ├───────────────────>│                      │
- │                   │                    │                      │
- │                   │ start_operation()  │                      │
- │                   ├───────────────────>│                      │
- │                   │                    │                      │
- │                   │                    │ State: CONFIRMING    │
- │                   │                    │                      │
- │                   │<───────────────────┤                      │
- │                   │ show_confirmation_ │                      │
- │                   │ dialog()           │                      │
- │                   │                    │                      │
- │<──────────────────┤                    │                      │
- │ Show dialog       │                    │                      │
- │                   │                    │                      │
- │ Press Y (confirm) │                    │                      │
- ├──────────────────>│                    │                      │
- │                   │                    │                      │
- │                   │ on_confirmed(True) │                      │
- │                   ├───────────────────>│                      │
- │                   │                    │                      │
- │                   │                    │ State: CHECKING_     │
- │                   │                    │ CONFLICTS            │
- │                   │                    │                      │
- │                   │                    │ _check_conflicts()   │
- │                   │                    │                      │
- │                   │                    │ (if conflicts found) │
- │                   │                    │ State: RESOLVING_    │
- │                   │                    │ CONFLICT             │
- │                   │                    │                      │
- │                   │<───────────────────┤                      │
- │                   │ show_conflict_     │                      │
- │                   │ dialog()           │                      │
- │                   │                    │                      │
- │<──────────────────┤                    │                      │
- │ Show dialog       │                    │                      │
- │                   │                    │                      │
- │ Choose action     │                    │                      │
- ├──────────────────>│                    │                      │
- │                   │                    │                      │
- │                   │ on_conflict_       │                      │
- │                   │ resolved()         │                      │
- │                   ├───────────────────>│                      │
- │                   │                    │                      │
- │                   │                    │ (all resolved)       │
- │                   │                    │ State: EXECUTING     │
- │                   │                    │                      │
- │                   │                    │ perform_copy_        │
- │                   │                    │ operation()          │
- │                   │                    ├─────────────────────>│
- │                   │                    │                      │
- │                   │                    │                      │ Background
- │                   │                    │                      │ thread
- │                   │                    │                      │ copies files
- │                   │                    │                      │
- │                   │                    │<─────────────────────┤
- │                   │                    │ completion_callback()│
- │                   │                    │                      │
- │                   │                    │ State: COMPLETED     │
- │                   │                    │                      │
- │                   │                    │ State: IDLE          │
- │                   │                    │                      │
- │<──────────────────┴────────────────────┴──────────────────────┘
- │ UI refreshed                                                   │
- │                                                                │
-```
+| Method | Destination | Confirm flag | Conflict handling |
+|---|---|---|---|
+| `copy(panel, targets, dest_dir, …)` | `dest_dir/name` | `CONFIRM_COPY` | per-file prompt |
+| `move(panel, targets, dest_dir, …)` | `dest_dir/name` | `CONFIRM_MOVE` | per-file prompt |
+| `duplicate(panel, targets, dest_dir, …)` | in place (source's own dir) | `CONFIRM_DUPLICATE` | none — always auto-renamed `name (N)` |
+| `delete(panel, targets, …)` | — | `CONFIRM_DELETE` (default button = Cancel) | — |
 
-## State Machine Diagram
+`_start` shows the relevant `CONFIRM_*` message box (skipped when its config flag is off); on confirm, `_submit` builds a `Task` and hands it to `TaskManager.submit(run=self._run, …)`.
 
-```
-                    ┌──────┐
-                    │ IDLE │◄─────────────────────────┐
-                    └──┬───┘                          │
-                       │                              │
-                       │ start_operation()            │
-                       │                              │
-                       ↓                              │
-                 ┌────────────┐                       │
-                 │ CONFIRMING │                       │
-                 └──┬─────┬───┘                       │
-          confirmed│     │cancelled                   │
-                   │     │                            │
-                   │     └────────────────────────────┘
-                   ↓
-         ┌──────────────────┐
-         │CHECKING_CONFLICTS│
-         └──┬───────────┬───┘
-    conflicts│         │no conflicts
-             │         │
-             ↓         │
-    ┌─────────────────┐│
-    │RESOLVING_CONFLICT││
-    └──┬──────────────┘│
-       │               │
-       │ all resolved  │
-       │               │
-       └───────┬───────┘
-               │
-               ↓
-    ┌──────────────────────┐
-    │     EXECUTING        │
-    └──────────┬───────────┘
-               │
-               │ completed
-               │
-               ↓
-         ┌───────────┐
-         │ COMPLETED │
-         └─────┬─────┘
-               │
-               │ cleanup
-               │
-               └──────────────────────────────────────┘
+## The linear worker (`_run`)
 
-State Descriptions:
-- IDLE: No operation in progress, task inactive
-- CONFIRMING: Showing confirmation dialog to user
-- CHECKING_CONFLICTS: Detecting file conflicts
-- RESOLVING_CONFLICT: User resolving conflicts one by one
-- EXECUTING: Background thread performing file operations
-- COMPLETED: Operation finished, preparing to return to IDLE
-```
+Runs on the task thread, top to bottom:
 
-## Layer Responsibilities
+1. **Plan.** Build a list of `(target, dest_base, overwrite)`:
+   - **delete** — trivial (one entry per target).
+   - **duplicate** — pre-plan a fresh ` (N)` name per target (an in-place copy always collides, so it never prompts).
+   - **copy / move** — `_resolve` checks each destination for an existing file and prompts only for collisions.
+2. **Count.** `_count` recursively totals the nodes and bytes to process, so the progress bar is determinate. A same-storage move is a single atomic rename, so it counts as one node and its subtree is never walked (`_is_atomic_move`).
+3. **Execute.** For each planned target: `task.checkpoint()` (cancellation point), then `_execute_one`, updating `task.progress`. Per-target exceptions are recorded in `errors` and processing continues; a `Cancelled` unwinds the loop.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ Layer 1: File List Management (FileListManager)                 │
-│                                                                  │
-│ Responsibilities:                                                │
-│ - Refresh directory contents                                     │
-│ - Sort file entries                                              │
-│ - Apply filters                                                  │
-│ - Manage selection state                                         │
-│ - Get file information                                           │
-│                                                                  │
-│ Does NOT:                                                        │
-│ - Perform file I/O operations                                    │
-│ - Show UI dialogs                                                │
-│ - Manage operation state                                         │
-└─────────────────────────────────────────────────────────────────┘
+### Result summary
 
-┌─────────────────────────────────────────────────────────────────┐
-│ Layer 2: UI Interactions (FileOperationsUI)                     │
-│                                                                  │
-│ Responsibilities:                                                │
-│ - Entry points for operations                                    │
-│ - Show confirmation dialogs                                      │
-│ - Show conflict resolution dialogs                               │
-│ - Show rename dialogs                                            │
-│ - Create FileOperationTask instances                             │
-│                                                                  │
-│ Does NOT:                                                        │
-│ - Perform file I/O operations                                    │
-│ - Manage operation state machine                                 │
-│ - Execute background threads                                     │
-└─────────────────────────────────────────────────────────────────┘
+`_run` returns a dict the caller reports via `format_op_summary` / `format_op_errors`:
 
-┌─────────────────────────────────────────────────────────────────┐
-│ Layer 3: Orchestration (FileOperationTask)                      │
-│                                                                  │
-│ Responsibilities:                                                │
-│ - State machine logic                                            │
-│ - Conflict detection                                             │
-│ - Workflow coordination                                          │
-│ - Delegate UI to FileOperationsUI                                │
-│ - Delegate I/O to FileOperationsExecutor                         │
-│                                                                  │
-│ Does NOT:                                                        │
-│ - Show UI dialogs directly                                       │
-│ - Perform file I/O directly                                      │
-│ - Manage file lists                                              │
-└─────────────────────────────────────────────────────────────────┘
+| Key | Meaning |
+|---|---|
+| `done` / `skipped` / `failed` | counts of **top-level targets** (what the user selected) |
+| `items` | total individual entries actually processed (recursive) |
+| `errors` | list of `(name, message)` for failed targets |
+| `cancelled` | `True` if a checkpoint or a "Cancel" conflict choice unwound the run |
 
-┌─────────────────────────────────────────────────────────────────┐
-│ Layer 4: I/O Operations (FileOperationsExecutor)                │
-│                                                                  │
-│ Responsibilities:                                                │
-│ - Execute file copy operations                                   │
-│ - Execute file move operations                                   │
-│ - Execute file delete operations                                 │
-│ - Track progress                                                 │
-│ - Handle errors                                                  │
-│ - Manage background threads                                      │
-│                                                                  │
-│ Does NOT:                                                        │
-│ - Show UI dialogs                                                │
-│ - Manage operation state machine                                 │
-│ - Manage file lists                                              │
-└─────────────────────────────────────────────────────────────────┘
-```
+A top-level target is `done` if any of its entries succeeded; `failed` only if it produced nothing and raised. Inner file failures stay in `errors` without sinking the whole target.
 
-## Component Communication
+## Conflict resolution (`ConflictDialog`)
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    Communication Patterns                        │
-└─────────────────────────────────────────────────────────────────┘
+For copy/move, `_resolve` prompts per collision through the task's UI bridge — `task.ask(_conflict_prompt(...))` pushes a `ConflictDialog` (a `FocusContainer` + `Widget`) that stacks just above the progress dialog. It offers four actions plus an **apply-to-all-remaining** checkbox, and reports `(action, apply_to_all)`:
 
-FileOperationsUI → FileOperationTask:
-  - Creates task with ui=self, executor=executor
-  - Calls task.start_operation()
-  - Provides callback methods for task to call
+| Action | Key | Effect |
+|---|---|---|
+| Overwrite | `o` | replace the destination (`overwrite=True`) |
+| Skip | `s` | leave it; increment `skipped` |
+| Keep both | `k` | write to a fresh `name (N)` (via `_unique_dest`) |
+| Cancel | `c` / `Esc` | raise `Cancelled` — abort the whole operation |
 
-FileOperationTask → FileOperationsUI:
-  - Calls ui.show_confirmation_dialog()
-  - Calls ui.show_conflict_dialog()
-  - Calls ui.show_rename_dialog()
+`a` / Space toggles apply-to-all, Tab moves focus, Enter activates the focused button. When apply-to-all is checked, the chosen action is reused for every remaining collision without prompting.
 
-FileOperationTask → FileOperationsExecutor:
-  - Calls executor.perform_copy_operation()
-  - Calls executor.perform_move_operation()
-  - Calls executor.perform_delete_operation()
+## Helpers
 
-FileOperationsExecutor → FileManager:
-  - Uses progress_manager for progress tracking
-  - Uses cache_manager for cache invalidation
-  - Calls mark_dirty() for UI refresh
+- `recursive_delete(entry)` — delete a file or directory tree.
+- `_unique_dest(dest_dir, name, is_dir=…)` — the shared ` (N)` non-colliding-name scheme (used by duplicate and "Keep both").
+- `_is_atomic_move(kind, target, dest_dir)` — true when a move stays within one storage backend (a single rename); a cross-storage move copies the tree then deletes the source.
+- `format_op_summary(verb, result)` / `format_op_errors(verb, result)` — human-readable reporting from the result dict.
 
-FileOperationTask → FileManager:
-  - Calls file_manager._clear_task() when complete
-  - Uses file_manager.operation_cancelled flag
-```
+## Integration
 
-## Benefits of Refactored Architecture
-
-### Before Refactoring
-
-Problems:
-- **Naming Confusion**: FileOperations class misnamed (handled file lists, not operations)
-- **Mixed Responsibilities**: FileOperationsUI contained both UI and I/O code
-- **Boundary Violations**: FileOperationTask contained UI code
-- **Circular Dependencies**: Task called back to UI for I/O operations
-- **Testing Difficulty**: Mixed responsibilities made unit testing complex
-
-### After Refactoring
-
-Improvements:
-- **Clear Naming**: FileListManager accurately reflects responsibilities
-- **Single Responsibility**: Each class has one clear purpose
-- **No Boundary Violations**: UI, orchestration, and I/O cleanly separated
-- **One-Way Dependencies**: Clean dependency flow, no circular dependencies
-- **Easy Testing**: Each component can be tested independently
-- **Better Maintainability**: Changes localized to appropriate layer
+- `TfmApp.__init__` — `self.tasks = TaskManager()`, `self._fileops = FileOperationService(self.config, self.tasks)`.
+- `TfmApp.copy_files()` / `move_files()` / `duplicate_files()` / `delete_files()` gather the active pane's selection and delegate to `self._fileops`, passing an `on_complete` that refreshes panes and logs the summary.
 
 ## References
 
-- **Implementation Documentation**: `doc/dev/TASK_FRAMEWORK_IMPLEMENTATION.md`
-- **Refactoring Design**: `.kiro/specs/file-operations-refactoring/design.md`
-- **Refactoring Requirements**: `.kiro/specs/file-operations-refactoring/requirements.md`
-- **Refactoring Tasks**: `.kiro/specs/file-operations-refactoring/tasks.md`
+- [Task Framework](TASK_FRAMEWORK_IMPLEMENTATION.md)
+- [Task Cancellation](TASK_CANCELLATION_IMPLEMENTATION.md)
+- [Progress Manager System](PROGRESS_MANAGER_SYSTEM.md)
+- [Path Polymorphism System](PATH_POLYMORPHISM_SYSTEM.md) — storage-agnostic operations behind `Path`
