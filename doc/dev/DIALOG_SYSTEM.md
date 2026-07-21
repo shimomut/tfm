@@ -2,522 +2,378 @@
 
 ## Overview
 
-The TFM Dialog System provides a comprehensive, flexible framework for handling various types of user input dialogs. It features a general-purpose dialog system for common input needs, specialized dialogs for specific operations, and an optimized rendering system that provides excellent performance while maintaining visual consistency.
+TFM's dialogs are the modal (and near-modal) overlays the app raises for input,
+selection, search, and information display: creating a file, renaming, picking a
+favorite, searching a tree, viewing help, batch-renaming, and so on.
 
-## Architecture
+Since the PuiKit port, every dialog is an ordinary **PuiKit widget pushed onto the
+`Panel` as a layer**. There is no bespoke dialog engine, no curses drawing, and no
+per-frame redraw bookkeeping. A dialog is a `Widget` (usually also a
+`FocusContainer`) that is composed from PuiKit primitives — `TextEdit`,
+`ListView`, `MarkdownView`, `Checkbox` — and relies on the Panel's layer stack for
+modality, focus, event routing, and drawing.
 
-### Core Components
+> Historical note: the pre-port curses design (an in-repo `ttk` toolkit with
+> `GeneralPurposeDialog`, `ListDialog`, `QuickEditBar`, `InfoDialog`,
+> `SearchDialog`, `DialogHelpers`, a `content_changed`/`needs_redraw` render
+> optimization, and `draw(stdscr, safe_addstr)` signatures) **no longer exists**.
+> Those classes and that rendering model have been removed; consult git history if
+> you need them. This document describes the current PuiKit implementation only.
 
-#### GeneralPurposeDialog Class
-- **Purpose**: Flexible, reusable dialog framework for common input needs
-- **Features**: Status line input, customizable prompts, width management, input validation
-- **Usage**: File/directory creation, rename operations, filter input, archive creation
+## The dialog classes
 
-#### Specialized Dialog Classes
-- **ListDialog**: Selection from lists of items
-- **InfoDialog**: Display information with scrolling support
-- **SearchDialog**: File search with real-time results
-- **JumpDialog**: Directory navigation with filtering
-- **BatchRenameDialog**: Multi-file rename operations
+| Class | Module | Factory | Role |
+|-------|--------|---------|------|
+| `InputDialog` | `tfm_input_dialog.py` | `show_input` | Single-line text prompt (create, rename, jump-to-path, archive name, password) |
+| `FilterListDialog` | `tfm_filter_list_dialog.py` | `show_filter_list` | Filterable list picker (favorites, drives, history, external programs) |
+| `ProgressiveSearchDialog` | `tfm_progressive_search_dialog.py` | `show_progressive_search` | Live search-as-you-type over the filesystem (filename / content) |
+| `TextDialog` | `tfm_text_dialog.py` | `show_text` | Read-only scrollable plain-text viewer |
+| `MarkdownDialog` | `tfm_text_dialog.py` | `show_markdown` | Read-only scrollable rich-text viewer (help, file details) |
+| `BatchRenameDialog` | `tfm_batch_rename_dialog.py` | `show_batch_rename` | Regex batch rename with a live preview |
+| `CompareSelectDialog` | `tfm_compare_dialog.py` | `show_compare_select` | Keyboard-first criteria picker for compare-and-select |
+| `ISearchBar` / `ViewerISearch` | `tfm_isearch_bar.py` | (constructed directly) | Incremental search input pinned in a pane / viewer footer |
+| `CandidateListOverlay` | `tfm_candidate_list.py` | (driven by `InputDialog`) | TAB-completion popup |
 
-#### Rendering Optimization System
-- **Content Change Tracking**: Only redraws dialogs when content actually changes
-- **Performance Benefits**: 77.8% reduction in unnecessary rendering calls
-- **Animation Support**: Smooth progress indicators for long operations
-- **Background Updates**: Real-time updates from background threads
+Two supporting pieces are not dialogs themselves:
 
-## General Purpose Dialog System
+- **`tfm_dialog_geometry.py`** — the shared sizing/chrome helpers every modal uses
+  (`draw_title_bar`, `pane_anchored_box`, `animate_open`).
+- **`show_message_box`** — a PuiKit widget primitive (from `puikit.widgets`) TFM
+  uses for confirmations, info, and error boxes (Quit, "No favorites configured",
+  operation-error summaries). It follows the same layer model but ships with
+  PuiKit rather than living in `src/`.
 
-### Core Capabilities
-- **Status Line Input**: Single-line text input in the status bar area
-- **Flexible Prompts**: Customizable prompt text and help messages
-- **Width Management**: Intelligent width calculation and help text positioning
-- **Input Validation**: Built-in validation and error handling
-- **Consistent Styling**: Unified appearance across all dialogs
+### Correspondence to the old (removed) classes
 
-### Dialog Types Supported
-- **File/Directory Creation**: Create new files and directories
-- **Rename Operations**: Rename files and directories
-- **Filter Input**: Set file filters for display
-- **Archive Creation**: Specify archive names and formats
-- **General Text Input**: Any single-line text input need
+| Removed ttk class | Current replacement |
+|-------------------|---------------------|
+| `QuickEditBar` (status-line input) | `InputDialog` — a centered modal, not a status-line prompt |
+| `ListDialog` / `BaseListDialog` | `FilterListDialog` |
+| `SearchDialog` | `ProgressiveSearchDialog` |
+| `InfoDialog` | `TextDialog` / `MarkdownDialog` |
+| `GeneralPurposeDialog`, `DialogHelpers` | (no equivalent — each dialog is self-contained; `show_*` factories replace the helpers) |
 
-### Class Structure
+The `JumpDialog` and the drives/favorites pickers survive as features but are
+implemented on this framework (jump has its own module; drives/favorites are
+`FilterListDialog` call sites). See the cross-links at the bottom.
+
+## The shared pattern
+
+Every dialog class follows the same shape, so once you have read one you can read
+them all.
+
+### 1. It is a Panel layer
+
+`show_xxx(panel, ...)` constructs the widget, computes a size from the backend's
+`size_units`, and pushes it:
 
 ```python
-class DialogType:
-    STATUS_LINE_INPUT = "status_line_input"
-
-class GeneralPurposeDialog:
-    def __init__(self, config)
-    def show_status_line_input(self, prompt_text, initial_text="", shortening_regions=None)
-    def handle_input(self, key)
-    def draw(self, stdscr, safe_addstr_func)
-    def needs_redraw(self)
-    def exit()
+panel.push_layer(dialog, z=z, hints={"shadow": True, "w": w, "h": h})
+animate_open(panel, dialog)
 ```
 
-### Usage Examples
+The default layer `z` is `70`. The `shadow` hint gives the modal its drop shadow;
+`animate_open` plays the shared entrance transition (below). Sizing is a fraction
+of the window clamped to sensible min/max (e.g. `InputDialog` is
+`max(36, min(sw*0.6, 64))` wide), so dialogs stay consistent regardless of item
+count.
 
-#### Basic Text Input
+### 2. The top interactive layer owns everything (modality)
+
+`Panel.dispatch_event` delivers events **exclusively** to the top-most
+*interactive* layer (`_top_interactive_slot`). While a dialog is that layer it
+receives every key and mouse event, and its `handle_event` returns `True` for
+everything it doesn't otherwise use — that trailing `return True` is what makes it
+modal (nothing leaks to the panes beneath). Being the top layer also makes the
+dialog the **focus root**, which is what engages the backend's text-input / IME
+system for its `TextEdit` field and blinks a caret.
+
+### 3. Focus resolves to a real text widget
+
+Each dialog subclasses `FocusContainer` and implements `focus_children()`
+(and sometimes `get_focused()`), returning the field(s) so the Panel's focus leaf
+lands on a `TextEdit`/`Checkbox`. Without this the focus would stop at the dialog
+(not a text widget) and the IME would never turn on. Class attributes
+`focusable = True` and `focus_stop_when_empty = True` keep the dialog a focus stop
+even when its list is momentarily empty.
+
+### 4. Drawing uses a `DrawContext`, not curses
+
 ```python
-dialog = GeneralPurposeDialog(config)
-dialog.show_status_line_input(
-    prompt_text="Enter filename: ",
-    initial_text="",
-    help_text="Enter the name for the new file"
-)
+def draw(self, ctx) -> None:
+    theme = ctx.theme
+    surface_bg = theme.popup_bg if theme else None
+    ctx.draw_box(0, 0, *ctx.size_units, box_style, hints={"fill": True})
+    y = draw_title_bar(ctx, self.title, surface_bg=surface_bg, border=border, y=1.0)
+    ctx.draw_child(self.edit, field_x, y, field_w, 1.0, hints={"focused": True})
 ```
 
-#### Rename Dialog
+Drawing is done through `ctx` (a PuiKit `DrawContext`): `draw_box`, `draw_text`,
+`draw_child`, `round_rect`, `fill_rect`, `draw_scrollbar`, `measure_text`,
+`line_height`, plus `ctx.theme`, `ctx.size_units`, and `ctx.vector_shapes` (True on
+GUI/vector backends, False on a character grid). Colors come from the theme
+(`popup_bg`, `popup_border`, `text`, `muted_text`, `selection_active_bg`, …) via
+`Style`, never from curses color pairs. Sub-widgets (the field, the list) are
+drawn with `ctx.draw_child(...)`, and their rects are captured for mouse
+hit-testing. The same widget code runs unchanged on the curses, macOS, and Windows
+backends.
+
+### 5. Events: keys, IME, mouse
+
+`handle_event(event)` handles three event families and swallows the rest:
+
+- **`EventType.KEY`** — `escape` cancels, `enter` accepts, `tab` switches
+  field/mode where applicable, navigation keys (`up`/`down`/`pageup`/`pagedown`,
+  and `home`/`end` for viewers) are forwarded to the embedded `ListView` /
+  `MarkdownView`, and anything else goes to the focused `TextEdit` (typing).
+- **`EventType.IME_COMPOSITION`** — forwarded to the field so CJK preedit renders
+  inline (the modal layer must relay composition because the field never receives
+  events directly).
+- **Mouse events** — routed by hit-testing the captured child rects; a
+  `MOUSE_CLICK` outside the dialog's own bounds cancels it (outside-click dismiss).
+
+### 6. Outcome via callbacks, dismissal via `pop_layer`
+
+Dialogs report results through callbacks passed to the factory — `on_accept`,
+`on_cancel`, `on_change`, `on_done`, `on_result`, `on_close` — not return values.
+A dialog closes itself with a guarded `panel.pop_layer()`:
+
 ```python
-dialog.show_status_line_input(
-    prompt_text=f"Rename '{original_name}' to: ",
-    initial_text=current_name,
-    help_text="Enter new name or press ESC to cancel"
-)
+def _close(self) -> None:
+    panel = self._panel
+    if panel is not None and panel.has_layers and panel._layers[-1].widget is self:
+        panel.pop_layer()
 ```
 
-**Note**: The rename dialog now uses intelligent prompt shortening via `QuickEditBarHelpers.create_rename_dialog()` which automatically hides the " '{original_name}' to" part when space is limited to ensure at least 40 chars for the input field.
+### Rendering model (what replaced the old optimization)
 
-### Prompt Shortening
+There is **no** `content_changed` flag, `needs_redraw()` method, or "77.8%
+rendering optimization" any more — that machinery belonged to the removed curses
+render loop. Under PuiKit, redraws are on demand: a handler mutates state and calls
+`self._panel.render()` (or the app calls `panel.render()` after an action). A
+dialog with live, asynchronous content drives its own repaints through
+`panel.request_animation_ticks(callback)` — see `ProgressiveSearchDialog` below —
+falling back to a synchronous settle on a still backend (chiefly tests). The
+entrance animation is handled once by `animate_open`.
 
-QuickEditBar supports intelligent prompt shortening using `ShorteningRegion` to ensure adequate space for text input:
+## Geometry and shared chrome (`tfm_dialog_geometry.py`)
+
+This module is the single home for a modal's size and chrome, so every dialog
+looks and opens the same way.
+
+- **`draw_title_bar(ctx, title, *, surface_bg, border, y=1.0) -> float`** — draws
+  the bold title with a frame-connecting rule beneath it and returns the first
+  content row. It reconciles the two backends: on a character grid the title, rule,
+  and content each take a whole row (`y`, `y+1`, `y+2`); on a vector backend the
+  bar is sized to the *measured* title line (`gui_title_bar_height`) so it reads
+  thin and balanced. Every modal calls this rather than drawing its own header.
+
+- **`pane_anchored_box(desired_w, screen_w, region, *, margin=2.0) -> (w, x)`** —
+  positions a pane-targeting picker over the pane it acts on. `region` is the
+  pane's `(x, width)` column span (base units). The dialog keeps its *own* desired
+  width (a narrow pane never shrinks it) and is centered on the pane's center, so
+  it visibly leans over its target pane; an on-screen clamp keeps a margin on each
+  side. Callers opt in by passing `region=` to a `show_*` factory (favorites,
+  drives, filter, compare, jump anchor over the active pane via
+  `TfmApp._active_pane_region()`).
+
+- **`animate_open(panel, widget, duration_ms=OPEN_MS_DIALOG)`** — the one
+  app-wide modal entrance: a scale-from-92%-plus-fade "materialize" with an
+  `ease_out_expo` curve. It honors a theme opting out (`dialog_effect=False` in
+  `Theme.extras`, e.g. Segment LCD) and reduced motion, returning `False` when no
+  transition was scheduled (the widget is simply already in its final state). On a
+  terminal the Panel renders the intent as a two-frame open. `OPEN_MS_DIALOG` is
+  `180` ms; viewers use the slightly faster `OPEN_MS_VIEWER` (`140` ms).
+
+## The dialogs in detail
+
+### InputDialog — `show_input`
+
+A small centered modal with a title, a prompt label, and one `TextEdit`. Typing
+edits; Enter accepts (text passed to `on_accept`); Esc or an outside click cancels;
+`on_change` fires live on every keystroke (used for incremental prompts).
+
+- **`validate(text) -> str | None`** — returns an error string to keep the dialog
+  open and show the message inline (empty/duplicate names), so a bad value never
+  silently closes it.
+- **`select_all`** — start with the whole value selected (rename: first keystroke
+  replaces) versus caret-at-end (append).
+- **`password`** — masks the field with a bullet glyph and disables clipboard
+  copy/cut of its contents (encrypted-archive password).
+- **`completer`** — enables TAB completion. A `CompletionController` (from
+  `tfm_completion`) mutates the field and tracks candidate state; when several
+  matches remain, a `CandidateListOverlay` is pushed as a separate,
+  **non-interactive** layer just below/above the field, navigated with the arrow
+  keys. Used for filepath completion in Jump-to-Path.
+
+Call sites: New Directory, New File, Rename, Create Archive, Jump to Path, and the
+archive password prompt.
+
+### FilterListDialog — `show_filter_list`
+
+The canonical searchable-list picker (the PuiKit equivalent of ttk's
+`BaseListDialog`), built from a `TextEdit` filter field over a `ListView`. Typing
+filters the list (substring, case-insensitive); `up`/`down`/`pageup`/`pagedown`
+drive the selection even while the field holds focus; Enter accepts the selected
+value via `on_accept`; a click selects/activates a row.
+
+- **`on_accept_text`** — optional free-text fallback: when Enter is pressed and no
+  row matches the query, the raw filter text is handed here instead, so the picker
+  can double as an editor (a brand-new filter pattern that isn't in history).
+- **`to_label`**, **`ellipsis`** / **`elide_where`** — control row rendering;
+  path lists use `elide_where="middle"` so a long path keeps its meaningful tail.
+
+Call sites: favorites, drives, directory history, external programs.
+
+### ProgressiveSearchDialog — `show_progressive_search`
+
+A single modal combining a query field with a **streaming results list**; typing
+re-runs a filesystem search on every keystroke. `Tab` switches between `filename`
+and `content` mode in place. Enter accepts the selected row via
+`on_accept(mode, value)`.
+
+Threading model (mirrors the port's async pane listing):
+
+- Each keystroke bumps a generation counter, signals the previous search's
+  `threading.Event` to cancel, and starts a fresh daemon thread pulling from the
+  caller-supplied `search_iter(mode, query, cancel)` generator.
+- The worker batches hits onto a `queue.Queue`; a per-frame drain registered via
+  `panel.request_animation_ticks(self._drain)` pulls batches on the UI thread,
+  extends the list, advances the braille spinner, and re-renders — so results
+  appear progressively and a stale generation is dropped.
+- On a still backend (no animation ticks, e.g. tests) the search settles
+  synchronously: the worker is joined and the queue drained in one shot.
+
+A `result_cap` (default `1000`) bounds growth on a huge tree.
+
+### TextDialog / MarkdownDialog — `show_text` / `show_markdown`
+
+The read-only counterparts (the `InfoDialog` replacement). Both share a
+`_ScrollModal` base that owns the box, title bar, a hint row, and event routing;
+they differ only in the body widget:
+
+- **`TextDialog`** hosts a `ListView` of preformatted lines (log-like /
+  pre-aligned content). `show_text`.
+- **`MarkdownDialog`** hosts a `MarkdownView` — CommonMark-ish headings, emphasis,
+  tables, `code`, and links — for content that reads better as structured prose.
+  `show_markdown`.
+
+Both forward `up`/`down`/`pageup`/`pagedown`/`home`/`end` to the body and close on
+Enter / Esc / outside-click. `keys_markdown(rows, intro=...)` is a helper that
+builds a two-column `| Key(s) | Action |` table source for key-help overlays.
+Call sites: file Details and the Help/About overlays.
+
+### BatchRenameDialog — `show_batch_rename`
+
+Rename many files with a regex *search* pattern and a *replace* pattern, with a
+live `original → new` preview before anything touches disk. Two `TextEdit` fields
+(`Tab` switches) sit above a `ListView` preview.
+
+- The pure function **`compute_preview(files, search, replace)`** produces the
+  plan (one dict per file with `original`, `new`, `valid`, `conflict`, `file`). It
+  is filesystem-free, so it is unit-test-friendly and safe to run on every
+  keystroke. The replace pattern supports `\0` (whole match), `\1`..`\9` (groups),
+  and `\d` (1-based batch index).
+- The preview flags invalid names and collisions (against an existing file **or**
+  against another row producing the same name), and Enter refuses to run while any
+  conflict stands. `on_done(success_count, errors)` fires after a successful run.
+
+### CompareSelectDialog — `show_compare_select`
+
+A compact, keyboard-first criteria picker (no Tab, no buttons) that assembles a
+`CompareCriteria` for the compare-and-select action. It has three `ConditionRow`s
+(Size / Modified / Content) — each a real `Checkbox` plus a segmented relation
+picker — and a "Preserve current selection" toggle.
+
+- **Up / Down** move focus between rows; **Left / Right** choose the relation on a
+  condition row; **Space** toggles the checkbox (`any` == unchecked, i.e. don't
+  compare that attribute); **Enter** accepts, **Esc** cancels.
+- It sizes itself to its content up front by measuring through the backend with the
+  proportional UI font (so the box hugs its text on a GUI backend, and counts
+  columns on a grid). The result is reported through `on_result(criteria)`
+  (`None` on cancel).
+
+### ISearchBar / ViewerISearch — `tfm_isearch_bar.py`
+
+Incremental search is the exception to the centered-modal rule: it must sit exactly
+on the active pane's (or a viewer's) **footer bar** while the list above stays
+visible and its cursor keeps moving as you type. So `ISearchBar` is pushed as a
+thin overlay layer positioned at the footer's captured rect (with a `"status"`
+surface hint), rather than a centered box.
+
+It is one row: a bold prompt on the left, an editable `TextEdit` pattern field
+across the rest, and a `position/total` match counter pinned to the right.
+`Up`/`Down` walk the match set, `Enter` stops at the current match, `Esc` (or an
+outside click) cancels. The bar owns no search logic — the host supplies callbacks
+(`on_change`, `on_navigate`, `on_submit`, `on_cancel`, `get_status`). See
+`TfmApp.enter_isearch` for the main-window wiring. **`ViewerISearch`** is a small
+driver that gives the full-window text/diff viewers the same footer-anchored
+incremental search without each re-implementing the plumbing.
+
+### CandidateListOverlay — `tfm_candidate_list.py`
+
+The TAB-completion popup for `InputDialog`. It is a small presentational widget
+pushed as its **own non-interactive layer** directly below/above the field being
+completed (above the dialog in z-order so it hugs the field, but non-interactive so
+keyboard focus stays with the dialog beneath). The host syncs it with
+`set_state(candidates, focused_index)` from a `CompletionController` and positions
+it with `overlay_geometry(...)`, which places the popup below the field (or above
+when there is no room), left-anchored so the candidate text lines up with the
+token, sized to the longest candidate and capped at `MAX_ROWS` (8) rows with a
+scrollbar. Because it is not the event-owning layer, the host forwards clicks that
+fall inside it to `handle_event`, which reports the chosen row through
+`on_activate`.
+
+## Integration with TfmApp
+
+The app holds a single `self.panel` (a PuiKit `Panel`). An action handler simply
+calls a factory and renders:
 
 ```python
-from tfm_string_width import ShorteningRegion
-
-# Define regions that can be shortened/removed when space is limited
-regions = [
-    ShorteningRegion(
-        start=6,  # After "Rename"
-        end=len(prompt) - 2,  # Before ": "
-        priority=1,
-        strategy='all_or_nothing'  # Either show full or remove entirely
+def show_favorites(self) -> None:
+    show_filter_list(
+        self.panel, favorites, title="Go to Favorite",
+        to_label=lambda fav: f"{fav['name']}  —  {fav['path']}",
+        on_accept=self._jump_to_favorite,
+        region=self._active_pane_region(),
+        elide_where="middle",
     )
-]
-
-dialog.show_status_line_input(
-    prompt="Rename 'very_long_filename.txt' to: ",
-    initial_text="very_long_filename.txt",
-    shortening_regions=regions
-)
+    self.panel.render()
 ```
 
-**Available Strategies**:
-- `all_or_nothing`: Either shows the full region or removes it entirely (no partial truncation)
-- `remove`: Gradually removes characters from the right side of the region
-- `abbreviate`: Replaces removed content with ellipsis ("…")
-
-**Behavior**:
-- Reserves minimum 40 chars for the input field
-- Shortens prompt using provided `ShorteningRegion` definitions
-- For `strategy='all_or_nothing'`: Uses "all or nothing" approach - either shows the full region or removes it entirely
-- Falls back to default right abbreviation if no regions specified
-- Automatically applied in `QuickEditBarHelpers.create_rename_dialog()`
-
-**Example**: In narrow terminals, "Rename 'document.txt' to: " becomes "Rename: " (complete removal using `all_or_nothing` strategy).
-
-### Helper Functions
-
-The `DialogHelpers` class provides pre-configured dialog setups:
-
-```python
-# Filter Dialog
-DialogHelpers.create_filter_dialog(dialog, current_filter="")
-
-# Rename Dialog
-DialogHelpers.create_rename_dialog(dialog, original_name, current_name="")
-
-# Create Directory Dialog
-DialogHelpers.create_create_directory_dialog(dialog)
-
-# Create File Dialog
-DialogHelpers.create_create_file_dialog(dialog)
-
-# Create Archive Dialog
-DialogHelpers.create_create_archive_dialog(dialog)
-```
-
-## Rendering Optimization System
-
-### Problem Solved
-
-Previously, dialogs were being rendered constantly on every frame, even when their content hadn't changed. This caused unnecessary CPU usage and potential screen flicker.
-
-### Solution: Content Change Tracking
-
-Added a `content_changed` boolean flag to all dialog classes with intelligent tracking:
-
-```python
-def needs_redraw(self):
-    """Check if this dialog needs to be redrawn"""
-    return self.content_changed or self.searching  # For animated dialogs
-
-def draw(self, stdscr, safe_addstr_func):
-    """Draw the dialog and automatically reset redraw flag"""
-    # ... drawing logic ...
-    
-    # Automatically mark as not needing redraw after drawing
-    if not self.searching:  # Preserve flag for animations
-        self.content_changed = False
-```
-
-### Main Loop Integration
-
-The main rendering loop only draws dialogs when necessary:
-
-```python
-def _check_dialog_content_changed(self):
-    """Check if any active dialog needs to be redrawn"""
-    if self.general_dialog.is_active:
-        return self.general_dialog.needs_redraw()
-    elif self.search_dialog.mode:
-        return self.search_dialog.needs_redraw()
-    # ... etc for all dialog types
-    return False
-
-# In main loop
-dialog_content_changed = self._check_dialog_content_changed()
-if dialog_content_changed or self.needs_full_redraw:
-    # Draw dialogs
-    self._draw_dialogs_if_needed()
-```
-
-### Performance Benefits
-
-- **77.8% reduction** in unnecessary rendering calls
-- **Reduced CPU Usage**: Eliminates redundant drawing operations
-- **Better Responsiveness**: Less time spent on redundant drawing
-- **Reduced Screen Flicker**: Fewer screen updates mean smoother visual experience
-- **Network Efficiency**: Important for remote terminal sessions
-
-### Background Thread Support
-
-Special handling for dialogs with background operations:
-
-```python
-# Main loop checks for background updates during timeout periods
-self.stdscr.timeout(16)  # 16ms timeout
-key = self.stdscr.getch()
-
-# If no key was pressed (timeout), check for background content changes
-if key == -1:
-    self._draw_dialogs_if_needed()
-    continue
-```
-
-This ensures real-time updates from background threads (search results, directory scanning).
-
-## Dialog Rendering Fixes
-
-### Comprehensive Rendering Fix
-
-Fixed multiple dialogs that had rendering bugs where pressing certain keys would cause dialogs to appear to "disappear" from the screen.
-
-### Root Cause
-
-The issue was in the dialog rendering optimization system. Dialogs would:
-1. Return `True` (indicating the key was handled)
-2. But fail to set `content_changed = True` in certain edge cases
-3. This caused `needs_redraw()` to return `False`
-4. Main loop would stop rendering the dialog
-
-### Universal Fix Pattern
-
-Applied consistent fix pattern to all affected dialogs:
-
-**Before (Problematic):**
-```python
-def handle_input(self, key):
-    if key == some_key:
-        if some_condition:
-            # Do something
-            self.content_changed = True  # Only set conditionally
-        return True  # Returns True but might not have set content_changed
-```
-
-**After (Fixed):**
-```python
-def handle_input(self, key):
-    if key == some_key:
-        if some_condition:
-            # Do something
-        # Always set content_changed for any handled key
-        self.content_changed = True
-        return True
-```
-
-### Dialogs Fixed
-
-1. **SearchDialog**: Fixed LEFT/RIGHT key handling
-2. **JumpDialog**: Fixed LEFT/RIGHT key handling
-3. **InfoDialog**: Fixed UP/DOWN/PAGE/HOME/END key handling at boundaries
-4. **BatchRenameDialog**: Fixed UP/DOWN/PAGE key handling and fallback cases
-
-### Dialog Redraw Fix
-
-Fixed timing issue where dialogs would disappear after main screen redraws:
-
-**Problem**: `needs_full_redraw` flag was reset too early, before dialogs had a chance to be redrawn.
-
-**Solution**: Delay flag reset until after both main screen AND dialogs are rendered:
-
-```python
-def run(self):
-    if self.needs_full_redraw:
-        # Draw main screen
-        self.draw_main_interface()
-        # Don't reset flag yet
-    
-    # Draw dialogs if needed
-    self._draw_dialogs_if_needed()  # Uses needs_full_redraw flag
-    
-    # Reset flag after both main screen and dialogs are rendered
-    if self.needs_full_redraw:
-        self.needs_full_redraw = False
-```
-
-## Technical Features
-
-### Width Management
-- **Intelligent Calculation**: Automatically calculates optimal field width
-- **Help Text Positioning**: Smart positioning to avoid overlap
-- **Minimum Width Guarantee**: Ensures usable input space even in narrow terminals
-- **Graceful Degradation**: Hides help text when space is insufficient
-
-### Input Handling
-- **SingleLineTextEdit Integration**: Uses robust text editing component
-- **Key Processing**: Handles Enter, ESC, and text input keys
-- **Validation**: Built-in validation for different input types
-- **Error Handling**: Graceful error handling and user feedback
-
-### Visual Design
-- **Consistent Styling**: Uses TFM color scheme and styling
-- **Status Bar Integration**: Seamlessly integrates with status bar area
-- **Help Text Display**: Optional help text with intelligent positioning
-- **Responsive Layout**: Adapts to different terminal sizes
-
-### Animation Support
-
-Animated dialogs (SearchDialog and JumpDialog) include special handling:
-
-```python
-def needs_redraw(self):
-    """Check if this dialog needs to be redrawn"""
-    # Always redraw when searching/scanning to animate progress indicator
-    return self.content_changed or self.searching
-
-def draw(self, stdscr, safe_addstr_func):
-    """Draw the dialog with animated progress indicator"""
-    # ... drawing logic including animated progress indicator ...
-    
-    # Only reset flag when not animating
-    if not self.searching:
-        self.content_changed = False
-```
-
-## Integration with TFM
-
-### Main Application Integration
-```python
-# In TfmApp class
-self.general_dialog = GeneralPurposeDialog(self.config)
-self.search_dialog = SearchDialog(self.config)
-self.jump_dialog = JumpDialog(self.config)
-# ... other dialogs
-
-# Show dialog
-self.general_dialog.show_status_line_input(
-    prompt_text="Enter name: ",
-    help_text="Type the new name"
-)
-
-# Handle input in main loop
-if self.general_dialog.is_active:
-    result = self.general_dialog.handle_input(key)
-    if result == 'submit':
-        text = self.general_dialog.text_editor.get_text()
-        # Process the input
-    elif result == 'cancel':
-        self.general_dialog.exit()
-```
-
-### Drawing Integration
-```python
-# In main draw loop
-def _draw_dialogs_if_needed(self):
-    dialog_content_changed = self._check_dialog_content_changed()
-    
-    if dialog_content_changed or self.needs_full_redraw:
-        if self.general_dialog.is_active:
-            self.general_dialog.draw(self.stdscr, self.safe_addstr)
-        elif self.search_dialog.mode:
-            self.search_dialog.draw(self.stdscr, self.safe_addstr)
-        # ... etc for all dialog types
-```
-
-## Error Handling
-
-### Input Validation
-- **Length Limits**: Configurable maximum input length
-- **Character Validation**: Filter invalid characters
-- **Empty Input Handling**: Appropriate handling of empty inputs
-- **Special Character Support**: Proper handling of special characters
-
-### Edge Cases
-- **Narrow Terminals**: Graceful degradation in constrained spaces
-- **Long Prompts**: Intelligent handling of long prompt text
-- **Help Text Overflow**: Smart positioning to prevent overlap
-- **Terminal Resize**: Responsive to terminal size changes
-
-### Threading Considerations
-- **Background Updates**: Safe handling of updates from background threads
-- **Race Conditions**: Prevention of race conditions in threaded operations
-- **Atomic Operations**: Boolean flag access is atomic in Python due to GIL
-
-## Configuration
-
-### Customizable Aspects
-- **Prompt Text**: Fully customizable prompt messages
-- **Help Text**: Optional help text for user guidance
-- **Initial Text**: Pre-populate input fields
-- **Validation**: Custom validation logic
-- **Styling**: Inherits from TFM color configuration
-
-### Width Calculation Settings
-The dialog system automatically handles width calculations but respects:
-- Terminal width constraints
-- Help text space requirements
-- Minimum usable input width (prompt + 5 characters)
+There is no dialog dispatch table, no `handle_input(key)` fan-out, and no
+`_draw_dialogs_if_needed()` in the main loop — the Panel routes events to the top
+layer and draws all layers itself. Incremental search is the one case the app
+manages more directly, because it constructs `ISearchBar` and pins it to a captured
+footer rect rather than centering it (`TfmApp.enter_isearch` and the
+`_isearch_*` callbacks).
 
 ## Testing
 
-### Comprehensive Test Coverage
+Dialog behavior is covered by unit tests that drive the widgets against PuiKit's
+headless backend (no live TUI). Representative files:
 
-#### Core Optimization Tests
-- `test/test_encapsulated_dialog_optimization.py`: Encapsulated design verification
-- `test/test_single_draw_call_optimization.py`: Single draw call optimization testing
-- `test/test_dual_draw_calls_necessity.py`: Dual draw necessity verification
+- `test/test_progressive_search_dialog.py` — streaming search, generations,
+  synchronous settle.
+- `test/test_batch_rename_conflicts.py` — `compute_preview` conflict/invalid
+  detection and macros.
+- `test/test_compare_dialog.py` — criteria assembly and navigation.
+- `test/test_dialog_geometry.py` — `pane_anchored_box` / title-bar sizing.
+- `test/test_viewer_isearch.py` — the viewer incremental-search driver.
 
-#### Rendering Fix Tests
-- `test/test_search_dialog_left_right_key_fix.py`: SearchDialog specific tests
-- `test/test_all_dialogs_left_right_key_fix.py`: Cross-dialog consistency tests
-- `test/test_info_dialog_up_key_bug.py`: InfoDialog specific tests
-- `test/test_all_dialogs_rendering_fix.py`: General rendering fix tests
-- `test/test_comprehensive_dialog_key_handling.py`: Exhaustive key testing
-
-#### Animation and Background Update Tests
-- `test/test_progress_animation.py`: Progress animation functionality
-- `test/test_search_dialog_background_updates.py`: Background search result updates
-- `test/test_search_dialog_cancellation.py`: Search cancellation UI updates
-
-#### Width Management Tests
-- `test/test_general_purpose_dialog_width_fix.py`: Width calculation tests
-- `test/test_dialog_width_edge_cases.py`: Edge case handling
-
-
-### Test Results
-
-All tests pass, confirming:
-- **Performance**: 77.8% reduction in unnecessary rendering calls
-- **Reliability**: No dialogs disappear after key presses
-- **Animation**: Progress indicators animate smoothly
-- **Background Updates**: Real-time updates work correctly
-- **Consistency**: All dialogs follow the same patterns
-
-## Benefits
-
-### Code Reuse
-- **Centralized Logic**: All dialog functionality in one place
-- **Consistent Behavior**: Same input handling across all dialogs
-- **Reduced Duplication**: Eliminates repeated dialog code
-- **Easy Maintenance**: Single point of maintenance for dialog features
-
-### User Experience
-- **Consistent Interface**: Familiar behavior across all input dialogs
-- **Intelligent Layout**: Optimal use of available screen space
-- **Helpful Guidance**: Optional help text for user assistance
-- **Responsive Design**: Works well on various terminal sizes
-- **Real-time Updates**: Background operations update UI immediately
-
-### Developer Experience
-- **Simple API**: Easy to use for new dialog types
-- **Helper Functions**: Pre-configured dialogs for common cases
-- **Flexible Configuration**: Customizable for specific needs
-- **Good Documentation**: Clear examples and usage patterns
-
-### Performance Benefits
-- **Reduced CPU Usage**: Eliminates unnecessary rendering operations
-- **Better Responsiveness**: Less time spent on redundant drawing
-- **Reduced Screen Flicker**: Fewer screen updates mean smoother experience
-- **Network Efficiency**: Important for remote terminal sessions
-- **Battery Life**: Lower CPU usage on laptops
-
-## Future Enhancements
-
-### Potential Improvements
-- **Multi-line Input**: Support for multi-line text input
-- **Input History**: Remember previous inputs for convenience
-- **Auto-completion**: Suggest completions based on context
-- **Input Validation**: Real-time validation with visual feedback
-- **Custom Styling**: Per-dialog styling options
-
-### Advanced Features
-- **Modal Dialogs**: Full-screen modal dialog support
-- **Form Dialogs**: Multi-field form input support
-- **Progress Dialogs**: Integration with progress tracking
-- **Confirmation Dialogs**: Yes/No confirmation dialog support
-
-### Performance Optimizations
-- **Granular Change Tracking**: Track which specific parts of dialogs changed
-- **Dirty Rectangle Optimization**: Only redraw changed regions
-- **Animation Optimization**: Special handling for animated elements
-- **Metrics Collection**: Track rendering performance in production
-
-## Design Principles
-
-### Fail-Safe Rendering
-The system ensures that ANY handled key triggers a redraw, preventing dialogs from becoming invisible due to edge cases in key handling logic.
-
-### Consistent Pattern
-All dialogs follow the same pattern:
-```python
-# Handle specific key logic
-if specific_condition:
-    # Do specific action
-    
-# ALWAYS set content_changed for any handled key
-self.content_changed = True
-return True
-```
-
-### Encapsulation
-Each dialog manages its own redraw logic through clean interfaces:
-- `needs_redraw()` method encapsulates all redraw logic
-- `draw()` methods automatically manage their own state flags
-- Main loop uses clean interface without accessing internal properties
-
-## Backward Compatibility
-
-All optimizations and fixes are fully backward compatible:
-- No changes to public APIs
-- No changes to user-visible behavior
-- Only internal rendering logic is optimized
-- All existing functionality remains intact
-
-## Conclusion
-
-The TFM Dialog System provides a robust, flexible, and high-performance foundation for all user input dialogs in TFM. It ensures consistent behavior, optimal performance, and excellent user experience across all dialog types while simplifying development and maintenance of dialog functionality.
-
-The system successfully combines:
-- **Flexibility**: General-purpose framework for common needs
-- **Specialization**: Dedicated dialogs for complex operations
-- **Performance**: Optimized rendering with 77.8% reduction in unnecessary draws
-- **Reliability**: Comprehensive fixes for all known rendering issues
-- **Maintainability**: Clean, encapsulated design with comprehensive testing
+Run them with the project's standard invocation
+(`PYTHONPATH=.:src pytest test/<file> -v`).
 
 ## Related Documentation
 
-- [TFM Application Overview](TFM_APPLICATION_OVERVIEW.md) - Overall application architecture and core components
-- Exception Handling Policy - Error handling guidelines
+- [Jump Dialog System](JUMP_DIALOG_SYSTEM.md) — the directory-jump picker built on
+  this framework.
+- [Drives Dialog System](DRIVES_DIALOG_SYSTEM.md) — the storage-location picker
+  (a `FilterListDialog` call site).
+- [Menu System](MENU_SYSTEM.md) — the menu-bar / context-menu overlays (also
+  PuiKit layers).
+- [Text Viewer System](TEXT_VIEWER_SYSTEM.md) and
+  [Directory Diff Viewer System](DIRECTORY_DIFF_VIEWER_SYSTEM.md) — full-window
+  viewers that reuse `ViewerISearch`.
+- [TFM Application Overview](TFM_APPLICATION_OVERVIEW.md) — overall architecture
+  and the Panel/layer model.
