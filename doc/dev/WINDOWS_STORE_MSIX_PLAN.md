@@ -327,6 +327,77 @@ can redirect writes at runtime — but prefer fixing paths in code over shipping
 
 ---
 
+## 8. Command-line installation (the primary consumption path)
+
+TFM is a terminal file manager — most of its audience installs software from a
+shell, not by clicking through the Store GUI. The good news is that a single
+Store MSIX submission (§4–6) gives you a **first-class `winget` install line for
+free**, and that is arguably the biggest end-user payoff of this whole effort.
+
+### 8a. `winget` via the `msstore` source (recommended)
+Once the package is live on the Store, it is installable directly from the
+command line — no browser, no GUI:
+
+```powershell
+winget install --id 9N‹XXXXXXXXXX› --source msstore
+```
+
+- The `9N…` is the **Store product ID** from the Partner Center listing / Store
+  URL — **not** the manifest `Identity/Name` (`‹PublisherId›.TFM`). They are
+  different identifiers; don't confuse them.
+- First use of the `msstore` source prompts once to accept Microsoft Store terms.
+  In CI / unattended installs, pre-agree with:
+  ```powershell
+  winget install --id 9N‹XXXXXXXXXX› --source msstore `
+    --accept-source-agreements --accept-package-agreements
+  ```
+
+### 8b. `winget` via the community repo (default `winget` source)
+You can *also* submit a manifest to
+[microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs) so the shorter,
+source-less form works from winget's default repository:
+
+```powershell
+winget install crftwr.TFM
+```
+
+That manifest can point at **either** the Store package **or** a directly-signed
+installer, so this is the same route SignPath's OV cert would use *without* the
+Store at all.
+
+### 8c. Sideloading (`Add-AppxPackage`) — dev/test and enterprise only
+```powershell
+Add-AppxPackage windows_app\build\TFM-<version>-x64.msix
+```
+
+Direct install of the `.msix`, no winget. Used for the local-test step (§5) and
+enterprise/MDM deployment — not a consumer path.
+
+### 🔴 Channel does not equal trust (why 8b/8c do NOT skip the warning)
+A future reader will be tempted to reach for the community repo or sideloading to
+"avoid the SmartScreen warning." **They don't.** The zero-warning experience comes
+from the **signature**, not the delivery channel:
+
+| Path | What it installs | SmartScreen / warning |
+|------|------------------|-----------------------|
+| `winget --source msstore` (8a) | The Microsoft-re-signed Store MSIX | **None** — Store signature |
+| `winget-pkgs` → Store product (8b) | Same Store MSIX, via a pointer | **None** — inherits Store signature |
+| `winget-pkgs` → SignPath-signed installer (8b) | Your OV-signed artifact | No hard block; **reputation ramp** |
+| `winget-pkgs` → unsigned zip/exe (8b) | Today's unsigned artifact | **Same block as today** |
+| `Add-AppxPackage` unsigned/self-signed (8c) | Loose `.msix` | **Won't install** unless the cert is already trusted (admin import) |
+
+- `winget-pkgs` is only a **pointer** — it downloads and runs whatever artifact it
+  references and adds no trust of its own.
+- `Add-AppxPackage` **cannot install an unsigned MSIX at all**; a self-signed cert
+  requires the user to import it into `TrustedPeople` first, which is worse UX than
+  the warning, not better.
+
+**Net:** trust = Microsoft re-signature (Store) **or** an OV cert (SignPath). The
+CLI paths above are about convenience and discovery; they change *how* users
+install, not *whether* they see a warning.
+
+---
+
 ## References
 
 - [Code signing options for Windows app developers](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/code-signing-options) — MSIX-via-Store is free + auto-signed

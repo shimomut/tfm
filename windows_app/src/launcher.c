@@ -53,7 +53,11 @@
  * import the `tfm` module (app\tfm.py) and call tfm.main(); sys.argv was already
  * set to ("TFM", "--backend", "gui") via PyConfig, so argparse selects the
  * Windows GUI backend. Any exception is turned into a MessageBox + a log file
- * next to the exe, because this is a GUI-subsystem process with no console.
+ * under ~/.tfm (TFM's user-state dir), because this is a GUI-subsystem process
+ * with no console. The log deliberately does NOT go next to the exe: under an
+ * MSIX/Store install the install dir is read-only to the app (writes there are
+ * silently redirected to a per-package VFS location), so ~/.tfm keeps the
+ * diagnostic findable and matches where the rest of TFM's state already lives.
  */
 static const char *BOOTSTRAP =
     "import os, sys, traceback\n"
@@ -67,7 +71,8 @@ static const char *BOOTSTRAP =
     "except BaseException:\n"
     "    tb = traceback.format_exc()\n"
     "    try:\n"
-    "        base = os.path.dirname(sys.executable)\n"
+    "        base = os.path.join(os.path.expanduser('~'), '.tfm')\n"
+    "        os.makedirs(base, exist_ok=True)\n"
     "        with open(os.path.join(base, 'TFM-error.log'), 'w', encoding='utf-8') as fh:\n"
     "            fh.write(tb)\n"
     "    except Exception:\n"

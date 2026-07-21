@@ -49,6 +49,8 @@ Thumbs.db
 # Windows app bundle build artifacts
 windows_app/build/
 windows_app/.cache/
+# Generated MSIX Store tiles (produced by make_store_assets.py from TFM.icns)
+windows_app/resources/Assets/
 
 temp/
 

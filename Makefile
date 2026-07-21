@@ -1,6 +1,6 @@
 # TFM Makefile
 
-.PHONY: help run run-gui test test-quick clean install uninstall dev-install lint format demo macos-app macos-app-clean macos-app-install macos-refresh-icon macos-dmg windows-app windows-app-clean windows-app-zip windows-app-install install-config venv venv-clean check-venv install-puikit
+.PHONY: help run run-gui test test-quick clean install uninstall dev-install lint format demo macos-app macos-app-clean macos-app-install macos-refresh-icon macos-dmg windows-app windows-app-clean windows-app-zip windows-app-install windows-app-msix windows-app-msix-install windows-app-msix-uninstall install-config venv venv-clean check-venv install-puikit
 
 # Python interpreter selection
 # All Python is run through the project virtual environment (.venv). There is no
@@ -59,6 +59,9 @@ help:
 	@echo "  windows-app-clean   - Clean Windows app build artifacts"
 	@echo "  windows-app-zip     - Build the bundle and zip it for distribution"
 	@echo "  windows-app-install - Install the built bundle to Program Files (elevates via UAC)"
+	@echo "  windows-app-msix          - Package the bundle as a self-signed MSIX (prototype)"
+	@echo "  windows-app-msix-install  - Trust cert (elevates) + install the MSIX per-user"
+	@echo "  windows-app-msix-uninstall- Remove the MSIX package + throwaway signing cert"
 	@echo ""
 	@echo "Examples:"
 	@echo "  make run                        # Run TFM in the terminal"
@@ -303,3 +306,22 @@ windows-app-clean:
 windows-app-install:
 	@echo "Installing Windows application bundle..."
 	@powershell -ExecutionPolicy Bypass -File windows_app/build.ps1 -Install $(if $(INSTALLDIR),-InstallDir "$(INSTALLDIR)")
+
+# --- MSIX (Microsoft Store / winget) packaging, PROTOTYPE ------------------
+# Wraps the built bundle into a self-signed .msix for local testing. Run
+# 'make windows-app' first. See doc/dev/WINDOWS_STORE_MSIX_PLAN.md.
+windows-app-msix:
+	@echo "Packaging Windows app as MSIX (self-signed prototype)..."
+	@powershell -ExecutionPolicy Bypass -File windows_app/build_msix.ps1 -Sign
+
+# Trust the self-signed cert (self-elevates via UAC) then install per-user.
+# Run 'make windows-app-msix' first to produce the signed package.
+windows-app-msix-install:
+	@echo "Installing MSIX package locally..."
+	@powershell -ExecutionPolicy Bypass -File windows_app/build_msix.ps1 -Install
+
+# Removes the package (per-user) and the throwaway signing cert; untrusting the
+# machine-store cert self-elevates via UAC.
+windows-app-msix-uninstall:
+	@echo "Removing installed MSIX package and throwaway cert..."
+	@powershell -ExecutionPolicy Bypass -File windows_app/build_msix.ps1 -Uninstall
