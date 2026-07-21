@@ -126,6 +126,6 @@ Python files should NOT be executable. Run them via `python3 script.py`, not `./
 
 ## References
 
-- Logging migration guide: `doc/dev/LOGGING_MIGRATION_GUIDE.md`
+- Logging system: `doc/dev/LOGGING_SYSTEM.md`
 - Logging feature: `doc/LOGGING_FEATURE.md`
 - Log manager: `src/tfm_log_manager.py`

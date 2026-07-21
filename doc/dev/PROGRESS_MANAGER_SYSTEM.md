@@ -1,28 +1,37 @@
 # Progress Manager System
 
-## Overview
+Module: `src/tfm_progress_manager.py`
 
-The Progress Manager System provides comprehensive progress tracking and display for long-running operations in TFM. It offers real-time progress updates, operation prioritization, and user-friendly progress visualization for file operations like copying, moving, deleting, and archive creation.
+`ProgressManager` tracks the state of one long-running file operation and formats
+it for display. It is deliberately small: it holds the current operation's counts
+and current item, drives a `ProgressAnimator` frame, and renders a status line or
+rich text segments. It does **not** own threads, cancellation, priorities, time
+estimates, or persistence — those belong to the task layer (`src/tfm_task.py`)
+and the file-operations worker (`src/tfm_file_operations.py`).
 
-## Features
+## Scope
 
-### Core Capabilities
-- **Real-time Progress**: Live progress updates during operations
-- **Multiple Operation Types**: Support for various file operations
-- **Priority Management**: Handle multiple concurrent operations
-- **Visual Progress Display**: Clear progress bars and status information
-- **Cancellation Support**: User can cancel long-running operations
+What `ProgressManager` does:
 
-### Advanced Features
-- **Throttled Updates**: Efficient progress updates to prevent UI flooding
-- **Operation Queuing**: Manage multiple operations with priorities
-- **Detailed Statistics**: File counts, sizes, and timing information
-- **Error Tracking**: Track and report operation errors
-- **Completion Callbacks**: Execute actions when operations complete
+- Track a single active operation (`OperationType`, total, processed, current
+  item, byte progress, error count, and a "still counting" flag).
+- Advance a spinner frame via an internal `ProgressAnimator`.
+- Format the operation as a plain status line or as layout segments.
+- Optionally push updates to a `progress_callback` (throttled).
 
-## Class Structure
+What it does **not** do (handled elsewhere):
 
-### OperationType Enum
+- Threading and the worker loop → `TaskManager` / the file-ops worker.
+- Cancellation → `Task.checkpoint()` / `Task.request_cancel()` raising
+  `Cancelled`.
+- Rendering the modal dialog and prompts → `ProgressDialog` (in `tfm_task.py`).
+
+There is no operation priority system, no ETA calculation, and no
+resume/replay — earlier drafts of this document described those, but they are not
+in the code.
+
+## OperationType
+
 ```python
 class OperationType(Enum):
     COPY = "copy"
@@ -32,397 +41,161 @@ class OperationType(Enum):
     ARCHIVE_EXTRACT = "archive_extract"
 ```
 
-### ProgressManager Class
+## API
+
 ```python
-class ProgressManager:
-    def __init__()
-    def start_operation(self, operation_type, total_items, description="")
-    def update_progress(self, current_item, item_name="")
-    def finish_operation(self, success=True, message="")
-    def cancel_operation()
-    def is_operation_active()
-    def get_progress_info()
+ProgressManager(config=None)          # builds its own spinner ProgressAnimator
+
+start_operation(operation_type, total_items, description="", progress_callback=None)
+update_operation_total(total_items, description="")   # ends the "counting" phase
+update_progress(current_item, processed_items=None)   # None → auto-increment
+update_file_byte_progress(bytes_copied, bytes_total)  # per-file byte bar
+refresh_animation()                                   # force a callback (no data change)
+increment_errors()                                    # bump the error counter
+finish_operation()                                    # clears state; callback(None)
+
+is_operation_active() -> bool
+get_current_operation() -> dict | None
+get_progress_percentage() -> int
+get_progress_text(max_width=80) -> str
+get_progress_segments() -> list
 ```
 
-## Usage Examples
+Notes on the real shapes (these differ from older drafts):
 
-### Basic Progress Tracking
+- `finish_operation()` takes **no** arguments; it clears state and, if a callback
+  is set, calls it once with `None` to clear the display.
+- `update_progress(current_item, processed_items=None)` — the first argument is
+  the item name; the count auto-increments unless overridden.
+- Errors are a simple integer counter (`increment_errors()`), not a structured
+  error list.
+- The current operation is a plain dict with keys: `type`, `total_items`,
+  `processed_items`, `current_item`, `description`, `errors`,
+  `file_bytes_copied`, `file_bytes_total`, `counting`.
+
+### Two-phase progress: counting then determinate
+
+An operation starts with `counting=True` and (typically) `total_items=0`, so the
+UI shows an indeterminate "Preparing…" state. Once the worker has recursively
+counted the work, it calls `update_operation_total(total)`, which flips
+`counting` off and makes the primary bar determinate. `update_progress` also
+clears `counting` as a safety net.
+
+### Byte-level progress
+
+`update_file_byte_progress(copied, total)` feeds a secondary bar for the current
+file. It is only surfaced for files larger than 1 MiB (`file_bytes_total > 1024*1024`),
+rendered compactly (e.g. `[15M/32.0G]`); small files show no byte bar.
+
+### Rendering
+
+- `get_progress_text(max_width)` — a single flat line
+  (`"⠋ Copying... 42/120 - report.pdf [15M/32.0G]"`), handy for logs and tests.
+- `get_progress_segments()` — rich segments for the layout engine
+  (`AsIsSegment` + a middle-abbreviating `FilepathSegment` for the filename + an
+  `AllOrNothingSegment` for byte progress), so the line degrades gracefully as
+  width shrinks.
+- `get_progress_percentage()` is available for a bar fraction but is not part of
+  the text line.
+
+The spinner frame comes from an internal `ProgressAnimator`
+(`pattern_override='spinner'`, `speed_override=0.08`); see
+[Progress Animation System](PROGRESS_ANIMATION_SYSTEM.md).
+
+### Update throttling
+
+Callbacks are throttled to at most one per `callback_throttle_ms` (50 ms), with
+`force=True` and the final update bypassing the throttle. This is only relevant
+when a `progress_callback` is used (push mode). The task UI renders in pull mode
+(below), reading state each frame instead.
+
+## Copy progress (worked example)
+
+File copy is the richest consumer of `ProgressManager` and shows how the pieces
+fit. The threading and UI belong to the task layer; `ProgressManager` is just the
+shared state both sides read and write.
+
+### Threading model
+
+A copy (like move/delete/duplicate) runs as a `Task`:
+
+1. `FileOperations` builds a `Task`, calls `task.progress.start_operation(...)`,
+   and hands a `run(task)` closure to `TaskManager.submit`.
+2. `TaskManager.submit` shows a `ProgressDialog` for the task and spawns a
+   **daemon worker thread** running `run(task)`. On the **main thread** it
+   registers an animation tick that, each frame, pumps the task's UI bridge and
+   repaints the panel; when the worker signals completion it tears down the
+   dialog and reports the result.
+3. The worker mutates `task.progress` as it goes; the `ProgressDialog` only
+   *reads* that state during `draw`. This pull-based rendering is what keeps the
+   spinner and bars moving smoothly — the per-frame repaint re-reads the animator
+   (which advances by elapsed time), independent of how often the worker updates
+   counts. No separate animation-refresh thread is needed.
+
+Because the worker only ever touches its own `Task`/`ProgressManager` and the
+main thread only reads during draw, there is no shared mutable UI state across
+the boundary.
+
+### The worker (linear, top-to-bottom)
+
+`FileOperations._run` executes prepare → resolve → execute:
+
+- **Resolve conflicts** first (cheap existence checks). Destination collisions are
+  resolved one-by-one through the task's UI bridge (`task.ask(...)`), which posts
+  a request the main-thread pump turns into a conflict dialog and blocks on the
+  answer — so prompts appear sequentially. Choices: skip, overwrite, keep-both
+  (a fresh ` (N)` name), or cancel.
+- **Count** the surviving plan recursively (`_count` / `_count_node`) to get
+  `total_items`, then `prog.update_operation_total(total_items)` to leave the
+  "Preparing…" phase.
+- **Execute** each top-level target. Before each unit, `task.checkpoint()` raises
+  `Cancelled` if cancellation was requested. `prog.update_progress(name)` marks
+  the current entry.
+
+### Byte-level copy
+
+`_copy_file` streams a file through `_copy_bytes` when it is large
+(`size >= 1 MiB`) or crosses storage backends; otherwise it uses a plain
+`copy_to`. For local large files it copies in 1 MiB chunks, calling
+`prog.update_file_byte_progress(copied, size)` per chunk and checkpointing between
+chunks (a cancel deletes the partial file so no stub is left). Cross-storage
+copies delegate to `Path.copy_to(..., progress_callback=prog.update_file_byte_progress)`,
+letting the backend drive the same byte bar.
+
+### Errors and cancellation
+
+- Per-entry failures are collected as `(path, reason)` and reported to the caller;
+  one bad file never aborts the rest of the target. `prog.increment_errors()`
+  bumps the visible error count.
+- Cancellation flows through `Cancelled` raised from a checkpoint (or a "Cancel"
+  conflict choice), unwinding into a clean partial summary. `finish_operation()`
+  runs in a `finally` so progress state is always cleared.
+
+## Integration
+
 ```python
-progress_manager = ProgressManager()
-
-# Start a copy operation
-progress_manager.start_operation(
-    OperationType.COPY, 
-    total_items=100, 
-    description="Copying files to backup"
-)
-
-# Update progress during operation
-for i, file in enumerate(files):
-    progress_manager.update_progress(i + 1, file.name)
-    copy_file(file)
-
-# Finish operation
-progress_manager.finish_operation(success=True, message="Copy completed")
+# One TaskManager per app; each Task owns a ProgressManager as task.progress.
+task = Task("Copy…", config=self.config, kind="copy")
+task.progress.start_operation(OperationType.COPY, 0, description="")
+task_manager.submit(task, panel, run=run, on_done=on_complete)
 ```
 
-### Archive Creation Progress
-```python
-# Start archive creation
-progress_manager.start_operation(
-    OperationType.ARCHIVE_CREATE,
-    total_items=len(files_to_archive),
-    description="Creating backup.tar.gz"
-)
-
-# Update progress for each file
-for i, file in enumerate(files_to_archive):
-    progress_manager.update_progress(i + 1, file.name)
-    add_to_archive(file)
-
-# Complete operation
-progress_manager.finish_operation(success=True, message="Archive created successfully")
-```
-
-### Delete Operation with Error Handling
-```python
-progress_manager.start_operation(
-    OperationType.DELETE,
-    total_items=len(files_to_delete),
-    description="Deleting selected files"
-)
-
-errors = []
-for i, file in enumerate(files_to_delete):
-    try:
-        progress_manager.update_progress(i + 1, file.name)
-        delete_file(file)
-    except Exception as e:
-        errors.append(f"Failed to delete {file.name}: {e}")
-
-# Finish with error information
-success = len(errors) == 0
-message = "Deletion completed" if success else f"Completed with {len(errors)} errors"
-progress_manager.finish_operation(success=success, message=message)
-```
-
-## Progress Display Features
-
-### Visual Progress Bar
-```
-┌─────────────────────────────────────┐
-│ Copying files to backup             │
-│ ████████████████░░░░░░░░░░░░ 67%    │
-│ Processing: document.pdf (45/67)    │
-│ Elapsed: 00:02:15  ETA: 00:01:05   │
-└─────────────────────────────────────┘
-```
-
-### Status Information
-- **Operation Description**: Clear description of current operation
-- **Progress Percentage**: Visual percentage completion
-- **Current Item**: Name of file/item being processed
-- **Item Counter**: Current item number and total count
-- **Timing Information**: Elapsed time and estimated completion time
-
-## Integration with TFM
-
-### Main Application Integration
-```python
-# In TfmApp class
-self.progress_manager = ProgressManager()
-
-# Check for active operations in main loop
-if self.progress_manager.is_operation_active():
-    # Handle progress display and user input
-    if key == 27:  # ESC key
-        self.progress_manager.cancel_operation()
-```
-
-### File Operations Integration
-```python
-def copy_files_with_progress(self, source_files, destination):
-    """Copy files with progress tracking"""
-    self.progress_manager.start_operation(
-        OperationType.COPY,
-        len(source_files),
-        f"Copying {len(source_files)} files"
-    )
-    
-    for i, source_file in enumerate(source_files):
-        if self.progress_manager.is_cancelled():
-            break
-            
-        self.progress_manager.update_progress(i + 1, source_file.name)
-        copy_file(source_file, destination)
-    
-    self.progress_manager.finish_operation()
-```
-
-## Progress Update Strategies
-
-### Throttled Updates
-```python
-class ProgressManager:
-    def __init__(self):
-        self.last_update_time = 0
-        self.update_threshold = 0.1  # Update at most every 100ms
-    
-    def update_progress(self, current_item, item_name=""):
-        current_time = time.time()
-        if current_time - self.last_update_time >= self.update_threshold:
-            self._do_update(current_item, item_name)
-            self.last_update_time = current_time
-```
-
-### Batch Updates
-```python
-# For very fast operations, batch updates
-batch_size = 10
-for i, file in enumerate(files):
-    process_file(file)
-    
-    # Update progress every 10 files
-    if i % batch_size == 0 or i == len(files) - 1:
-        progress_manager.update_progress(i + 1, file.name)
-```
-
-## Operation Management
-
-### Priority System
-```python
-class OperationPriority:
-    HIGH = 1      # User-initiated operations
-    NORMAL = 2    # Regular file operations
-    LOW = 3       # Background operations
-    
-# Start high-priority operation
-progress_manager.start_operation(
-    OperationType.COPY,
-    total_items=files_count,
-    priority=OperationPriority.HIGH
-)
-```
-
-### Cancellation Handling
-```python
-def long_running_operation(self):
-    """Example of cancellation-aware operation"""
-    for i, item in enumerate(items):
-        # Check for cancellation before each item
-        if self.progress_manager.is_cancelled():
-            self.cleanup_partial_operation()
-            return False
-        
-        self.progress_manager.update_progress(i + 1, item.name)
-        process_item(item)
-    
-    return True
-```
-
-## Advanced Features
-
-### Time Estimation
-```python
-class ProgressManager:
-    def calculate_eta(self):
-        """Calculate estimated time to completion"""
-        if self.current_item <= 0:
-            return None
-        
-        elapsed = time.time() - self.start_time
-        rate = self.current_item / elapsed
-        remaining_items = self.total_items - self.current_item
-        
-        return remaining_items / rate if rate > 0 else None
-```
-
-### Statistics Tracking
-```python
-def get_operation_stats(self):
-    """Get detailed operation statistics"""
-    return {
-        'operation_type': self.operation_type,
-        'total_items': self.total_items,
-        'completed_items': self.current_item,
-        'elapsed_time': time.time() - self.start_time,
-        'estimated_completion': self.calculate_eta(),
-        'items_per_second': self.calculate_rate(),
-        'success_rate': self.calculate_success_rate()
-    }
-```
-
-### Error Reporting
-```python
-class ProgressManager:
-    def __init__(self):
-        self.errors = []
-        self.warnings = []
-    
-    def report_error(self, error_message, item_name=None):
-        """Report an error during operation"""
-        error_info = {
-            'message': error_message,
-            'item': item_name,
-            'timestamp': time.time()
-        }
-        self.errors.append(error_info)
-    
-    def get_error_summary(self):
-        """Get summary of errors encountered"""
-        return {
-            'error_count': len(self.errors),
-            'warning_count': len(self.warnings),
-            'recent_errors': self.errors[-5:]  # Last 5 errors
-        }
-```
-
-## Performance Optimization
-
-### Efficient Updates
-- **Throttled Rendering**: Limit UI updates to prevent performance issues
-- **Batch Processing**: Group multiple updates for efficiency
-- **Minimal Redraws**: Only redraw changed portions of progress display
-- **Background Processing**: Non-blocking progress updates
-
-### Memory Management
-```python
-class ProgressManager:
-    def cleanup_completed_operation(self):
-        """Clean up resources after operation completion"""
-        self.operation_type = None
-        self.current_item = 0
-        self.total_items = 0
-        self.errors.clear()
-        self.warnings.clear()
-```
-
-## Error Handling
-
-### Operation Failures
-```python
-def handle_operation_error(self, error, item_name=None):
-    """Handle errors during operations"""
-    self.report_error(str(error), item_name)
-    
-    # Decide whether to continue or abort
-    if self.is_critical_error(error):
-        self.finish_operation(success=False, message=f"Operation failed: {error}")
-        return False
-    else:
-        # Continue with next item
-        return True
-```
-
-### Recovery Mechanisms
-```python
-def resume_operation(self, from_item=None):
-    """Resume a previously interrupted operation"""
-    if from_item is not None:
-        self.current_item = from_item
-    
-    # Continue from where we left off
-    remaining_items = self.total_items - self.current_item
-    self.description = f"Resuming operation ({remaining_items} items remaining)"
-```
-
-## Common Use Cases
-
-### File Copy Operations
-```python
-def copy_files_with_progress(self, files, destination):
-    self.progress_manager.start_operation(
-        OperationType.COPY,
-        len(files),
-        f"Copying {len(files)} files to {destination.name}"
-    )
-    
-    copied_count = 0
-    for i, file in enumerate(files):
-        try:
-            self.progress_manager.update_progress(i + 1, file.name)
-            shutil.copy2(file, destination / file.name)
-            copied_count += 1
-        except Exception as e:
-            self.progress_manager.report_error(f"Failed to copy {file.name}: {e}")
-    
-    success = copied_count == len(files)
-    message = f"Copied {copied_count}/{len(files)} files"
-    self.progress_manager.finish_operation(success=success, message=message)
-```
-
-### Archive Creation
-```python
-def create_archive_with_progress(self, files, archive_path):
-    self.progress_manager.start_operation(
-        OperationType.ARCHIVE_CREATE,
-        len(files),
-        f"Creating archive {archive_path.name}"
-    )
-    
-    with tarfile.open(archive_path, 'w:gz') as tar:
-        for i, file in enumerate(files):
-            self.progress_manager.update_progress(i + 1, file.name)
-            tar.add(file, arcname=file.name)
-    
-    self.progress_manager.finish_operation(
-        success=True,
-        message=f"Archive {archive_path.name} created successfully"
-    )
-```
-
-## Benefits
-
-### User Experience
-- **Visual Feedback**: Clear indication of operation progress
-- **Time Awareness**: Estimated completion times for planning
-- **Cancellation Control**: Ability to cancel long operations
-- **Error Visibility**: Clear reporting of operation issues
-
-### System Performance
-- **Efficient Updates**: Throttled updates prevent UI flooding
-- **Resource Management**: Proper cleanup of operation resources
-- **Background Processing**: Non-blocking operation execution
-- **Memory Efficiency**: Minimal memory usage for progress tracking
-
-### Developer Experience
-- **Simple API**: Easy to integrate progress tracking
-- **Flexible Configuration**: Customizable for different operation types
-- **Error Handling**: Built-in error reporting and handling
-- **Comprehensive Tracking**: Detailed operation statistics
-
-## Future Enhancements
-
-### Potential Improvements
-- **Multiple Operations**: Support for concurrent operations
-- **Operation History**: Track and display operation history
-- **Progress Persistence**: Save and restore operation state
-- **Custom Callbacks**: User-defined completion callbacks
-- **Progress Notifications**: System notifications for completion
-
-### Advanced Features
-- **Network Progress**: Progress tracking for network operations
-- **Bandwidth Monitoring**: Track transfer speeds and bandwidth usage
-- **Operation Scheduling**: Schedule operations for later execution
-- **Progress Analytics**: Detailed analytics and reporting
-- **Remote Progress**: Progress tracking for remote operations
+Synchronous mode (used by tests) runs the worker inline with no dialog, and
+`task.ask` resolves to its headless default.
 
 ## Testing
 
-### Test Coverage
-- **Progress Updates**: Verify correct progress calculation
-- **Cancellation**: Test operation cancellation functionality
-- **Error Handling**: Test error reporting and recovery
-- **Performance**: Test with large numbers of files
-- **Integration**: Test integration with file operations
+- Progress calculations: start/update/finish, percentage, counting→determinate
+  transition, byte-progress thresholds.
+- Text and segment rendering at varying widths.
+- Copy/move/delete workers: conflict resolution, per-entry error collection,
+  cancellation via checkpoints, and partial-file cleanup.
 
-### Test Scenarios
-- **Basic Operations**: Simple progress tracking scenarios
-- **Error Conditions**: Operations with various error conditions
-- **Cancellation**: User cancellation at different stages
-- **Performance**: Large-scale operations with many files
-- **Edge Cases**: Empty operations, single file operations
+## Related
 
-## Conclusion
-
-The Progress Manager System provides essential progress tracking functionality for TFM, offering users clear visibility into long-running operations while maintaining excellent performance and system responsiveness. Its comprehensive feature set, efficient implementation, and easy integration make it a crucial component for professional file management operations.
+- [Progress Animation System](PROGRESS_ANIMATION_SYSTEM.md) — the frame engine.
+- `src/tfm_task.py` — `Task` / `TaskManager` / `ProgressDialog` (threading, UI
+  bridge, rendering).
+- `src/tfm_file_operations.py` — the copy/move/delete worker.
+- `doc/COPY_PROGRESS_FEATURE.md` — end-user documentation.
+</content>

@@ -2,160 +2,95 @@
 
 ## Overview
 
-The Text Diff Viewer is a side-by-side comparison tool integrated into TFM that displays differences between two text files. This document describes the technical implementation details.
+The Text Diff Viewer is a full-window modal side-by-side comparison of two text
+files, integrated into TFM. It is a PuiKit `Widget` (`DiffViewer`, in
+`src/tfm_diff_viewer.py`), pushed over the active panel with
+`show_diff_viewer(panel, path1, path2)`.
 
 ## Architecture
 
-### Core Components
+### Current components (`src/tfm_diff_viewer.py`)
 
-#### 1. DiffViewer Class (`src/tfm_diff_viewer.py`)
+- **`DiffViewer(Widget)`** — the modal viewer. Holds the shared scroll state
+  (`top` / `left` / `_view_h`), the computed diff rows, and the incremental-search
+  state; draws the header band, shared vertical scrollbar, and footer chrome.
+- **`_DiffPane(Widget)`** — one side (left/old, right/new): its filename header,
+  line-number gutter, and scrolling content. Both panes read the parent's shared
+  scroll state, so they stay row-aligned and pan together; only the split *width*
+  differs. The rows render in a clipped child (`_ScrollBody`) for smooth
+  fractional scroll on both axes.
+- **`Splitter`** (from PuiKit) — carries the two panes with a draggable divider.
+- **`compute_diff(lines1, lines2)`** — a module function (see below) that builds
+  the diff model.
 
-The main viewer class that handles:
-- File loading with encoding detection
-- Diff computation using Python's `difflib`
-- Side-by-side rendering
-- User interaction and navigation
+The viewer **reuses the text viewer's file machinery** (`tfm_text_viewer`):
+`_read_lines` for encoding-detected reading + binary sniffing, and `_highlight`
+for pygments syntax colors — so each side keeps its syntax colors with the diff
+tint laid over them. There is no separate file-loading or binary-detection code
+here.
 
-**Key Methods:**
-- `__init__()`: Initialize viewer with two file paths
-- `load_files()`: Load both files with encoding fallback
-- `compute_diff()`: Generate line-by-line diff using SequenceMatcher
-- `draw_header()`: Render header with file names
-- `draw_content()`: Render side-by-side diff with color coding
-- `draw_status_bar()`: Display statistics and position
-- `handle_key()`: Process keyboard input
-- `run()`: Main event loop
+### Integration with TfmApp (`tfm.py`)
 
-#### 2. Integration with TfmApp (`tfm.py`)
+**Method: `diff_files()`** — bound to `=` (the `diff_files` action, `EQUAL` in
+`src/_config.py`). It collects the selected files from both panes, validates that
+exactly two non-directory files are selected, and launches the viewer.
 
-**Method: `diff_selected_files()`**
-- Collects selected files from both panes
-- Validates exactly 2 files are selected
-- Checks both are text files
-- Launches the diff viewer
-
-**Key Binding:**
-- `=` (equals key) - Launches diff viewer when 2 files selected
-
-### File Selection Logic
+## File Selection Logic
 
 The diff viewer supports three selection patterns:
 
-1. **Both files in left pane**: User selects 2 files in left pane
-2. **Both files in right pane**: User selects 2 files in right pane  
-3. **One file per pane**: User selects 1 file in left, 1 in right
+1. **Both files in the left pane**
+2. **Both files in the right pane**
+3. **One file per pane**
 
-Selection validation:
+All three fall out of collecting selected files across *both* panes and requiring
+exactly two:
+
 ```python
-# Collect from both panes
-left_selected = [Path(f) for f in self.pane_manager.left_pane['selected_files']]
-right_selected = [Path(f) for f in self.pane_manager.right_pane['selected_files']]
-all_selected = left_selected + right_selected
+selected = []
+for name in ("left", "right"):
+    pane = self.pane(name)
+    for entry in pane["files"]:
+        if str(entry) in pane["selected_files"]:
+            selected.append(entry)
 
-# Filter to files only (not directories)
-selected_files = [f for f in all_selected if f.exists() and f.is_file()]
+files = [e for e in selected if not e.is_dir()]     # files only, not directories
 
-# Validate exactly 2 files
-if len(selected_files) != 2:
-    # Show appropriate error message
+if len(files) != 2:
+    self.log_info(f"Select exactly 2 files to compare (selected {len(files)})")
     return
+
+show_diff_viewer(self.panel, files[0], files[1])
 ```
 
 ## Diff Algorithm
 
 ### SequenceMatcher
 
-Uses Python's `difflib.SequenceMatcher` for line-by-line comparison:
+`compute_diff` uses Python's `difflib.SequenceMatcher` for line-by-line
+comparison, walking `get_opcodes()`:
 
 ```python
-matcher = difflib.SequenceMatcher(None, file1_lines, file2_lines)
-
+matcher = difflib.SequenceMatcher(None, lines1, lines2)
 for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-    if tag == 'equal':
-        # Lines are identical
-    elif tag == 'replace':
-        # Lines are different
-    elif tag == 'delete':
-        # Lines only in file1
-    elif tag == 'insert':
-        # Lines only in file2
+    # tag is one of: 'equal', 'replace', 'delete', 'insert'
 ```
 
-### Diff Line Format
+### Diff model — `(rows, blocks)`
 
-Each diff line is stored as a tuple:
-```python
-(line1: str, line2: str, status: str, line_num1: int, line_num2: int, char_diff1: list, char_diff2: list)
-```
+`compute_diff(lines1, lines2) -> (rows, blocks)`:
 
-Where:
-- `line1`, `line2`: Text content from each file
-- `status`: One of `'equal'`, `'replace'`, `'delete'`, `'insert'`
-- `line_num1`, `line_num2`: Line numbers in original files (None if no corresponding line)
-- `char_diff1`, `char_diff2`: Character-level diff data for replace operations (None otherwise)
-
-### Whitespace Ignore Mode
-
-The diff viewer includes a whitespace ignore mode that strips all space and tab characters before comparison:
-
-**Implementation:**
-
-```python
-def _strip_whitespace(self, line: str) -> str:
-    """Remove all whitespace characters (spaces and tabs) from a line"""
-    return line.replace(' ', '').replace('\t', '')
-
-def compute_diff(self):
-    """Compute side-by-side diff using difflib"""
-    # Prepare lines for comparison (strip whitespace if mode is enabled)
-    compare_lines1 = [self._strip_whitespace(line) for line in self.file1_lines] if self.ignore_whitespace else self.file1_lines
-    compare_lines2 = [self._strip_whitespace(line) for line in self.file2_lines] if self.ignore_whitespace else self.file2_lines
-    
-    # Use difflib's SequenceMatcher for line-by-line comparison
-    matcher = difflib.SequenceMatcher(None, compare_lines1, compare_lines2)
-```
-
-**Character-Level Diff with Whitespace Ignore:**
-
-When whitespace ignore is enabled, character-level diffs compare stripped versions but display original text:
-
-```python
-def _compute_char_diff(self, line1: str, line2: str):
-    # Compare stripped versions
-    compare_line1 = self._strip_whitespace(line1) if self.ignore_whitespace else line1
-    compare_line2 = self._strip_whitespace(line2) if self.ignore_whitespace else line2
-    
-    matcher = difflib.SequenceMatcher(None, compare_line1, compare_line2)
-    
-    if self.ignore_whitespace:
-        # Build mappings from stripped position to original position
-        map1 = [i for i, char in enumerate(line1) if char not in (' ', '\t')]
-        map2 = [i for i, char in enumerate(line2) if char not in (' ', '\t')]
-        
-        # Map opcodes back to original positions
-        # Include whitespace segments as non-highlighted
-        # Highlight only non-whitespace differences
-```
-
-This ensures that when whitespace ignore is enabled:
-- Lines are compared without whitespace for determining differences
-- Original text with all whitespace is always displayed
-- Character-level highlighting works on non-whitespace characters only
-- Whitespace characters are shown but never highlighted as differences
-- The mapping preserves the original text structure while comparing content
-
-**Key Features:**
-- Strips all spaces and tabs before comparison
-- Preserves original text for display (only comparison is affected)
-- Recomputes diff automatically when toggled
-- Works with both line-level and character-level diffs
-- Status bar shows "IGNORE-WS" when enabled
-
-**Use Cases:**
-- Comparing files with different indentation styles
-- Ignoring trailing whitespace
-- Focusing on content changes rather than formatting
-- Comparing code formatted with different tab widths
+- **`rows`** — a `list[dict]`, one entry per display line, with keys:
+  - `tag` — `'equal'`, `'replace'`, `'delete'`, or `'insert'`
+  - `l1`, `l2` — the text shown on the left / right side (`""` where a side has
+    no line for this row)
+  - `n1`, `n2` — the 1-based line numbers in each file, or `None` when that side
+    has no line
+  - `cr1`, `cr2` — per-side changed-character ranges for a `replace` row (or
+    `None`), computed by `_char_ranges(a, b)` from `SequenceMatcher` opcodes so
+    only the differing spans are emphasised
+- **`blocks`** — the row index where each change block begins, driving the
+  `n` / `N` next/prev-change navigation (independent of search).
 
 ## Rendering
 
@@ -163,259 +98,83 @@ This ensures that when whitespace ignore is enabled:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ Header (2 lines)                                            │
+│ Header (filename per side)                                  │
 ├──────────────────────────┬──────────────────────────────────┤
 │ Left File Content        │ Right File Content               │
 │ (scrollable)             │ (scrollable)                     │
 ├──────────────────────────┴──────────────────────────────────┤
-│ Status Bar (1 line)                                         │
+│ Status Bar                                                  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Color Coding
+### Color coding
 
-Colors indicate change type:
-- **White/Regular** (`COLOR_REGULAR_FILE`): Equal lines
-- **Red** (`COLOR_ERROR`): Deleted lines (left only)
-- **Blue/Cyan** (`COLOR_DIRECTORIES`): Inserted lines (right only)
-- **Green/Yellow** (`COLOR_EXECUTABLES`): Modified lines (different)
+Diff band tints are **derived from the active theme's content background**, not
+fixed color constants — a dark band on a dark theme, a pastel one on a light
+theme. `_diff_bgs(content)` blends the content background toward semantic hues:
+
+- deleted / left-side change — red (`_HUE_DEL`)
+- inserted / right-side change — green (`_HUE_INS`)
+- replaced line, both sides — amber (`_HUE_REPLACE`)
+- the empty side of an insert/delete row — a faint neutral fill
+
+The whole-row tint uses `_ROW_TINT`; the changed-character span inside a replaced
+line uses the stronger `_CHAR_TINT`. Syntax colors keep their exact palette on a
+dark theme and are auto-inked to the surface on a light one.
 
 ### Scrolling
 
-**Vertical Scrolling:**
-- Synchronized across both panes
-- Uses `scroll_offset` to track position
-- Respects display height boundaries
-
-**Horizontal Scrolling:**
-- Synchronized across both panes
-- Uses `horizontal_offset` for column position
-- Handles wide characters correctly
-
-## File Loading
-
-### Encoding Detection
-
-Multi-stage encoding detection:
-
-1. **Binary Detection**: Check for null bytes in first 1024 bytes
-2. **UTF-8**: Try UTF-8 encoding first (most common)
-3. **Latin-1**: Fallback for Western European text
-4. **CP1252**: Fallback for Windows text files
-5. **Error Handling**: Display error message if all fail
-
-```python
-def _load_file(self, file_path: Path) -> List[str]:
-    # Check for binary file
-    chunk = file_path.read_bytes()
-    if b'\x00' in chunk[:1024]:
-        return ["[Binary file - cannot display as text]"]
-    
-    # Try encodings
-    for encoding in ['utf-8', 'latin-1', 'cp1252']:
-        try:
-            content = file_path.read_text(encoding=encoding)
-            return content.splitlines()
-        except UnicodeDecodeError:
-            continue
-```
-
-### Error Handling
-
-Specific exception handling for different error types:
-- `FileNotFoundError`: File doesn't exist
-- `PermissionError`: Access denied
-- `OSError`: System-level errors
-- `UnicodeDecodeError`: Encoding issues
+Both panes share `top` (vertical) and `left` (horizontal), so they scroll and pan
+together. Vertical scroll uses one shared scrollbar; each pane draws its own
+horizontal scrollbar (the panes have different widths). Offsets are floats for
+smooth fractional (sub-cell) scroll on a vector backend.
 
 ## Navigation Controls
 
-### Keyboard Bindings
+Config-driven keys resolve through the shared `KEY_BINDINGS` (honouring the user's
+rebinds); the scroll and `n`/`N` keys are viewer-local.
 
 | Key | Action |
 |-----|--------|
-| `↑` | Scroll up one line |
-| `↓` | Scroll down one line |
-| `←` | Scroll left one column |
-| `→` | Scroll right one column |
-| `Page Up` | Scroll up one page |
-| `Page Down` | Scroll down one page |
-| `Home` | Jump to beginning |
-| `End` | Jump to end |
-| `q` | Quit viewer |
-| `Enter` | Quit viewer |
-| `Escape` | Quit viewer |
+| `↑` / `↓` | Scroll one line |
+| `PgUp` / `PgDn` | Scroll one page |
+| `Home` / `End` | Top / bottom |
+| `←` / `→` | Scroll horizontally |
+| `n` / `N` | Next / previous change block |
+| `search` (default `F`) | Incremental search — the shared `ISearchBar` overlay (matches on both sides; `↑`/`↓` walk them) |
+| `help` (default `?`) | Key reference |
+| `quit` (default `q`) / `Esc` | Close |
 
-### Event Handling
-
-```python
-def handle_key(self, event: KeyEvent) -> bool:
-    """Returns True to continue, False to exit"""
-    if event.key_code == KeyCode.DOWN:
-        max_scroll = max(0, len(self.diff_lines) - display_height)
-        if self.scroll_offset < max_scroll:
-            self.scroll_offset += 1
-    # ... other key handlers
-    return True  # Continue running
-```
-
-## Performance Considerations
-
-### Memory Usage
-
-- Files are loaded entirely into memory
-- Diff computation creates additional data structures
-- Suitable for files up to ~10MB
-
-### Optimization Opportunities
-
-1. **Lazy Loading**: Load and diff on-demand for large files
-2. **Chunked Rendering**: Only render visible lines
-3. **Caching**: Cache diff results for repeated views
-4. **Streaming**: Stream large files instead of loading entirely
+Mouse events route to the `Splitter` so the divider can be dragged; the panes
+themselves are display-only.
 
 ## Testing
 
-### Test Coverage
-
-**Unit Tests** (`test/test_diff_viewer.py`):
-- Viewer initialization
-- Diff computation
-- File loading with errors
-- Keyboard navigation
-- Binary file detection
-- Complex diffs
-- Identical files
-- Completely different files
-
-
-### Test Execution
-
-```bash
-python3 test/test_diff_viewer.py
-```
-
-## Configuration
-
-### Key Binding Configuration
-
-In `src/_config.py`:
-```python
-KEY_BINDINGS = {
-    'diff_files': {'keys': ['='], 'selection': 'required'},
-}
-```
-
-The `'selection': 'required'` ensures the action only works when files are selected.
+- `test/test_diff_viewer_theme.py` — the theme-derived diff band tints.
 
 ## Integration Points
 
 ### Dependencies
 
-- `difflib`: Standard library for diff computation
-- `tfm_path`: Path abstraction for local/remote files
-- `tfm_colors`: Color scheme integration
-- PuiKit text utilities: wide character support (was `tfm_wide_char_utils`)
-- PuiKit scrollbars: scrollbar rendering (was `tfm_scrollbar`)
-- `puikit`: UI framework used for rendering (external — the old in-repo `ttk` toolkit)
+- `difflib` — standard-library diff computation
+- `tfm_text_viewer` — reused `_read_lines`, `_highlight`, `_ScrollBody`, the
+  scrollbar / status-bar helpers, and the shared viewer layer hints
+- `tfm_path` — path abstraction for local/remote files
+- `puikit` — the external UI framework (`Widget`, `Splitter`, backend); the old
+  in-repo `ttk` toolkit was removed in the port
 
 ### File Manager Integration
 
-1. **Selection System**: Uses `pane_manager.left_pane['selected_files']` and `pane_manager.right_pane['selected_files']`
-2. **Text Detection**: none up front — files are read and decoded, with binary
-   content detected from the bytes during the read (see
-   [Text Viewer System](TEXT_VIEWER_SYSTEM.md#text-file-detection))
-3. **Renderer**: Shares the PuiKit rendering backend with the main file manager
-4. **Color Scheme**: Uses same color scheme as file manager
-
-## Future Enhancements
-
-### Planned Features
-
-1. **Inline Diff View**: Single column with +/- markers
-2. **Word-Level Diff**: Highlight changed words within lines
-3. **Syntax Highlighting**: Apply syntax colors to diff
-4. **Export to Patch**: Generate unified diff format
-5. **Three-Way Merge**: Compare three files simultaneously
-6. **Diff Statistics**: Show detailed change statistics
-7. **Jump to Next/Previous Change**: Quick navigation between changes
-8. **Ignore Whitespace**: Option to ignore whitespace differences
-
-### Technical Improvements
-
-1. **Streaming for Large Files**: Handle files >100MB
-2. **Incremental Diff**: Compute diff incrementally
-3. **Background Loading**: Load files in background thread
-4. **Diff Caching**: Cache computed diffs
-5. **Custom Diff Algorithm**: Implement patience diff or histogram diff
-
-## Error Handling
-
-### User-Facing Errors
-
-Clear, actionable error messages:
-- "No files selected. Select exactly 2 text files to compare."
-- "Only 1 file selected. Select exactly 2 text files to compare."
-- "Selected 3 files. Select exactly 2 text files to compare."
-- "'filename' is not a text file"
-
-### Internal Error Handling
-
-Follows TFM exception handling policy:
-- Specific exception types caught
-- Informative error messages
-- Graceful degradation
-- No silent failures
-
-## Code Quality
-
-### Standards Compliance
-
-- Follows TFM coding standards
-- Type hints for public methods
-- Comprehensive docstrings
-- Specific exception handling
-- Module-level imports only
-
-### Documentation
-
-- End-user documentation: `doc/DIFF_VIEWER_FEATURE.md`
-- Developer documentation: This file
-- Inline code comments for complex logic
-- Test documentation in test files
-
-## Troubleshooting
-
-### Common Issues
-
-**Issue**: Diff viewer doesn't launch
-- **Cause**: Not exactly 2 files selected
-- **Solution**: Check selection count in status bar
-
-**Issue**: Binary file error
-- **Cause**: File contains null bytes
-- **Solution**: Use hex viewer or binary diff tool
-
-**Issue**: Encoding errors
-- **Cause**: Unsupported file encoding
-- **Solution**: Convert file to UTF-8
-
-**Issue**: Performance problems
-- **Cause**: Very large files
-- **Solution**: Use external diff tool for large files
+- **Selection**: reads `pane["selected_files"]` on both panes
+- **Text detection**: none up front — files are read and decoded, with binary
+  content detected from the bytes during the read (see
+  [Text Viewer System](TEXT_VIEWER_SYSTEM.md#text-file-detection))
+- **Color scheme**: uses the same theme as the file manager
 
 ## References
 
-### Related Files
-
-- `src/tfm_diff_viewer.py`: Main implementation
-- `tfm.py`: Integration with file manager
-- `src/_config.py`: Configuration and key bindings
-- `test/test_diff_viewer.py`: Test suite
-- `doc/DIFF_VIEWER_FEATURE.md`: User documentation
-
-### External Documentation
-
+- `src/tfm_diff_viewer.py` — implementation
+- `tfm.py` — `diff_files()` launch
+- `src/_config.py` — the `diff_files` key binding (`=`)
+- `doc/DIFF_VIEWER_FEATURE.md` — user documentation
 - Python difflib: https://docs.python.org/3/library/difflib.html
-- PuiKit backend API: `puikit/backend.py` (in the [PuiKit](https://github.com/crftwr/puikit) repo)
-- TFM Path Abstraction: `src/tfm_path.py`

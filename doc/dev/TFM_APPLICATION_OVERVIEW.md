@@ -75,41 +75,44 @@ flowchart TB
     class Curses,MacOS,Windows be;
 ```
 
-### Main Components
+### Design principles
 
-#### Application Core
-- **tfm.py**: Main TfmApp class and application logic
-- **tfm_config.py**: Configuration system with user customization support
-- **tfm_const.py**: Application constants and key definitions
-- **tfm_colors.py**: Color scheme management and terminal color support
+TFM's UI is assembled from small, reusable components, each owning one aspect of
+the interface. The principles that recur across them:
 
-#### Path and Storage Systems
-- **tfm_path.py**: Extended Path implementation supporting local and S3 paths
-- **tfm_s3.py**: AWS S3 integration with full pathlib compatibility
-- **tfm_ssh_cache.py**: Intelligent caching system for remote operations
+- **Modularity** — each feature lives in its own module (`src/tfm_*.py`).
+- **Consistency** — uniform keyboard navigation and behavior across every dialog
+  and pane.
+- **Reusability** — the same component serves multiple contexts: the searchable
+  list picker backs favorites, drives, programs, and the jump dialog; the same
+  `FilePane` widget renders both real directories and virtual (search-results)
+  listings.
+- **Manager pattern** — specialized managers isolate concerns: `PaneManager`
+  (dual-pane state and navigation), `FileOperationService` (copy / move / delete
+  / rename), `TaskManager` (threaded work), `ProgressManager`, `StateManager`,
+  and `LogManager`.
+- **Extensibility** — new dialogs, viewers, and storage backends slot into the
+  existing seams (the `Path` polymorphism and PuiKit widget layers shown above).
 
-#### User Interface Components
-- **tfm_text_viewer.py**: Built-in text viewer with syntax highlighting
-- **tfm_filter_list_dialog.py**: Base class for searchable list dialogs
-- **tfm_filter_list_dialog.py**: Searchable list selection dialog
-- **tfm_progressive_search_dialog.py**: File and content search functionality
-- **tfm_batch_rename_dialog.py**: Regex-based batch renaming
-- **tfm_text_dialog.py**: Scrollable information display
-- **tfm_general_purpose_dialog.py**: Flexible dialog system
-- **PuiKit**: Status bar quick selection
-- **PuiKit**: Single-line text editor component
+### Component groups
 
-#### Management Systems
-- **tfm_pane_manager.py**: Dual pane management and navigation
-- **tfm_log_manager.py**: Logging system with in-app log pane
-- **tfm_file_operations.py**: File system operations handler
-- **tfm_progress_manager.py**: Progress tracking for long operations
-- **tfm_state_manager.py**: Application state persistence
-- **tfm_key_bindings.py**: Key binding management system
+The architecture diagram above shows how the pieces fit together; the full
+per-module inventory lives in [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md). The
+major groups are:
 
-#### Integration and Extensions
-- **tfm_external_programs.py**: External program execution framework
-- **tfm_archive.py**: Archive creation and extraction (ZIP, TAR.GZ, TGZ)
+- **Dual-pane model** — `PaneManager` tracks the active pane, per-pane selection,
+  sort/filter state, and directory navigation, while `FilePane` renders one pane
+  (real or virtual). Cross-pane copy/move and directory comparison fall out of
+  this model naturally.
+- **Reusable dialogs & bars** — a searchable list picker, scrollable text/info
+  dialogs, a progressive (threaded) filename/content search dialog, batch rename,
+  single-line input, and status-bar quick choices, all built on PuiKit widgets.
+- **Viewers** — text (with syntax highlighting), diff, directory-diff, image, and
+  structured (JSON/CSV/Markdown) content.
+- **Storage abstraction** — a single `Path` facade over local, S3, SSH/SFTP, and
+  archive backends, so every file operation works uniformly across them.
+- **Integration & extensions** — external-program execution and archive
+  create/extract (ZIP, TAR.GZ, TGZ).
 
 ## Key Features
 

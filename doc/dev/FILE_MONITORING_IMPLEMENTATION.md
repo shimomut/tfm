@@ -1466,7 +1466,7 @@ If upgrading from a version without file monitoring:
 
 ### Related TFM Systems
 
-- **Logging System**: `doc/dev/LOGGING_MIGRATION_GUIDE.md`
+- **Logging System**: `doc/dev/LOGGING_SYSTEM.md`
 - **Configuration System**: `src/tfm_config.py`
 - **File List Manager**: `src/tfm_file_list_manager.py`
 - **Pane Manager**: `src/tfm_pane_manager.py`

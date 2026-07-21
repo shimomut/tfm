@@ -148,9 +148,105 @@ The viewer uses different comparison strategies based on file type:
 ### Performance Optimizations
 
 - **Lazy Loading**: Only scan directories when needed
-- **Caching**: Cache comparison results to avoid re-scanning
-- **Batch Processing**: Process multiple files per iteration
 - **Priority Queue**: Process visible items first
+- **On-Demand Scanning**: User expansion scans that level immediately
+
+## Thread Safety and the Thread → UI Bridge
+
+Scanning and comparison run off the main thread, but **all rendering stays on the
+main thread** — PuiKit has no cross-thread draw. Two mechanisms keep that safe.
+
+### One reentrant lock
+
+A single `threading.RLock` (`self._lock`) guards every tree mutation and the
+reflow that rebuilds the flattened `visible` list. The PuiKit port deliberately
+collapsed the pre-port viewer's multi-lock hierarchy (separate queue / data /
+tree locks, acquired in a fixed order to avoid deadlock) into this one reentrant
+lock: with a single lock there is no lock-ordering rule to get wrong. The
+`*_locked` methods (`_reflow_locked`, `_insert_children_locked`,
+`_reclassify_ancestors_locked`, …) are the ones that must run while holding it.
+
+The discipline that *does* still matter is **never hold the lock across I/O**: a
+worker lists a directory level (`DirectoryScanner.scan_level`) or byte-compares a
+file (`DiffEngine.compare_file_content`) with no lock held, then takes `_lock`
+only to merge the result — a short critical section. `visible` is reassigned
+wholesale under the lock, so `draw` / `_draw_rows` read it lock-free (an atomic
+snapshot). The `_dirty`, `_scanning`, and `_cancel` booleans are plain attributes
+(assignment is atomic in CPython) and need no lock.
+
+### `_dirty` + animation ticks
+
+Workers mutate the tree and set `self._dirty = True`; a per-frame animation tick
+drains it on the main thread. On push the viewer registers
+`panel.request_animation_ticks(self._tick)`. `_tick()` runs each frame on the
+main thread:
+
+- if `self._cancel`, return `False` (unregisters the tick — no busy spin after
+  close);
+- if `self._dirty`, clear it and call `self._panel.render()`;
+- return `self._scanning or self._dirty` — keep ticking while a scan is live or a
+  repaint is pending, then stop once idle.
+
+This keeps every `DrawContext` / `render` call on the main thread while preserving
+the progressive-scan UX. It is the one genuinely new-in-port decision: the
+pre-port viewer drove redraws directly from the worker threads through the layer
+stack's dirty loop, which does not exist under PuiKit.
+
+### Threads and queues
+
+- **Coordinator** (`_scan_coordinator`, the one joinable thread): scans both
+  roots' top level, starts the two workers, waits for both queues to drain, then
+  finalises.
+- **Scanner worker** (`_scanner_worker`): pulls directories off `_scan_q`, lists
+  one level each (`_scan_node`), enqueues child directories (breadth-first) and
+  two-sided files for comparison.
+- **Comparator worker** (`_comparator_worker`): resolves two-sided files' content
+  verdicts off `_cmp_q` (`_compare_node`), decoupled so neither queue blocks the
+  other.
+
+Both queues are `queue.PriorityQueue` holding `(-priority, seq, node)` — the
+`seq` (an `itertools.count`) keeps items unique so two `TreeNode`s are never
+compared, and negating the priority turns the min-heap into highest-first.
+Priorities: `_PRIO_IMMEDIATE` (1000, user just expanded), `_PRIO_VISIBLE` (100,
+on-screen), `_PRIO_NORMAL` (10, discovered off-screen). Re-prioritisation runs on
+the **main thread** in `_update_priorities` (on scroll / expand / collapse) —
+there is no separate priority-handler thread. `children_scanned` guards a
+directory from being scanned twice; `_hi_pri` bounds a node to one viewport
+re-enqueue.
+
+Cancellation: `cancel()` sets `_cancel` and cancels the live scanners; workers
+poll `_scan_q.get(timeout=0.1)` and check `_cancel`, so they wind down promptly.
+Tests construct with `background=False`, running a full recursive walk plus
+one-shot classification synchronously (`_scan_sync`) — no threads, deterministic.
+
+## Active Side and Cross-Side File Operations
+
+The viewer tracks an **active side** (`self.active`, `"left"` or `"right"`),
+switched with **Tab** (the arrow keys expand/collapse the tree instead). The
+active side is shown by the accent-colored, bold pane header;
+`_active_side_path(node)` returns the focused node's path on that side.
+
+The file operations the pre-port design listed as "future" have shipped, driven
+through the same config `KEY_BINDINGS` and the shared `FileOperationService` the
+main file manager uses:
+
+- **Copy** (`copy_files`, default `C`) / **Move** (`move_files`, default `M`) —
+  `_copy_focused` / `_move_focused` transfer the focused node from the active
+  side to its *mirrored* location on the opposite side. `_mirror_dest_dir` maps
+  `sub/a.txt` on the active side to `sub/` under the opposite root, keeping the
+  two trees aligned.
+- **Delete** (`delete_files`, default `K` / `Del`) — `_delete_focused` removes
+  the focused node from the active side.
+- **Merge** (`edit_file`, default `E`) — `_edit_merge` launches the configured
+  `TEXT_DIFF` tool (e.g. `vimdiff`, `code --diff`) on a two-sided local file via
+  the backend's suspend/resume.
+- **Diff** (`view_file`, `Enter`) — `_open_file_diff` opens the per-file diff for
+  a two-sided differing file (reusing `tfm_diff_viewer.show_diff_viewer`).
+
+Each op completes via `_on_op_complete`, which rescans (`_restart_scan`) so
+verdicts re-evaluate (a merged file's `!` flips to `=` live) while
+`_save_expansion` / `_restore_cursor` preserve the expanded set and focus across
+the rebuild.
 
 ## Integration Points
 
@@ -204,7 +300,7 @@ Key areas for testing:
 ## Related Documentation
 
 - [Directory Diff Viewer Feature](../DIRECTORY_DIFF_VIEWER_FEATURE.md) - User documentation
-- [Threaded Search Implementation](THREADED_SEARCH_IMPLEMENTATION.md) - Similar threading pattern
+- [Search Results Pane](SEARCH_RESULTS_PANE_IMPLEMENTATION.md) - Similar threaded background-worker pattern (`ProgressiveSearchDialog`)
 - [Progress Manager System](PROGRESS_MANAGER_SYSTEM.md) - Progress reporting
 - [Dialog System](DIALOG_SYSTEM.md) - Dialog framework
 

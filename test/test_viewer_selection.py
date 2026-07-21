@@ -3,7 +3,7 @@
 The raw text viewer selects source lines as ``(line, col)`` and copies plain
 text; in rich (Markdown) mode the viewer forwards mouse + copy to the embedded
 PuiKit ``MarkdownView``, which copies plain text plus rich HTML. See
-doc/TEXT_SELECTION_FEATURE.md and doc/dev/TEXT_SELECTION_IMPLEMENTATION.md.
+doc/TEXT_SELECTION_FEATURE.md and doc/dev/TEXT_VIEWER_SYSTEM.md.
 
 Run with: PYTHONPATH=.:src pytest test/test_viewer_selection.py -v
 """

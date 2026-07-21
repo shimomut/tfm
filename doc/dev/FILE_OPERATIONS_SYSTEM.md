@@ -2,586 +2,155 @@
 
 ## Overview
 
-The File Operations System provides comprehensive file and directory management functionality for TFM. It handles all file system operations including copying, moving, deleting, creating, and managing files and directories with proper error handling, progress tracking, and user feedback.
+Copy, move, duplicate, and delete are provided by a single class, `FileOperationService` (`tfm_file_operations.py`). It confirms the operation on the main thread, then runs the actual work as a background **task** (see [Task Framework](TASK_FRAMEWORK_IMPLEMENTATION.md)) whose body is one **linear** function — prepare → resolve conflicts → count → execute, top to bottom. There is no state machine and no separate UI / executor / list-manager split; the earlier four-layer design was removed in the PuiKit port.
 
-## Features
+The same service instance serves any view. `TfmApp` owns one (`self._fileops = FileOperationService(config, self.tasks)`); a full-window modal such as the directory-diff viewer can construct its own and pass a higher `z` so its dialogs stack above itself.
 
-### Core Operations
-- **File Copy**: Copy files and directories with progress tracking
-- **File Move**: Move/rename files and directories
-- **File Delete**: Delete files and directories with confirmation
-- **Directory Creation**: Create new directories with validation
-- **File Creation**: Create new empty files
-- **Archive Operations**: Create and extract archives
+## Copy operation — end to end
 
-### Advanced Features
-- **Batch Operations**: Handle multiple files simultaneously
-- **Progress Tracking**: Real-time progress for long operations
-- **Error Handling**: Comprehensive error reporting and recovery
-- **Conflict Resolution**: Handle file conflicts and overwrites
-- **Permission Management**: Proper handling of file permissions
-- **Symbolic Link Support**: Handle symbolic links appropriately
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as User
+    participant App as TfmApp
+    participant Svc as FileOperationService
+    participant Mgr as TaskManager + ProgressDialog
+    participant W as worker thread — _run()
 
-## Class Structure
-
-### FileOperations Class
-```python
-class FileOperations:
-    def __init__(self, config, log_manager, progress_manager)
-    def copy_files(self, source_files, destination_path, callback=None)
-    def move_files(self, source_files, destination_path, callback=None)
-    def delete_files(self, file_paths, callback=None)
-    def create_directory(self, path, name)
-    def create_file(self, path, name)
-    def rename_file(self, old_path, new_name)
+    U->>App: press C (copy)
+    App->>Svc: copy(panel, targets, dest_dir, on_complete)
+    Svc->>U: CONFIRM_COPY message box (if enabled)
+    U-->>Svc: confirm
+    Svc->>Mgr: submit(task, run=_run)
+    Mgr->>U: show ProgressDialog (modal)
+    Mgr->>W: spawn worker
+    W->>W: _resolve() — build plan of survivors
+    loop each colliding destination
+        W->>U: ask() → ConflictDialog (via pump)
+        U-->>W: Overwrite / Skip / Keep both / Cancel
+    end
+    W->>W: _count() → set progress total
+    loop each planned target
+        W->>W: checkpoint(); _execute_one(); update progress
+    end
+    W-->>Mgr: result {done, skipped, failed, items, errors, cancelled}
+    Mgr->>U: close dialog
+    Mgr->>App: on_complete(result) → summary in the log
 ```
 
-### Operation Result Structure
+## Public API
+
 ```python
-operation_result = {
-    'success': bool,           # Whether operation succeeded
-    'processed_count': int,    # Number of items processed
-    'error_count': int,        # Number of errors encountered
-    'errors': List[str],       # List of error messages
-    'skipped_count': int,      # Number of items skipped
-    'total_size': int,         # Total size of processed data
-    'elapsed_time': float      # Time taken for operation
-}
+FileOperationService(config, tasks: TaskManager | None = None)
 ```
 
-## Usage Examples
+Each entry point takes the `panel` to draw on plus keyword options (`on_complete`, `log`, `z`, `background`):
 
-### Basic File Copy
+| Method | Destination | Confirm flag | Conflict handling |
+|---|---|---|---|
+| `copy(panel, targets, dest_dir, …)` | `dest_dir/name` | `CONFIRM_COPY` | per-file prompt |
+| `move(panel, targets, dest_dir, …)` | `dest_dir/name` | `CONFIRM_MOVE` | per-file prompt |
+| `duplicate(panel, targets, dest_dir, …)` | in place (source's own dir) | `CONFIRM_DUPLICATE` | none — always auto-renamed `name (N)` |
+| `delete(panel, targets, …)` | — | `CONFIRM_DELETE` (default button = Cancel) | — |
+
+`_start` shows the relevant `CONFIRM_*` message box (skipped when its config flag is off); on confirm, `_submit` builds a `Task` and hands it to `TaskManager.submit(run=self._run, …)`.
+
+## The linear worker (`_run`)
+
+Runs on the task thread, top to bottom:
+
+1. **Plan.** Build a list of `(target, dest_base, overwrite)`:
+   - **delete** — trivial (one entry per target).
+   - **duplicate** — pre-plan a fresh ` (N)` name per target (an in-place copy always collides, so it never prompts).
+   - **copy / move** — `_resolve` checks each destination for an existing file and prompts only for collisions.
+2. **Count.** `_count` recursively totals the nodes and bytes to process, so the progress bar is determinate. A same-storage move is a single atomic rename, so it counts as one node and its subtree is never walked (`_is_atomic_move`).
+3. **Execute.** For each planned target: `task.checkpoint()` (cancellation point), then `_execute_one`, updating `task.progress`. Per-target exceptions are recorded in `errors` and processing continues; a `Cancelled` unwinds the loop.
+
+### Result summary
+
+`_run` returns a dict the caller reports via `format_op_summary` / `format_op_errors`:
+
+| Key | Meaning |
+|---|---|
+| `done` / `skipped` / `failed` | counts of **top-level targets** (what the user selected) |
+| `items` | total individual entries actually processed (recursive) |
+| `errors` | list of `(name, message)` for failed targets |
+| `cancelled` | `True` if a checkpoint or a "Cancel" conflict choice unwound the run |
+
+A top-level target is `done` if any of its entries succeeded; `failed` only if it produced nothing and raised. Inner file failures stay in `errors` without sinking the whole target.
+
+## Conflict resolution (`ConflictDialog`)
+
+For copy/move, `_resolve` prompts per collision through the task's UI bridge — `task.ask(_conflict_prompt(...))` pushes a `ConflictDialog` (a `FocusContainer` + `Widget`) that stacks just above the progress dialog. It offers four actions plus an **apply-to-all-remaining** checkbox, and reports `(action, apply_to_all)`:
+
+| Action | Key | Effect |
+|---|---|---|
+| Overwrite | `o` | replace the destination (`overwrite=True`) |
+| Skip | `s` | leave it; increment `skipped` |
+| Keep both | `k` | write to a fresh `name (N)` (via `_unique_dest`) |
+| Cancel | `c` / `Esc` | raise `Cancelled` — abort the whole operation |
+
+`a` / Space toggles apply-to-all, Tab moves focus, Enter activates the focused button. When apply-to-all is checked, the chosen action is reused for every remaining collision without prompting.
+
+## Duplicate
+
+In-place duplication (GitHub issue #192) is a thin `"duplicate"` operation kind layered onto the shared copy engine, plus app wiring for the two entry points. No new copy/rename logic was written — it reuses `_unique_dest()` and the existing threaded task pipeline.
+
+### Engine — `src/tfm_file_operations.py`
+
+`"duplicate"` is registered alongside `copy`/`move`/`delete`:
+
+- `_VERB["duplicate"] = "Duplicate"`, `_OP_TYPE["duplicate"] = OperationType.COPY`.
+- `FileOperationService.duplicate(panel, targets, dest_dir, …)` mirrors `copy()` and calls `_start(..., "duplicate", ...)`. `dest_dir` is the source's own directory.
+
+It differs from copy in exactly one place — plan building in `_run()`. A duplicate always collides with itself, so it **never prompts**; instead every target is pre-planned to a fresh ` (N)` name up front:
+
 ```python
-file_ops = FileOperations(config, log_manager, progress_manager)
-
-# Copy selected files to destination
-source_files = [Path("file1.txt"), Path("file2.txt")]
-destination = Path("/backup/")
-
-result = file_ops.copy_files(source_files, destination)
-if result['success']:
-    print(f"Copied {result['processed_count']} files successfully")
-else:
-    print(f"Copy failed with {result['error_count']} errors")
+elif kind == "duplicate":
+    plan = [(t, _unique_dest(dest_dir, t.name, is_dir=t.is_dir()), False)
+            for t in targets]
+    result["created"] = [dest.name for _t, dest, _o in plan]
 ```
 
-### File Move with Callback
-```python
-def move_callback(current_file, progress_info):
-    print(f"Moving {current_file.name} ({progress_info['current']}/{progress_info['total']})")
+Because distinct targets in one directory have distinct names, computing all destinations against the pre-op filesystem state is collision-free (unlike duplicating the *same* file twice, which cannot happen — targets are distinct list entries). `result["created"]` carries the new names back to the caller for cursor placement.
 
-result = file_ops.move_files(source_files, destination, callback=move_callback)
-```
+Everything else falls through the copy path: `_count()` walks the plan, `_execute_one()` routes to `_copy_tree()` (the `if kind == "move"` source-delete is skipped, so the original is never removed), and the per-file log line reads "Duplicated" via the verb map `{"move": "Moved", "duplicate": "Duplicated"}.get(kind, "Copied")`.
 
-### Directory Operations
-```python
-# Create new directory
-result = file_ops.create_directory(Path("/home/user"), "new_folder")
+The confirm prompt in `_start()` gets a duplicate-specific line ("Duplicate **N** item(s) in `<dir>`?") and honors `CONFIRM_DUPLICATE` through the existing `getattr(config, f"CONFIRM_{verb.upper()}", True)` — no special casing needed. `CONFIRM_DUPLICATE = True` lives in `src/_config.py`.
 
-# Create new file
-result = file_ops.create_file(Path("/home/user"), "new_file.txt")
+### App wiring — `tfm.py`
 
-# Rename file
-result = file_ops.rename_file(Path("/home/user/old_name.txt"), "new_name.txt")
-```
+Two entry points, one shared runner:
 
-## File Copy Operations
+- `duplicate_files()` — guards (virtual pane, read-only archive, empty targets), gathers `_selected_or_focused(pane)`, then delegates to `_run_duplicate`. Returns `True` on a synchronous guard bail, `False` after handoff — same contract as `copy_files()`.
+- `_run_duplicate(pane, targets)` — calls `self._fileops.duplicate(...)` with `pane["path"]` as the destination. `on_complete` clears the source selection, refreshes via `_refresh(pane, on_ready=lambda p: _select_by_name(p, created[0]))` so the cursor lands on the new copy, logs `format_op_summary("Duplicate", …)`, and reports failures.
 
-### Copy Implementation
-```python
-def copy_files(self, source_files, destination_path, callback=None):
-    """Copy files with progress tracking and error handling"""
-    result = {
-        'success': True,
-        'processed_count': 0,
-        'error_count': 0,
-        'errors': [],
-        'total_size': 0,
-        'elapsed_time': 0
-    }
-    
-    start_time = time.time()
-    
-    # Start progress tracking
-    self.progress_manager.start_operation(
-        OperationType.COPY,
-        len(source_files),
-        f"Copying {len(source_files)} files"
-    )
-    
-    try:
-        for i, source_file in enumerate(source_files):
-            try:
-                # Update progress
-                self.progress_manager.update_progress(i + 1, source_file.name)
-                
-                # Check for cancellation
-                if self.progress_manager.is_cancelled():
-                    break
-                
-                # Perform copy operation
-                dest_file = destination_path / source_file.name
-                
-                # Handle conflicts
-                if dest_file.exists():
-                    conflict_resolution = self.handle_file_conflict(source_file, dest_file)
-                    if conflict_resolution == 'skip':
-                        continue
-                    elif conflict_resolution == 'cancel':
-                        break
-                
-                # Copy file
-                if source_file.is_file():
-                    shutil.copy2(source_file, dest_file)
-                elif source_file.is_dir():
-                    shutil.copytree(source_file, dest_file)
-                
-                result['processed_count'] += 1
-                result['total_size'] += source_file.stat().st_size if source_file.is_file() else 0
-                
-                # Execute callback if provided
-                if callback:
-                    callback(source_file, {'current': i + 1, 'total': len(source_files)})
-                
-            except Exception as e:
-                error_msg = f"Failed to copy {source_file.name}: {str(e)}"
-                result['errors'].append(error_msg)
-                result['error_count'] += 1
-                self.log_manager.add_message(error_msg, "ERROR")
-    
-    finally:
-        result['elapsed_time'] = time.time() - start_time
-        result['success'] = result['error_count'] == 0
-        self.progress_manager.finish_operation(
-            success=result['success'],
-            message=f"Copy completed: {result['processed_count']} files"
-        )
-    
-    return result
-```
+Reachability (no default key binding):
 
-### Copy Features
-- **Metadata Preservation**: Preserves file timestamps and permissions
-- **Directory Handling**: Recursive copying of directory trees
-- **Conflict Resolution**: Interactive handling of file conflicts
-- **Progress Tracking**: Real-time progress updates
-- **Error Recovery**: Continues operation despite individual file errors
+- Dispatch: `elif action == "duplicate_files": return self.duplicate_files()` — so a user-defined `duplicate_files` key binding works.
+- Menu bar (`_build_menu` → File menu) and right-click context menu (`_show_context_menu`): a **Duplicate** item after **Rename…**.
 
-## File Move Operations
+The same-directory copy relaxation lives in `_transfer()`: when `dest_dir == src_pane["path"]` and `kind == "copy"`, it routes to `_run_duplicate(src_pane, targets)` instead of logging the old "source and destination are the same directory" error. Move keeps that error.
 
-### Move Implementation
-```python
-def move_files(self, source_files, destination_path, callback=None):
-    """Move files with cross-filesystem support"""
-    # Try fast move first (same filesystem)
-    for source_file in source_files:
-        dest_file = destination_path / source_file.name
-        try:
-            source_file.rename(dest_file)
-            # Fast move successful
-        except OSError:
-            # Cross-filesystem move - use copy + delete
-            copy_result = self.copy_files([source_file], destination_path, callback)
-            if copy_result['success']:
-                self.delete_files([source_file])
-```
+### Tests
 
-### Move Features
-- **Cross-Filesystem Support**: Handles moves across different filesystems
-- **Atomic Operations**: Uses rename when possible for atomic moves
-- **Fallback Strategy**: Falls back to copy+delete for cross-filesystem moves
-- **Conflict Handling**: Same conflict resolution as copy operations
+`test/test_file_operations.py` — the `cfg` fixture sets `CONFIRM_DUPLICATE = False` for headless runs; tests exercise file, directory, and multi-target duplication (each getting its own ` (N)`) plus the "Duplicated" log line, all via the existing `_run_sync(svc, svc.duplicate, …)` harness.
 
-## File Delete Operations
+## Helpers
 
-### Delete Implementation
-```python
-def delete_files(self, file_paths, callback=None):
-    """Delete files and directories with confirmation"""
-    result = {
-        'success': True,
-        'processed_count': 0,
-        'error_count': 0,
-        'errors': []
-    }
-    
-    # Start progress tracking
-    self.progress_manager.start_operation(
-        OperationType.DELETE,
-        len(file_paths),
-        f"Deleting {len(file_paths)} items"
-    )
-    
-    for i, file_path in enumerate(file_paths):
-        try:
-            self.progress_manager.update_progress(i + 1, file_path.name)
-            
-            if file_path.is_file():
-                file_path.unlink()
-            elif file_path.is_dir():
-                shutil.rmtree(file_path)
-            
-            result['processed_count'] += 1
-            
-            if callback:
-                callback(file_path, {'current': i + 1, 'total': len(file_paths)})
-                
-        except Exception as e:
-            error_msg = f"Failed to delete {file_path.name}: {str(e)}"
-            result['errors'].append(error_msg)
-            result['error_count'] += 1
-    
-    result['success'] = result['error_count'] == 0
-    self.progress_manager.finish_operation(
-        success=result['success'],
-        message=f"Delete completed: {result['processed_count']} items"
-    )
-    
-    return result
-```
+- `recursive_delete(entry)` — delete a file or directory tree.
+- `_unique_dest(dest_dir, name, is_dir=…)` — the shared ` (N)` non-colliding-name scheme (used by duplicate and "Keep both").
+- `_is_atomic_move(kind, target, dest_dir)` — true when a move stays within one storage backend (a single rename); a cross-storage move copies the tree then deletes the source.
+- `format_op_summary(verb, result)` / `format_op_errors(verb, result)` — human-readable reporting from the result dict.
 
-### Delete Features
-- **Safe Deletion**: Proper handling of files and directories
-- **Permission Handling**: Handles read-only and protected files
-- **Directory Recursion**: Recursive deletion of directory trees
-- **Error Reporting**: Detailed error reporting for failed deletions
+## Integration
 
-## Conflict Resolution
+- `TfmApp.__init__` — `self.tasks = TaskManager()`, `self._fileops = FileOperationService(self.config, self.tasks)`.
+- `TfmApp.copy_files()` / `move_files()` / `duplicate_files()` / `delete_files()` gather the active pane's selection and delegate to `self._fileops`, passing an `on_complete` that refreshes panes and logs the summary.
 
-### Conflict Handling
-```python
-def handle_file_conflict(self, source_file, dest_file):
-    """Handle file conflicts during operations"""
-    # Check if files are identical
-    if self.files_are_identical(source_file, dest_file):
-        return 'skip'  # Skip identical files
-    
-    # Show conflict resolution dialog
-    conflict_options = [
-        {'key': 'o', 'label': 'Overwrite', 'action': 'overwrite'},
-        {'key': 's', 'label': 'Skip', 'action': 'skip'},
-        {'key': 'r', 'label': 'Rename', 'action': 'rename'},
-        {'key': 'c', 'label': 'Cancel', 'action': 'cancel'}
-    ]
-    
-    message = f"File '{dest_file.name}' already exists. Overwrite?"
-    
-    # Show dialog and get user choice
-    choice = self.show_conflict_dialog(message, conflict_options)
-    
-    if choice == 'rename':
-        new_name = self.get_unique_filename(dest_file)
-        return ('rename', new_name)
-    
-    return choice
+## References
 
-def files_are_identical(self, file1, file2):
-    """Check if two files are identical"""
-    if file1.stat().st_size != file2.stat().st_size:
-        return False
-    
-    # Compare file contents for small files
-    if file1.stat().st_size < 1024 * 1024:  # 1MB
-        return file1.read_bytes() == file2.read_bytes()
-    
-    # Compare checksums for large files
-    return self.calculate_checksum(file1) == self.calculate_checksum(file2)
-```
-
-### Conflict Resolution Options
-- **Overwrite**: Replace existing file with source file
-- **Skip**: Skip the conflicting file and continue
-- **Rename**: Create unique name for destination file
-- **Cancel**: Cancel the entire operation
-
-## Archive Operations
-
-### Archive Creation
-```python
-def create_archive(self, source_files, archive_path, archive_type='tar.gz'):
-    """Create archive from selected files"""
-    self.progress_manager.start_operation(
-        OperationType.ARCHIVE_CREATE,
-        len(source_files),
-        f"Creating {archive_path.name}"
-    )
-    
-    try:
-        if archive_type == 'tar.gz':
-            with tarfile.open(archive_path, 'w:gz') as tar:
-                for i, file_path in enumerate(source_files):
-                    self.progress_manager.update_progress(i + 1, file_path.name)
-                    tar.add(file_path, arcname=file_path.name)
-        
-        elif archive_type == 'zip':
-            with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-                for i, file_path in enumerate(source_files):
-                    self.progress_manager.update_progress(i + 1, file_path.name)
-                    if file_path.is_file():
-                        zip_file.write(file_path, file_path.name)
-                    elif file_path.is_dir():
-                        for sub_file in file_path.rglob('*'):
-                            if sub_file.is_file():
-                                zip_file.write(sub_file, sub_file.relative_to(file_path.parent))
-        
-        self.progress_manager.finish_operation(
-            success=True,
-            message=f"Archive {archive_path.name} created successfully"
-        )
-        return True
-        
-    except Exception as e:
-        self.progress_manager.finish_operation(
-            success=False,
-            message=f"Archive creation failed: {str(e)}"
-        )
-        return False
-```
-
-### Archive Extraction
-```python
-def extract_archive(self, archive_path, destination_path):
-    """Extract archive to destination directory"""
-    try:
-        if archive_path.suffix.lower() in ['.tar', '.tar.gz', '.tgz']:
-            with tarfile.open(archive_path, 'r:*') as tar:
-                members = tar.getmembers()
-                self.progress_manager.start_operation(
-                    OperationType.ARCHIVE_EXTRACT,
-                    len(members),
-                    f"Extracting {archive_path.name}"
-                )
-                
-                for i, member in enumerate(members):
-                    self.progress_manager.update_progress(i + 1, member.name)
-                    tar.extract(member, destination_path)
-        
-        elif archive_path.suffix.lower() == '.zip':
-            with zipfile.ZipFile(archive_path, 'r') as zip_file:
-                members = zip_file.infolist()
-                self.progress_manager.start_operation(
-                    OperationType.ARCHIVE_EXTRACT,
-                    len(members),
-                    f"Extracting {archive_path.name}"
-                )
-                
-                for i, member in enumerate(members):
-                    self.progress_manager.update_progress(i + 1, member.filename)
-                    zip_file.extract(member, destination_path)
-        
-        self.progress_manager.finish_operation(
-            success=True,
-            message=f"Archive {archive_path.name} extracted successfully"
-        )
-        return True
-        
-    except Exception as e:
-        self.progress_manager.finish_operation(
-            success=False,
-            message=f"Archive extraction failed: {str(e)}"
-        )
-        return False
-```
-
-## Integration with TFM
-
-### Main Application Integration
-```python
-# In TfmApp class
-self.file_operations = FileOperations(self.config, self.log_manager, self.progress_manager)
-
-# Copy files between panes
-def copy_selected_files(self):
-    source_files = self.get_selected_files()
-    destination = self.get_other_pane_path()
-    
-    result = self.file_operations.copy_files(source_files, destination)
-    
-    if result['success']:
-        self.log_manager.add_message(f"Copied {result['processed_count']} files")
-        self.refresh_panes()
-    else:
-        self.show_error_dialog(f"Copy failed: {result['error_count']} errors")
-```
-
-### Progress Integration
-```python
-# File operations automatically integrate with progress manager
-def perform_file_operation(self, operation_type, files, destination=None):
-    """Generic file operation with progress tracking"""
-    if operation_type == 'copy':
-        return self.file_operations.copy_files(files, destination)
-    elif operation_type == 'move':
-        return self.file_operations.move_files(files, destination)
-    elif operation_type == 'delete':
-        return self.file_operations.delete_files(files)
-```
-
-## Error Handling
-
-### Comprehensive Error Handling
-```python
-class FileOperationError(Exception):
-    """Custom exception for file operation errors"""
-    def __init__(self, message, file_path=None, error_code=None):
-        super().__init__(message)
-        self.file_path = file_path
-        self.error_code = error_code
-
-def safe_file_operation(self, operation_func, *args, **kwargs):
-    """Wrapper for safe file operations with error handling"""
-    try:
-        return operation_func(*args, **kwargs)
-    except PermissionError as e:
-        raise FileOperationError(f"Permission denied: {e}", error_code='PERMISSION')
-    except FileNotFoundError as e:
-        raise FileOperationError(f"File not found: {e}", error_code='NOT_FOUND')
-    except OSError as e:
-        raise FileOperationError(f"System error: {e}", error_code='SYSTEM')
-    except Exception as e:
-        raise FileOperationError(f"Unexpected error: {e}", error_code='UNKNOWN')
-```
-
-### Recovery Strategies
-- **Retry Logic**: Automatic retry for transient errors
-- **Partial Success**: Continue operation despite individual file failures
-- **Rollback**: Undo partial operations on critical failures
-- **User Intervention**: Prompt user for error resolution
-
-## Performance Optimization
-
-### Efficient Operations
-```python
-class FileOperations:
-    def __init__(self, config, log_manager, progress_manager):
-        self.buffer_size = 64 * 1024  # 64KB buffer for file copying
-        self.batch_size = 100         # Process files in batches
-        self.use_sendfile = hasattr(os, 'sendfile')  # Use sendfile if available
-    
-    def optimized_copy(self, source_file, dest_file):
-        """Optimized file copying with platform-specific optimizations"""
-        if self.use_sendfile and source_file.is_file():
-            # Use sendfile for efficient copying on Unix systems
-            with open(source_file, 'rb') as src, open(dest_file, 'wb') as dst:
-                os.sendfile(dst.fileno(), src.fileno(), 0, source_file.stat().st_size)
-        else:
-            # Fallback to buffered copying
-            shutil.copy2(source_file, dest_file)
-```
-
-### Memory Management
-- **Streaming Operations**: Process large files without loading into memory
-- **Buffer Management**: Optimal buffer sizes for different operations
-- **Resource Cleanup**: Proper cleanup of file handles and resources
-- **Memory Monitoring**: Monitor memory usage during large operations
-
-## Common Use Cases
-
-### Backup Operations
-```python
-def backup_files(self, source_files, backup_directory):
-    """Create backup of selected files"""
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_path = backup_directory / f"backup_{timestamp}"
-    backup_path.mkdir(exist_ok=True)
-    
-    return self.file_operations.copy_files(source_files, backup_path)
-```
-
-### Batch File Processing
-```python
-def process_files_batch(self, files, processor_func):
-    """Process files in batches for efficiency"""
-    batch_size = 50
-    results = []
-    
-    for i in range(0, len(files), batch_size):
-        batch = files[i:i + batch_size]
-        batch_result = processor_func(batch)
-        results.append(batch_result)
-    
-    return results
-```
-
-### Synchronization Operations
-```python
-def sync_directories(self, source_dir, dest_dir):
-    """Synchronize two directories"""
-    source_files = set(f.name for f in source_dir.iterdir())
-    dest_files = set(f.name for f in dest_dir.iterdir())
-    
-    # Files to copy (new or modified)
-    to_copy = []
-    for file_name in source_files:
-        source_file = source_dir / file_name
-        dest_file = dest_dir / file_name
-        
-        if not dest_file.exists() or source_file.stat().st_mtime > dest_file.stat().st_mtime:
-            to_copy.append(source_file)
-    
-    # Files to delete (removed from source)
-    to_delete = [dest_dir / name for name in dest_files - source_files]
-    
-    # Perform synchronization
-    copy_result = self.copy_files(to_copy, dest_dir) if to_copy else {'success': True}
-    delete_result = self.delete_files(to_delete) if to_delete else {'success': True}
-    
-    return copy_result['success'] and delete_result['success']
-```
-
-## Benefits
-
-### User Experience
-- **Progress Feedback**: Real-time progress for all operations
-- **Error Transparency**: Clear error reporting and resolution options
-- **Conflict Resolution**: Interactive handling of file conflicts
-- **Cancellation Support**: Ability to cancel long-running operations
-
-### System Integration
-- **Platform Optimization**: Uses platform-specific optimizations when available
-- **Resource Efficiency**: Efficient memory and CPU usage
-- **Error Resilience**: Robust error handling and recovery
-- **Progress Integration**: Seamless integration with progress tracking
-
-### Developer Experience
-- **Simple API**: Easy-to-use interface for file operations
-- **Comprehensive Results**: Detailed operation results and statistics
-- **Flexible Callbacks**: Customizable progress and completion callbacks
-- **Error Handling**: Built-in error handling and reporting
-
-## Future Enhancements
-
-### Potential Improvements
-- **Parallel Operations**: Multi-threaded file operations for better performance
-- **Network Operations**: Support for network file operations
-- **Checksums**: Built-in checksum verification for data integrity
-- **Compression**: On-the-fly compression for large file operations
-- **Deduplication**: Automatic deduplication during copy operations
-
-### Advanced Features
-- **Operation Queuing**: Queue multiple operations for batch processing
-- **Operation History**: Track and replay previous operations
-- **Custom Filters**: User-defined filters for selective operations
-- **Scripting Support**: Scriptable file operations for automation
-- **Cloud Integration**: Support for cloud storage operations
-
-## Testing
-
-### Test Coverage
-- **Basic Operations**: Test all core file operations
-- **Error Conditions**: Test various error scenarios and recovery
-- **Performance**: Test with large files and many files
-- **Edge Cases**: Test edge cases and boundary conditions
-- **Integration**: Test integration with progress and logging systems
-
-### Test Scenarios
-- **Copy Operations**: Various copy scenarios and conflict resolution
-- **Move Operations**: Cross-filesystem moves and error handling
-- **Delete Operations**: Safe deletion and permission handling
-- **Archive Operations**: Archive creation and extraction
-- **Error Recovery**: Error handling and recovery mechanisms
-
-## Conclusion
-
-The File Operations System provides comprehensive, robust file management functionality for TFM. Its combination of efficient operations, comprehensive error handling, progress tracking, and user-friendly conflict resolution makes it the foundation for all file management tasks in TFM. The system's performance optimization and platform integration ensure excellent user experience across different operating systems and file system types.
+- [Task Framework](TASK_FRAMEWORK_IMPLEMENTATION.md)
+- [Task Cancellation](TASK_FRAMEWORK_IMPLEMENTATION.md#cancellation)
+- [Progress Manager System](PROGRESS_MANAGER_SYSTEM.md)
+- [Path Polymorphism System](PATH_POLYMORPHISM_SYSTEM.md) — storage-agnostic operations behind `Path`

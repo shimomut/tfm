@@ -291,6 +291,56 @@ else:
     apply_default_behavior()   # no rule at all
 ```
 
+## OS-default fallback (`open_with_os`)
+
+`open_with_os()` in `tfm.py` is the deliberate "hand this file to another
+program" action (bound to Cmd/Ctrl-Enter), as opposed to Enter's
+open-inside-TFM. It is **not** association-blind: it consults `FILE_ASSOCIATIONS`
+first, exactly like the other three handlers, and only reaches the OS default
+when no rule applies.
+
+> **Reconciliation note.** An earlier standalone doc described this action as a
+> pure `platform.system()` dispatch to `open` / `xdg-open` / `start` with no
+> mention of associations, and used older method names (`_action_open_with_os`,
+> `_action_reveal_in_file_manager`). That is stale. The real dispatch order,
+> confirmed against `open_with_os()`, is: association first, OS default second.
+
+The dispatch, on the **focused entry** (not the whole selection):
+
+1. `get_program_for_file(entry.name, 'open')` — a matching `open` command wins
+   and is launched through `_launch_associated()`. On success, done.
+2. `has_explicit_association(entry.name, 'open')` — an entry set explicitly to
+   `None` **suppresses the launch entirely** and returns; this is how a file
+   type is stopped from being handed to the OS at all.
+3. Otherwise, fall back to the OS default application by platform:
+   - macOS (`Darwin`): `open <file>`
+   - Windows: `start "" <file>` (via `shell=True`)
+   - Linux / other: `xdg-open <file>`
+
+The fallback runs `subprocess.run(..., check=True)` directly and does **not**
+suspend the renderer — these launchers open their target in a separate
+application and return immediately, so there is no terminal handover to manage
+(unlike `_launch_associated()`, which suspends in terminal mode). Errors are
+logged, never raised. Platform detection uses `platform.system()`
+(`'Darwin'` / `'Linux'` / `'Windows'`).
+
+### Reveal in file manager (`reveal_in_os`)
+
+`reveal_in_os()` is the companion action: it opens the OS file manager with the
+focused entry selected. It ignores `FILE_ASSOCIATIONS` entirely (there is no
+program to associate — the target is always the platform's file manager) and
+operates only on the focused entry:
+
+- macOS: `open -R <item>` — reveals/selects the item in Finder (files and
+  directories alike).
+- Windows: `explorer /select, <item>` — selects the item in Explorer.
+- Linux / other: `xdg-open <parent>` — opens the containing directory (no
+  portable "select this item" verb).
+
+Default binding is `Alt-Enter` (`Ctrl-Shift-E` on Windows), configured under
+`KEY_BINDINGS` in `src/_config.py`. As with `open_with_os`, the launcher
+returns immediately, so the renderer is not suspended; errors are logged.
+
 ## Data Structures
 
 ### FILE_ASSOCIATIONS List (Compact Format)

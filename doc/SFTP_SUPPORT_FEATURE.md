@@ -444,6 +444,5 @@ tar czf archive.tar.gz $TFM_THIS_DIR/*
 ## Technical Details
 
 For implementation details and architecture, see:
-- **[SSH Control Master Optimization](../doc/dev/SSH_CONTROL_MASTER_OPTIMIZATION_IMPLEMENTATION.md)**
-- **[SFTP Bulk Stat Optimization](../doc/dev/SFTP_BULK_STAT_OPTIMIZATION_IMPLEMENTATION.md)**
+- **[SSH System](../doc/dev/SSH_SYSTEM.md)** - Connection, control-master sharing, bulk-stat caching, default-directory resolution
 - **[Path Polymorphism System](../doc/dev/PATH_POLYMORPHISM_SYSTEM.md)**

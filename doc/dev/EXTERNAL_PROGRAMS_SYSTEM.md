@@ -2,243 +2,209 @@
 
 ## Overview
 
-The External Programs System manages the execution of external programs and subshell features in TFM. It provides a safe and configurable way to launch external editors, viewers, and shell commands from within the file manager.
+The External Programs system lets users run configured external programs from
+within TFM with access to the current file-manager state through environment
+variables. It also provides the interactive sub-shell feature. Both are
+implemented in `src/tfm_external_programs.py` by the `ExternalProgramManager`
+class.
+
+This document covers the implementation. For the interactive shell in
+particular, see [SUBSHELL_SYSTEM.md](SUBSHELL_SYSTEM.md); for the user-facing
+description see [External Programs Feature](../EXTERNAL_PROGRAMS_FEATURE.md).
 
 ## Architecture
 
-### Core Class: ExternalProgramManager
-
-The `ExternalProgramManager` class handles:
-
-- **Program Execution**: Launching external programs with proper arguments
-- **Subshell Management**: Opening shell sessions in current directory
-- **Terminal Handling**: Managing terminal state during external execution
-- **Error Handling**: Gracefully handling program failures
-
-### Key Responsibilities
-
-1. **Configuration**: Read external program settings from config
-2. **Execution**: Launch programs with proper environment
-3. **Terminal Management**: Save/restore terminal state
-4. **Error Reporting**: Report execution errors to user
-
-## Implementation Details
-
-### Program Execution Flow
+### `ExternalProgramManager`
 
 ```python
-# Pseudo-code for program execution
-def execute_program(program, args, path):
-    # Save terminal state
-    save_terminal_state()
-    
-    try:
-        # Build command
-        cmd = [program] + args
-        
-        # Execute in subprocess
-        result = subprocess.run(cmd, cwd=path)
-        
-        # Check result
-        if result.returncode != 0:
-            report_error(result)
-    finally:
-        # Restore terminal state
-        restore_terminal_state()
+ExternalProgramManager(config, log_manager, renderer=None)
 ```
 
-### Terminal State Management
+The class holds the config, the log manager, and the active renderer, and
+exposes two entry points:
 
-The system must carefully manage terminal state:
+| Method | Purpose |
+|---|---|
+| `execute_external_program(pane_manager, program)` | Run one configured program with TFM environment variables set. |
+| `enter_subshell_mode(pane_manager)` | Start an interactive shell (`$SHELL`) with the same environment. |
 
-1. **Save State**: Save current terminal settings
-2. **Reset Terminal**: Reset to cooked mode for external program
-3. **Execute**: Run external program
-4. **Restore State**: Restore TFM's raw mode settings
+Both follow the same shape: set up the TFM environment, suspend the renderer,
+run the child process, then restore the renderer and stdio in a `finally` block.
 
-### Subshell Feature
+### Module-level helpers
 
-The subshell feature allows users to open a shell:
-
-- **Current Directory**: Opens in current pane's directory
-- **Environment**: Inherits TFM's environment
-- **Return**: Returns to TFM on shell exit
-- **State Preservation**: TFM state preserved during shell session
+- `tfm_tool(tool_name)` — resolve a tool script to an absolute path, searching
+  `~/.tfm/tools/` (user tools, highest priority) then the `tools/` directory
+  next to the module (bundled tools; `src/tools/` in a source checkout). Returns
+  the original name if not found, so execution fails later with a clear error.
+- `tfm_python` — path to the correct Python interpreter, accounting for the
+  macOS app bundle where a bundled `python3` lives inside the `.app`.
+- `quote_filenames_with_double_quotes(filenames)` — quote filenames with double
+  quotes (escaping `"` and `\`) for safe use in the `TFM_*_SELECTED` variables.
+- `get_selected_or_cursor_files(pane_data)` — the selected files, or the file
+  under the cursor when nothing is selected.
+- `ensure_common_paths_in_env(env)` — on macOS, prepend common binary paths
+  (`/usr/local/bin`, `/opt/homebrew/bin`, …) to `PATH`, since an app launched
+  from Finder/Dock does not inherit the user's shell `PATH`.
 
 ## Configuration
 
-External programs are configured in the config file:
+External programs are configured as a `PROGRAMS` list in the config
+(`src/_config.py`, overridable in `~/.tfm/config.py`). Each entry:
+
+- `name` — display name.
+- `command` — command as a list of arguments (executed without a shell, so no
+  shell injection).
+- `options` (optional) — currently just `auto_return` (bool, default `False`):
+  return to TFM immediately after the program exits instead of waiting for the
+  user to press Enter.
 
 ```python
-# Example configuration
-external_programs = {
-    'editor': 'vim',
-    'viewer': 'less',
-    'shell': '/bin/bash',
-    'diff': 'vimdiff',
-}
+PROGRAMS = [
+    {'name': 'Git Status', 'command': ['git', 'status']},
+    {'name': 'Git Log', 'command': ['git', 'log', '--oneline', '-10']},
+    {'name': 'Python REPL', 'command': ['python3']},
+    {'name': 'My Tool', 'command': [tfm_python, tfm_tool('my_script.py')]},
+    {'name': 'Quick Git Status', 'command': ['git', 'status', '--short'],
+     'options': {'auto_return': True}},
+]
 ```
 
-### Program Types
+## Environment variables
 
-The system supports several program types:
+Before running a program (or the sub-shell), `ExternalProgramManager` copies the
+current environment and adds:
 
-- **Editor**: Text editor for file editing
-- **Viewer**: File viewer (alternative to built-in)
-- **Shell**: Shell for subshell feature
-- **Diff**: Diff tool for file comparison
-- **Custom**: User-defined programs
+- `TFM_ACTIVE` — set to `'1'` to indicate TFM launched the program.
+- `TFM_LEFT_DIR` / `TFM_RIGHT_DIR` — left / right pane directory paths.
+- `TFM_THIS_DIR` / `TFM_OTHER_DIR` — active / inactive pane directory paths.
+- `TFM_LEFT_SELECTED` / `TFM_RIGHT_SELECTED` — space-separated, double-quoted
+  selected filenames in the left / right panes.
+- `TFM_THIS_SELECTED` / `TFM_OTHER_SELECTED` — same for the active / inactive
+  panes.
 
-## Key Methods
+If no files are selected in a pane, the file under the cursor is used instead.
 
-### ExternalProgramManager Methods
+The working directory is set to the active pane's directory, except when that
+pane is browsing a remote path (e.g. S3), in which case it falls back to TFM's
+own working directory.
+
+## Execution flow
+
+`execute_external_program` branches on `is_desktop_mode()`:
+
+- **Terminal mode** — restore stdout/stderr so the child can use the terminal
+  directly, suspend the renderer, and run with `subprocess.run(command, env=env)`
+  so the program shares the terminal. On completion it prints the exit status
+  and, unless `auto_return` is set, waits for the user to press Enter.
+- **Desktop mode** — keep `LogCapture` active and run with
+  `capture_output=True`; the program's stdout is echoed to the log pane at
+  `info` level and stderr at `error` level. Desktop mode always returns
+  immediately (no Enter prompt), even on error, since the user can read the log
+  pane.
+
+Errors (`FileNotFoundError`, other exceptions) are logged with a hint to use
+`tfm_tool()` for TFM tools. In every case the `finally` block resumes the
+renderer, re-initializes colors, and restores stdio capture.
+
+## Comparison with sub-shell mode
+
+| | External program | Sub-shell mode |
+|---|---|---|
+| Purpose | Run one specific program | Interactive shell session |
+| Configuration | Pre-configured `PROGRAMS` list | Uses `$SHELL` |
+| Environment | TFM variables set | TFM variables + `[TFM]` prompt hint |
+| Interaction | Program runs and exits | Full shell session |
+| Use case | Quick operations, scripts | Extended command-line work |
+
+`enter_subshell_mode` additionally sets a `[TFM]` prefix on `PS1`/`PROMPT` and
+logs snippets the user can add to their shell config to show the marker
+themselves. See [SUBSHELL_SYSTEM.md](SUBSHELL_SYSTEM.md).
+
+## Authoring external programs
+
+Standards for scripts that integrate with TFM, folded in from the former
+External Programs Policy.
+
+### Use environment variables, not arguments
+
+External programs **must** read TFM's environment variables rather than expect
+command-line arguments. This keeps every program integrated with TFM's
+selection and navigation state in the same way, and lets a program adapt to the
+user's current context automatically.
+
+Directory variables: `TFM_THIS_DIR`, `TFM_OTHER_DIR`, `TFM_LEFT_DIR`,
+`TFM_RIGHT_DIR`. Selection variables (space-separated, double-quoted filenames):
+`TFM_THIS_SELECTED`, `TFM_OTHER_SELECTED`, `TFM_LEFT_SELECTED`,
+`TFM_RIGHT_SELECTED`. Status: `TFM_ACTIVE` (set to `"1"` under TFM).
+
+### Script placement
+
+Bundled end-user programs live in **`src/tools/`** and may be executable shell
+scripts; user-specific tools go in `~/.tfm/tools/`. Reference them from a
+`PROGRAMS` entry via `tfm_tool('script_name.sh')`, which resolves either
+location to an absolute path. Follow a descriptive naming convention
+(`descriptive_name.sh`).
+
+### Script structure
+
+```bash
+#!/bin/bash
+# script_name.sh - Brief description
+# Uses TFM environment variables for integration.
+
+# Validate the TFM environment.
+if [ -z "$TFM_THIS_DIR" ]; then
+    echo "Error: TFM environment variables not set"
+    echo "This script should be run from within TFM"
+    exit 1
+fi
+
+CURRENT_DIR="$TFM_THIS_DIR"
+
+if [ -n "$TFM_THIS_SELECTED" ]; then
+    # Parse selected files (properly handles quoted filenames).
+    eval "SELECTED_FILES=($TFM_THIS_SELECTED)"
+    for file in "${SELECTED_FILES[@]}"; do
+        [ -n "$file" ] && process_file "$CURRENT_DIR/$file"
+    done
+else
+    # No selection — operate on the current directory.
+    process_directory "$CURRENT_DIR"
+fi
+```
+
+Guidelines:
+
+- Always validate that TFM variables are set; provide clear error messages and
+  meaningful exit codes.
+- Support both the "files selected" and "no selection" cases, and validate file
+  existence before operating.
+- Use `eval` to parse the quoted selection variables, and build absolute paths
+  by joining `TFM_THIS_DIR` with each filename, so spaces and special
+  characters are handled correctly.
+- When launching a GUI application, `unset` the `TFM_*` variables first and set
+  `options.auto_return = True` for a seamless return.
+
+### Registering the program
+
+Add it to the `PROGRAMS` list in `src/_config.py` (or the user's
+`~/.tfm/config.py`). Platform-specific programs can be appended conditionally:
 
 ```python
-class ExternalProgramManager:
-    def execute_editor(self, filepath):
-        """Launch external editor for file."""
-        
-    def execute_viewer(self, filepath):
-        """Launch external viewer for file."""
-        
-    def open_subshell(self, directory):
-        """Open shell in specified directory."""
-        
-    def execute_custom(self, program, args):
-        """Execute custom external program."""
-        
-    def get_program_path(self, program_type):
-        """Get configured program path for type."""
+import platform
+
+if platform.system() == 'Darwin':
+    PROGRAMS.append({'name': 'macOS Program',
+                     'command': [tfm_tool('macos_program.sh')],
+                     'options': {'auto_return': True}})
 ```
 
-### Terminal Management Methods
+Use `auto_return: True` for GUI apps that return control immediately, and the
+default (`False`) for CLI tools whose output you want to read before returning.
 
-```python
-def save_terminal_state():
-    """Save current terminal settings."""
-    
-def restore_terminal_state():
-    """Restore saved terminal settings."""
-    
-def reset_terminal():
-    """Reset terminal to cooked mode."""
-```
+## Related documentation
 
-## Integration Points
-
-### File Manager Integration
-
-The external programs system integrates with file manager:
-
-- **Edit File**: Launch editor for selected file
-- **View File**: Launch viewer for selected file
-- **Subshell**: Open shell in current directory
-- **Custom Actions**: Execute user-defined programs
-
-### Configuration System
-
-Integrates with configuration system:
-
-- **Program Paths**: Read program paths from config
-- **Arguments**: Read default arguments from config
-- **Environment**: Read environment variables from config
-
-### Menu System
-
-Integrated into menu system:
-
-- **File Menu**: Edit, View options
-- **Tools Menu**: Subshell, custom programs
-- **Key Bindings**: Keyboard shortcuts for common actions
-
-## Error Handling
-
-The system handles various error conditions:
-
-- **Program Not Found**: Report missing program
-- **Execution Failure**: Report execution errors
-- **Permission Denied**: Report permission errors
-- **Terminal Errors**: Handle terminal state errors
-
-### Error Recovery
-
-On error, the system:
-
-1. **Log Error**: Log error details
-2. **Restore Terminal**: Ensure terminal state restored
-3. **Report to User**: Show error message
-4. **Continue**: Allow TFM to continue running
-
-## Security Considerations
-
-### Command Injection Prevention
-
-The system prevents command injection:
-
-- **No Shell Expansion**: Use subprocess without shell
-- **Argument Escaping**: Properly escape arguments
-- **Path Validation**: Validate file paths
-
-### Program Validation
-
-Before execution:
-
-- **Existence Check**: Verify program exists
-- **Permission Check**: Verify program is executable
-- **Path Sanitization**: Sanitize file paths
-
-## Platform Considerations
-
-### Unix/Linux/macOS
-
-- **Terminal Control**: Use termios for terminal control
-- **Signal Handling**: Handle SIGTSTP, SIGCONT
-- **Process Groups**: Manage process groups properly
-
-### Windows
-
-- **Console API**: Use Windows Console API
-- **Process Creation**: Use Windows process creation
-- **Path Handling**: Handle Windows path conventions
-
-## Performance Considerations
-
-### Startup Time
-
-- **Lazy Loading**: Load external program config on demand
-- **Caching**: Cache program paths after first lookup
-- **Validation**: Validate programs only when needed
-
-### Resource Management
-
-- **Process Cleanup**: Ensure child processes cleaned up
-- **File Descriptors**: Close unused file descriptors
-- **Memory**: Release resources after execution
-
-## Testing Considerations
-
-Key areas for testing:
-
-- **Program Execution**: Test launching various programs
-- **Terminal State**: Verify terminal state preserved
-- **Error Handling**: Test error conditions
-- **Subshell**: Test subshell feature
-- **Configuration**: Test config reading
-- **Platform Support**: Test on different platforms
-
-## Related Documentation
-
-- [External Programs Feature](../EXTERNAL_PROGRAMS_FEATURE.md) - User documentation
-- [Configuration System](CONFIGURATION_SYSTEM.md) - Configuration management
-- [Subshell System](SUBSHELL_SYSTEM.md) - Subshell implementation details
-
-## Future Enhancements
-
-Potential improvements:
-
-- **Program Templates**: Configurable program templates
-- **Argument Substitution**: Variable substitution in arguments
-- **Multiple Programs**: Support multiple programs per type
-- **Program Discovery**: Auto-discover installed programs
-- **Async Execution**: Non-blocking program execution
-- **Output Capture**: Capture and display program output
+- [External Programs Feature](../EXTERNAL_PROGRAMS_FEATURE.md) — user documentation
+- [Subshell System](SUBSHELL_SYSTEM.md) — interactive sub-shell details
+- [Configuration System](CONFIGURATION_SYSTEM.md) — configuration management

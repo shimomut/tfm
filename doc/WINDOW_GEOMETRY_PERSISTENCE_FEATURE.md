@@ -161,4 +161,4 @@ This feature is only available when running TFM in desktop mode with the CoreGra
 
 - [Desktop Mode Guide](DESKTOP_MODE_GUIDE.md) - Complete guide to using TFM in desktop mode
 - [TFM User Guide](TFM_USER_GUIDE.md) - General TFM usage instructions
-- Developer documentation: `doc/dev/WINDOW_GEOMETRY_PERSISTENCE_IMPLEMENTATION.md`
+- Window geometry persistence is implemented by the PuiKit backends (macOS `setFrameAutosaveName:` / Windows registry frame autosave), not in the TFM repo — see the PuiKit project for implementation details.

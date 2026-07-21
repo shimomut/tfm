@@ -68,7 +68,7 @@ A `Task` is the handle shared between the worker thread and the main thread.
 | `cancelled()` | worker | Non-raising check of the cancel flag |
 | `request_cancel()` | main | Set the cooperative cancel flag; a blocked `ask()` wakes within `_WAIT_TICK` (50 ms) and unwinds |
 
-Internally the cancel flag is a `threading.Event` and pending UI requests sit on a `queue.Queue` of `_UiRequest`. See [Task Cancellation](TASK_CANCELLATION_IMPLEMENTATION.md) for the full cancellation model.
+Internally the cancel flag is a `threading.Event` and pending UI requests sit on a `queue.Queue` of `_UiRequest`. See [Cancellation](#cancellation) below for the full cancellation model.
 
 ### `TaskStatus`
 
@@ -111,9 +111,54 @@ The bridge is how a worker safely drives a modal:
 
 Only one request is serviced at a time — the worker blocks on the answer before it can post the next — so prompts (e.g. per-file copy conflicts) appear sequentially.
 
+## Cancellation
+
+Cancellation is **cooperative**: the main thread sets a flag, and the worker unwinds itself at the next safe point, leaving a clean partial result. Nothing is force-killed.
+
+### The cooperative model
+
+Each `Task` owns a `threading.Event` cancel flag (`_cancel`). Two calls on the worker thread observe it and raise `Cancelled` when it is set:
+
+- `task.checkpoint()` — a non-UI check the worker calls between units of work (per file, per chunk).
+- `task.ask(...)` — while blocked waiting for a modal answer, it wakes every `_WAIT_TICK` (50 ms) and raises `Cancelled` if the flag flipped, so a pending prompt cancels promptly instead of stranding the worker.
+
+`task.cancelled()` is the non-raising form for spots that want to branch rather than unwind.
+
+### Requesting cancellation
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as User
+    participant Dlg as ProgressDialog (main thread)
+    participant T as Task (flag)
+    participant W as worker thread
+
+    U->>Dlg: press Esc
+    Dlg->>U: confirm box — "Cancel <title>?" (default: Keep running)
+    Note over W: worker keeps running while the user decides
+    U-->>Dlg: choose "Cancel operation"
+    Dlg->>T: request_cancel() — set _cancel Event
+    W->>T: next checkpoint() / ask() sees the flag
+    T-->>W: raise Cancelled
+    W-->>Dlg: run() returns a partial result {cancelled: True}
+```
+
+`Esc` on the progress dialog does **not** cancel immediately — it opens a confirm box (`Cancel operation` / `Keep running`, defaulting to keep). The worker continues while the user decides; cancellation only takes effect if confirmed, at which point `task.request_cancel()` sets the flag.
+
+A third path reaches the same place: choosing **Cancel** in a per-file conflict dialog raises `Cancelled` directly inside the operation's `_resolve` step.
+
+### Unwinding into a partial result
+
+`Cancelled` propagates up through the operation body, which catches it and returns a summary dict with `cancelled = True` (the counts reflect whatever completed before the cancel). `TaskManager` then maps the outcome to `TaskStatus.CANCELLED` when finalising the task, closes the dialog, and calls the caller's `on_done` with the partial result — so a cancelled copy still reports what it managed to copy.
+
+### Blocking other actions
+
+The `ProgressDialog` is pushed as a modal layer; its `handle_event` returns `True` for everything, so no key or mouse event reaches the panes or menus while a task runs. Blocking is therefore a property of the modal layer, not a special case in the key handler. For callers that need to know programmatically whether work is in flight, `TaskManager.has_active()` / `active_tasks()` report the `PENDING` / `RUNNING` tasks in the registry.
+
 ## Example: a file operation as a task
 
-`FileOperationService` (see [File Operations Architecture](FILE_OPERATIONS_ARCHITECTURE.md)) builds and submits a task like this:
+`FileOperationService` (see [File Operations System](FILE_OPERATIONS_SYSTEM.md)) builds and submits a task like this:
 
 ```python
 task = Task("Copy…", config=self.config, kind="copy")
@@ -129,12 +174,11 @@ The `run` body resolves conflicts (via `task.ask`), counts work (updating `task.
 
 ## Implementation files
 
-- `src/tfm_task.py` — `Task`, `TaskStatus`, `Cancelled`, `_UiRequest`, `TaskManager`, `ProgressDialog`
+- `src/tfm_task.py` — `Task`, `TaskStatus`, `Cancelled`, `_UiRequest`, `TaskManager`, `ProgressDialog`; the cancellation machinery (`Task._cancel`, `checkpoint()`, `ask()`, `request_cancel()`; `ProgressDialog._confirm_cancel`; `TaskManager._finish`)
 - `src/tfm_progress_manager.py` — `ProgressManager` (the per-task progress model)
-- `src/tfm_file_operations.py` — the first heavy user of the framework
+- `src/tfm_file_operations.py` — the first heavy user of the framework (its `_run` / `_resolve` catch `Cancelled` and return a partial summary)
 
 ## Related documentation
 
-- [Task Cancellation](TASK_CANCELLATION_IMPLEMENTATION.md)
-- [File Operations Architecture](FILE_OPERATIONS_ARCHITECTURE.md)
+- [File Operations System](FILE_OPERATIONS_SYSTEM.md)
 - [Progress Manager System](PROGRESS_MANAGER_SYSTEM.md)

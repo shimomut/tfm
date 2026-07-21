@@ -46,6 +46,54 @@ flowchart TB
 3. **Single Responsibility**: Each PathImpl subclass handles only its storage type
 4. **Polymorphism Over Conditionals**: Behavior varies through method overriding, not if/else checks
 
+## Path Facade and Migration History
+
+### The Facade / Implementation Split
+
+The polymorphism system is built on a three-layer split in `src/tfm_path.py`:
+
+- **`PathImpl` (abstract base)** — defines the full `pathlib.Path`-compatible
+  interface (`exists`, `is_dir`, `is_file`, `iterdir`, `stat`, …) plus the
+  strategic virtual methods documented below. Instantiating it directly raises
+  `TypeError`.
+- **`LocalPathImpl` (concrete)** — implements `PathImpl` for the local filesystem
+  by wrapping a `pathlib.Path`, so local operations have no overhead and behave
+  identically to stock `pathlib`.
+- **`Path` (facade)** — the public class every module imports. It holds a single
+  `self._impl` and delegates every call to it. `Path.__init__` selects the
+  implementation via **`Path._create_implementation(path_str)`**, which dispatches
+  by URI scheme.
+
+`_create_implementation` is the real entry point for backend selection (there is
+no `Path()`): it returns an `ArchivePathImpl`, `S3PathImpl`, or
+`SSHPathImpl` for the matching scheme, and falls back to `LocalPathImpl` for
+ordinary paths. `Path.__init__` also keeps the raw URI intact (instead of running
+it through `PathlibPath`) for any registered remote scheme.
+
+### pathlib Compatibility
+
+The facade preserves 100% compatibility with `pathlib.Path`:
+
+- **Import swap only** — modules migrated from `from pathlib import Path` to
+  `from tfm_path import Path`; call sites were left unchanged.
+- **Same behavior and performance** — local paths delegate straight to `pathlib.Path`.
+- **Zero breaking changes** — existing local-path code kept working through the migration.
+
+### Migration History
+
+TFM originally used `pathlib.Path` directly throughout `src/`. To make room for
+non-local storage without rewriting call sites, the codebase was migrated to the
+`Path` facade above. All `src/` modules that touch paths were switched to
+`from tfm_path import Path` — including `tfm.py`, `tfm_file_operations.py`,
+`tfm_pane_manager.py`, `tfm_state_manager.py`, `tfm_config.py`,
+`tfm_text_viewer.py`, and the various dialog modules.
+
+What early design notes framed as "future remote storage" now **exists**: the
+archive (`tfm_archive.ArchivePathImpl`), S3 (`tfm_s3.S3PathImpl`), and SSH/SFTP
+(`tfm_ssh.SSHPathImpl`) backends are all implemented and selected automatically by
+`_create_implementation`. Additional schemes (FTP, WebDAV, etc.) can be added the
+same way — see "Adding New Storage Types" below.
+
 ## PathImpl Virtual Methods
 
 The `PathImpl` abstract base class defines 7 strategic virtual methods that encapsulate all storage-specific behavior:
@@ -342,20 +390,35 @@ class CustomPathImpl(PathImpl):
         }
 ```
 
-### Step 2: Register with Path Factory
+### Step 2: Register with the Path Factory
 
-Update the `Path.from_uri()` factory method in `src/tfm_path.py`:
+Add your scheme to the `Path._create_implementation()` method in `src/tfm_path.py`.
+This instance method is called from `Path.__init__` and selects the implementation
+by URI scheme:
 
 ```python
-@staticmethod
-def from_uri(uri: str) -> 'Path':
-    """Create Path from URI string."""
-    if uri.startswith('custom://'):
-        from src.tfm_custom import CustomPathImpl
-        return Path(CustomPathImpl(uri))
-    elif uri.startswith('archive://'):
-        # ... existing code
-    # ... rest of factory logic
+def _create_implementation(self, path_str: str) -> PathImpl:
+    """Create the appropriate implementation based on the path string"""
+    if path_str.startswith('custom://'):
+        from tfm_custom import CustomPathImpl
+        return CustomPathImpl(path_str)
+    if path_str.startswith('archive://'):
+        # ... existing archive handling
+    if path_str.startswith('s3://'):
+        # ... existing S3 handling
+    if path_str.startswith('ssh://'):
+        # ... existing SSH handling
+    # Default to the local file system
+    return LocalPathImpl(PathlibPath(path_str))
+```
+
+Also add the scheme to the prefix tuple in `Path.__init__`, so the raw URI is
+passed through untouched instead of being normalized by `PathlibPath`:
+
+```python
+if len(args) == 1 and isinstance(args[0], str) and args[0].startswith(
+        ('archive://', 's3://', 'ssh://', 'scp://', 'ftp://', 'custom://')):
+    path_str = args[0]
 ```
 
 ### Step 3: Add Capability Methods (if needed)
@@ -379,12 +442,12 @@ Create unit tests for your new PathImpl:
 
 ```python
 def test_custom_path_display():
-    path = Path.from_uri('custom://resource')
+    path = Path('custom://resource')
     assert path.get_display_prefix() == "CUSTOM: "
     assert path.get_display_title() == 'custom://resource'
 
 def test_custom_path_metadata():
-    path = Path.from_uri('custom://resource')
+    path = Path('custom://resource')
     metadata = path.get_extended_metadata()
     assert metadata['type'] == 'custom'
     assert len(metadata['details']) > 0
@@ -623,14 +686,14 @@ Test UI components work with your storage type:
 ```python
 def test_text_viewer_with_custom_storage():
     """Test text viewer displays custom storage correctly."""
-    path = Path.from_uri('custom://resource')
+    path = Path('custom://resource')
     viewer = TextViewer(path)
     title = viewer.get_title()
     assert 'CUSTOM:' in title
 
 def test_info_dialog_with_custom_storage():
     """Test info dialog shows custom metadata."""
-    path = Path.from_uri('custom://resource')
+    path = Path('custom://resource')
     dialog = InfoDialog(path)
     content = dialog.get_content()
     assert 'Custom Field 1' in content
@@ -646,14 +709,14 @@ from hypothesis import given, strategies as st
 @given(st.text())
 def test_display_methods_never_none(uri):
     """Test display methods never return None."""
-    path = Path.from_uri(f'custom://{uri}')
+    path = Path(f'custom://{uri}')
     assert path.get_display_prefix() is not None
     assert path.get_display_title() is not None
 
 @given(st.text())
 def test_metadata_structure_valid(uri):
     """Test metadata structure is always valid."""
-    path = Path.from_uri(f'custom://{uri}')
+    path = Path(f'custom://{uri}')
     metadata = path.get_extended_metadata()
     assert isinstance(metadata, dict)
     assert 'type' in metadata
@@ -668,7 +731,7 @@ def test_metadata_structure_valid(uri):
 **Solution**: Search for `if scheme ==`, `if uri.startswith`, `isinstance(path._impl` and replace with virtual method calls
 
 **Issue**: New storage type not recognized
-**Solution**: Verify Path factory includes your URI scheme in `from_uri()` method
+**Solution**: Verify `Path._create_implementation()` includes your URI scheme
 
 **Issue**: Metadata not displaying correctly
 **Solution**: Verify `get_extended_metadata()` returns dict with required keys and proper structure
@@ -726,7 +789,7 @@ def verify_pathimpl(impl_class):
 ## References
 
 - **Source Code**: `src/tfm_path.py` - PathImpl interface and Path facade
-- **Implementations**: `src/tfm_path.py` (Local), `src/tfm_archive.py` (Archive), `src/tfm_s3.py` (S3)
+- **Implementations**: `src/tfm_path.py` (Local), `src/tfm_archive.py` (Archive), `src/tfm_s3.py` (S3), `src/tfm_ssh.py` (SSH/SFTP)
 - **UI Integration**: `src/tfm_text_viewer.py`, `src/tfm_text_dialog.py`, `src/tfm_progressive_search_dialog.py`
 - **Tests**: `test/test_virtual_methods_checkpoint.py`, `test/test_info_dialog_refactoring.py`
 - **Design Document**: `.kiro/specs/path-polymorphism-refactoring/design.md`

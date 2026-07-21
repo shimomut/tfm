@@ -100,7 +100,7 @@ For comprehensive information about TFM's features and usage:
 ### Developer Documentation
 - **[Path Polymorphism System](doc/dev/PATH_POLYMORPHISM_SYSTEM.md)** - Storage-agnostic architecture and extensibility
 - **[Navigation System](doc/dev/NAVIGATION_SYSTEM.md)** - Core navigation implementation
-- **[External Programs](doc/dev/EXTERNAL_PROGRAMS_IMPLEMENTATION.md)** - Program integration system
+- **[External Programs](doc/dev/EXTERNAL_PROGRAMS_SYSTEM.md)** - Program integration system
 
 ## Key Features Overview
 

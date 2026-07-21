@@ -67,4 +67,4 @@ see, formatting and all.
 
 - [Built-in Viewer Association](BUILTIN_VIEWER_ASSOCIATION_FEATURE.md) — how a
   file type picks the raw vs. rich viewer.
-- Developer notes: `doc/dev/TEXT_SELECTION_IMPLEMENTATION.md`.
+- Developer notes: `doc/dev/TEXT_VIEWER_SYSTEM.md` (see the "Text selection" section).

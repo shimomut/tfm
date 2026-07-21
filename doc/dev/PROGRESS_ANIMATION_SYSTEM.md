@@ -1,234 +1,106 @@
 # Progress Animation System
 
-## Overview
+Module: `src/tfm_progress_animator.py`
 
-The Progress Animation System provides animated progress indicators for various operations in TFM. It creates visual feedback for long-running operations like file copying, searching, and directory scanning.
+A small, generalized engine for animated progress indicators (spinners and
+progress-bar-style effects) used wherever TFM needs "something is happening"
+feedback — search, and, through `ProgressManager`, file operations. It is a pure
+frame generator: it computes which glyph to show based on elapsed time. Rendering
+and threading live in the callers.
 
 ## Architecture
 
-### Core Classes
+- **`ProgressAnimator`** — the engine. Holds the pattern table, the configured
+  pattern/speed, and the current frame index; advances the frame when enough time
+  has passed and formats status strings.
+- **`ProgressAnimatorFactory`** — static factory methods that build animators
+  preconfigured for common use cases, so callers don't repeat pattern/speed
+  choices.
 
-**ProgressAnimator**
-- Base class for progress animations
-- Manages animation state and timing
-- Provides frame generation
-- Handles animation lifecycle
-
-**ProgressAnimatorFactory**
-- Factory for creating animator instances
-- Manages animator types and configurations
-- Provides default animators for common operations
-- Supports custom animator registration
-
-### Animation Types
-
-The system supports several animation types:
-
-1. **Spinner**: Rotating character animation
-2. **Progress Bar**: Percentage-based bar
-3. **Dots**: Animated dots (e.g., "Loading...")
-4. **Pulse**: Pulsing indicator
-5. **Custom**: User-defined animations
-
-## Implementation Details
-
-### ProgressAnimator Base Class
+## ProgressAnimator
 
 ```python
-class ProgressAnimator:
-    def __init__(self, frames, interval=0.1):
-        """Initialize animator with frames and interval."""
-        self.frames = frames
-        self.interval = interval
-        self.current_frame = 0
-        self.last_update = time.time()
-        
-    def get_frame(self):
-        """Get current animation frame."""
-        now = time.time()
-        if now - self.last_update >= self.interval:
-            self.current_frame = (self.current_frame + 1) % len(self.frames)
-            self.last_update = now
-        return self.frames[self.current_frame]
-        
-    def reset(self):
-        """Reset animation to first frame."""
-        self.current_frame = 0
-        self.last_update = time.time()
+ProgressAnimator(config, pattern_override=None, speed_override=None)
 ```
 
-### Built-in Animators
+`config` supplies defaults `PROGRESS_ANIMATION_PATTERN` and
+`PROGRESS_ANIMATION_SPEED`; the two overrides let a single instance pick a
+different pattern or speed without touching config. Key methods:
 
-**Spinner Animator**:
-```python
-spinner_frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
-spinner = ProgressAnimator(spinner_frames, interval=0.08)
-```
+- `get_current_frame() -> str` — the glyph to show now; advances the frame when
+  `animation_speed` seconds have elapsed since the last advance.
+- `reset()` — back to frame 0 (call on operation start/finish).
+- `set_pattern(pattern)` / `set_speed(speed)` — change either at runtime.
+- `get_available_patterns()` / `get_pattern_preview(pattern=None)` — introspection.
+- `get_progress_indicator(context_info=None, is_active=True, style='default')` —
+  the bare indicator; for the `'progress'` pattern this renders a filling bar
+  effect. Styles: `'default'`, `'brackets'`, `'minimal'`.
+- `get_status_text(operation_name, context_info=None, is_active=True)` — a full
+  line, e.g. `"Searching ⠋ (42 found)"`; when inactive returns a "complete"
+  message.
 
-**Progress Bar Animator**:
-```python
-def create_progress_bar(width, progress):
-    """Create progress bar frame."""
-    filled = int(width * progress)
-    bar = '█' * filled + '░' * (width - filled)
-    return f"[{bar}] {progress*100:.0f}%"
-```
+Timing is purely elapsed-time based, so the animation is independent of how often
+the caller redraws — a caller can force smoothness by redrawing on a timer even
+without new progress data.
 
-**Dots Animator**:
-```python
-dots_frames = ['   ', '.  ', '.. ', '...']
-dots = ProgressAnimator(dots_frames, interval=0.3)
-```
+### Patterns
 
-### ProgressAnimatorFactory
+The `patterns` table maps a name to a frame list. Available names: `spinner`
+(default, Braille), `dots`, `progress` (bar fill), `bounce`, `pulse`, `wave`,
+`clock`, `arrow`. An unknown name falls back to `spinner`. The exact frame lists
+are defined in the source; treat that as authoritative rather than duplicating
+them here.
+
+## ProgressAnimatorFactory
+
+Static builders:
+
+- `create_search_animator(config)` — defaults, tuned for search.
+- `create_loading_animator(config)` — `spinner` at speed `0.15`.
+- `create_processing_animator(config)` — `progress` at speed `0.25`.
+- `create_custom_animator(config, pattern='spinner', speed=0.2)` — arbitrary
+  pattern/speed.
+
+## Usage
 
 ```python
-class ProgressAnimatorFactory:
-    _animators = {}
-    
-    @classmethod
-    def register(cls, name, animator_class):
-        """Register custom animator type."""
-        cls._animators[name] = animator_class
-        
-    @classmethod
-    def create(cls, operation_type):
-        """Create animator for operation type."""
-        if operation_type in cls._animators:
-            return cls._animators[operation_type]()
-        return cls.get_default_animator()
-        
-    @classmethod
-    def get_default_animator(cls):
-        """Get default spinner animator."""
-        return ProgressAnimator(
-            ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'],
-            interval=0.08
-        )
+from tfm_progress_animator import ProgressAnimator, ProgressAnimatorFactory
+
+search_animator = ProgressAnimatorFactory.create_search_animator(config)
+status = search_animator.get_status_text("Searching", "42 found", is_active=True)
+
+animator = ProgressAnimatorFactory.create_custom_animator(config, 'progress', 0.3)
+animator.set_pattern('wave')   # change at runtime
+animator.set_speed(0.1)
 ```
 
-## Animation Lifecycle
+`ProgressManager` (`src/tfm_progress_manager.py`) constructs its own
+`ProgressAnimator` with `pattern_override='spinner'`, `speed_override=0.08` and
+calls `get_current_frame()` while formatting operation status — see
+[Progress Manager System](PROGRESS_MANAGER_SYSTEM.md).
 
-### Initialization
-
-1. **Create Animator**: Factory creates appropriate animator
-2. **Configure**: Set frames and timing
-3. **Start**: Begin animation
-
-### Runtime
-
-1. **Update**: Update animation frame based on time
-2. **Render**: Render current frame to UI
-3. **Repeat**: Continue until operation completes
-
-### Cleanup
-
-1. **Stop**: Stop animation
-2. **Clear**: Clear animation from display
-3. **Release**: Release resources
-
-## Integration Points
-
-### Progress Manager Integration
-
-The animation system integrates with progress manager:
-
-- **Operation Start**: Create animator when operation starts
-- **Progress Update**: Update animation on progress
-- **Operation Complete**: Stop animation when done
-- **Cancellation**: Handle operation cancellation
-
-### UI Integration
-
-Integrates with TFM's UI system:
-
-- **Status Bar**: Display in status bar
-- **Progress Dialog**: Display in progress dialog
-- **Details Pane**: Display in details pane
-- **Inline**: Display inline with operation
-
-### Configuration System
-
-Respects configuration options:
-
-- `progress.animation_enabled`: Enable/disable animations
-- `progress.animation_speed`: Animation speed multiplier
-- `progress.animation_style`: Default animation style
-
-## Performance Considerations
-
-### Frame Rate Control
-
-- **Interval-Based**: Update based on time interval
-- **Throttling**: Limit update frequency
-- **Adaptive**: Adjust based on system load
-
-### Resource Usage
-
-- **Minimal Memory**: Use small frame arrays
-- **Efficient Rendering**: Only redraw when changed
-- **CPU Usage**: Minimal CPU overhead
-
-## Customization
-
-### Custom Animators
-
-Users can create custom animators:
+## Configuration
 
 ```python
-# Define custom frames
-custom_frames = ['◐', '◓', '◑', '◒']
-
-# Create custom animator
-custom_animator = ProgressAnimator(custom_frames, interval=0.1)
-
-# Register with factory
-ProgressAnimatorFactory.register('custom', lambda: custom_animator)
+# Defaults consumed from config
+PROGRESS_ANIMATION_PATTERN = 'spinner'
+PROGRESS_ANIMATION_SPEED   = 0.2   # seconds per frame; ~0.1–0.5 is reasonable
 ```
 
-### Animation Styles
+## Notes
 
-Different styles for different operations:
+- Thread-safe in practice: animation state is independent of the work being
+  tracked; frame updates don't touch the operation's data.
+- Minimal cost — a small frame list and a time comparison per call.
+- Unicode terminal recommended; `spinner` has the widest glyph compatibility.
 
-- **File Copy**: Progress bar with percentage
-- **Search**: Spinner with "Searching..."
-- **Scan**: Dots with "Scanning..."
-- **Network**: Pulse with "Connecting..."
+## Tests
 
-## Error Handling
+- `test/test_search_animation.py` — pattern behavior, frame cycling, timing,
+  config integration.
+- `test/test_search_animation_integration.py` — integration and thread-safety.
 
-The system handles various error conditions:
+## Related
 
-- **Invalid Frames**: Validate frame data
-- **Timing Errors**: Handle time calculation errors
-- **Render Errors**: Handle rendering failures
-- **Thread Errors**: Handle threading issues
-
-## Testing Considerations
-
-Key areas for testing:
-
-- **Frame Generation**: Verify correct frames
-- **Timing**: Verify correct timing intervals
-- **Lifecycle**: Test start/stop/reset
-- **Integration**: Test with progress manager
-- **Performance**: Test with many animations
-- **Thread Safety**: Test concurrent animations
-
-## Related Documentation
-
-- Progress Animation Feature - User documentation
-- [Progress Manager System](PROGRESS_MANAGER_SYSTEM.md) - Progress management
-- [Copy Progress Feature](../COPY_PROGRESS_FEATURE.md) - File copy progress
-- [Search Animation Feature](../SEARCH_ANIMATION_FEATURE.md) - Search animation
-
-## Future Enhancements
-
-Potential improvements:
-
-- **More Styles**: Additional animation styles
-- **Color Animation**: Animated colors
-- **Smooth Transitions**: Smooth frame transitions
-- **Adaptive Speed**: Adjust speed based on operation
-- **Custom Rendering**: Custom rendering backends
-- **3D Effects**: Pseudo-3D animations
+- [Progress Manager System](PROGRESS_MANAGER_SYSTEM.md)
+</content>

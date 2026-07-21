@@ -7,10 +7,10 @@ TFM includes a comprehensive built-in text file viewer with syntax highlighting,
 ## Core Features
 
 ### ✅ Syntax Highlighting
-- **Automatic detection** of file types based on extension and content
-- **Pygments integration** for professional syntax highlighting
-- **Graceful fallback** when pygments is not available
-- **Support for 20+ file formats** including Python, JavaScript, JSON, Markdown, YAML, and more
+- **Automatic detection** of file types via pygments' filename lexer, with an
+  extension fallback map (`_EXT_LEXERS`) for common source types
+- **Pygments integration** for syntax highlighting (a soft dependency)
+- **Graceful fallback** to plain text when pygments is not available
 
 ### ✅ Navigation Controls
 - **Vertical scrolling**: `↑↓` arrow keys
@@ -42,33 +42,21 @@ TFM includes a comprehensive built-in text file viewer with syntax highlighting,
 
 ## File Format Support
 
-### Programming Languages
-- Python (`.py`)
-- JavaScript (`.js`)
-- Java (`.java`)
-- C/C++ (`.c`, `.cpp`, `.h`, `.hpp`)
-- Go (`.go`)
-- Rust (`.rs`)
-- PHP (`.php`)
-- Ruby (`.rb`)
-- Shell scripts (`.sh`, `.bash`, `.zsh`)
+Highlighting is driven by pygments, so any language pygments has a lexer for is
+supported. Lexer selection is:
 
-### Markup & Documentation
-- HTML (`.html`)
-- XML (`.xml`)
-- Markdown (`.md`)
-- reStructuredText (`.rst`)
+1. `pygments.lexers.get_lexer_for_filename(path.name)` — pygments' own filename
+   matching (handles `Dockerfile`, `Makefile`, `.rst`, and most extensions).
+2. On `ClassNotFound`, a small extension fallback map, `_EXT_LEXERS` in
+   `tfm_text_viewer.py` (`.py`, `.js`, `.ts`, `.json`, `.md`, `.yml`/`.yaml`,
+   `.xml`, `.html`, `.css`, `.sh`/`.bash`, `.c`/`.cpp`/`.h`/`.hpp`, `.java`,
+   `.go`, `.rs`, `.php`, `.rb`, `.sql`, `.ini`/`.cfg`/`.conf`, `.toml`).
+3. Otherwise `TextLexer` (plain, uncolored).
 
-### Data Formats
-- JSON (`.json`)
-- YAML (`.yml`, `.yaml`)
-- CSV (`.csv`)
-- TSV (`.tsv`)
-
-### Configuration Files
-- INI files (`.ini`, `.cfg`, `.conf`)
-- TOML (`.toml`)
-- Various config files (`Dockerfile`, `Makefile`, etc.)
+Token categories are mapped to a small palette (`DEFAULT_SYNTAX`, VS Code Dark+)
+that a theme may override via `extras['syntax']`. Structured formats such as
+JSON and CSV also have dedicated *rich* renderers (see
+`JSON_CSV_VIEWERS_IMPLEMENTATION.md`) reachable via the view-mode toggle.
 
 ## Usage
 
@@ -202,6 +190,68 @@ Multi-step approach to identify text files:
 - **Minimal data transfer** - Binary detection only reads first 1024 bytes
 - **Streaming support** - Through tfm_path abstraction
 
+### Horizontal scrolling
+
+Content is drawn in a fixed-advance face (`MONO`), so a column is a character and
+the gutter, horizontal scroll, and highlights all align by column. `self.left`
+(and `self.top`) are floats, so a GUI pan is smooth rather than cell-snapped.
+
+Tabs are expanded once at read time by the module function `_expand_tabs()`,
+column-aware to `_TAB` (8) stops; `_read_lines()` runs it on every line, so the
+rest of the viewer never sees a raw tab.
+
+`_draw_line(ctx, y, line_idx, col0)` renders the visible column window
+`[col0, col0 + content_w)`. It walks the line's `(text, fg)` segments tracking a
+running character index `col`, clips each to `vis_start = max(col, col0_int)` /
+`vis_end = min(seg_end, window_end)`, and slices by index arithmetic. `col0` may
+be fractional: the row shifts left by its fractional part (`xfrac`) for smooth
+pan, the gutter fill (drawn after) masks the left bleed, and the body's clip
+trims the partial right edge.
+
+> **War story — don't locate a character by value.** An earlier version found the
+> first visible character with `text.index(char)`. `str.index` returns the
+> *first occurrence of that character value*, not the character's position, so
+> any line containing a repeated character (e.g. `0123450123...`) rendered from
+> the wrong column at horizontal offsets past the repeat. The durable fix is to
+> never search for a character by value — track the running character index
+> explicitly (the current code's accumulating `col`).
+
+### Text selection
+
+Mouse text selection + clipboard copy in the modal viewer. The feature spans two
+repos:
+
+- **PuiKit** owns the reusable pieces — the `clipboard_rich` capability
+  (`Panel.set_clipboard_rich`) and `MarkdownView`'s own selection + rich-HTML
+  copy (documented in `puikit/docs/widget_catalog.md`).
+- **TFM** owns the raw text viewer's own selection, and forwarding mouse/keys to
+  the embedded `MarkdownView` in rich mode.
+
+**Raw text mode.** `_RawTextSelection` holds a `(line, col)` selection over the
+source lines (monospace, so a column is a character), using PuiKit's
+`MultiClickTracker` + `word_bounds` for the word/line gestures. It is a local
+counterpart to PuiKit's `SelectableText` mixin, which can't be reused because
+this viewer scrolls vertically **and** horizontally and draws its own line-number
+gutter. `_pos_at(ex, ey)` maps a layer-local point through `_body_rect` and the
+current `top`/`left` scroll (unwrapping `_row_map` when wrapping) to a
+`(line, col)`; `_draw_selection` overlays the selected span of each visible row
+over `theme.text_selection_bg` (mirroring the search-match overlay
+`_draw_matches`). `handle_event` processes `MOUSE_DOWN`/`UP`/`DRAG` plus
+`Cmd`/`Ctrl`+`C` (copy, plain text via `Panel.set_clipboard`) and
+`Cmd`/`Ctrl`+`A` (select-all); a press outside the body clears the selection.
+
+**Rich mode.** `_forward_mouse_to_rich` translates a mouse event into the
+embedded `MarkdownView`'s coordinate space (`event.translated(-bx0, -by0)`) so
+its own selection and link clicks work through this modal viewer. KEY events
+(including `Cmd`+`C`) are already forwarded in rich mode, so the widget's copy
+path needs no extra wiring. `tfm_viewer_registry._build_markdown` builds the
+file viewer's `MarkdownView` with `selectable=True`; help / message-box
+MarkdownViews build without the flag and stay inert.
+
+Tests: `test/test_viewer_selection.py` (raw-mode drag / multi-line / select-all /
+press-outside-clears, and rich-mode mouse + copy forwarding). User-facing
+behavior: `doc/TEXT_SELECTION_FEATURE.md`.
+
 ## Installation & Dependencies
 
 ### Core Functionality
@@ -214,9 +264,9 @@ For **full syntax highlighting support**, install pygments:
 pip install pygments
 ```
 
-**Without pygments**: The viewer still works perfectly but displays files as plain text without syntax coloring.
+**Without pygments**: The viewer still works but displays files as plain text without syntax coloring.
 
-**With pygments**: Full syntax highlighting for 20+ file formats with professional color schemes.
+**With pygments**: Syntax highlighting for any language pygments can lex, using the theme's syntax palette.
 
 ### Remote File Support
 Remote file support is provided through the tfm_path system:
@@ -225,21 +275,22 @@ Remote file support is provided through the tfm_path system:
 
 ## Usage Examples
 
+The viewer is a full-window modal PuiKit `Widget`, pushed over the active panel
+with `show_text_viewer`:
+
 ### Viewing Local Files
 ```python
 from tfm_path import Path
-from tfm_text_viewer import view_text_file
+from tfm_text_viewer import show_text_viewer
 
 # Local file
-local_path = Path('/home/user/document.txt')
-view_text_file(stdscr, local_path)
+show_text_viewer(panel, Path('/home/user/document.txt'), state_manager=state_manager)
 ```
 
 ### Viewing Remote Files
 ```python
-# S3 file
-s3_path = Path('s3://my-bucket/document.txt')
-view_text_file(stdscr, s3_path)
+# S3 file (same call — tfm_path.Path abstracts the backend)
+show_text_viewer(panel, Path('s3://my-bucket/document.txt'))
 ```
 
 ### Text File Detection
@@ -335,30 +386,9 @@ The text viewer respects TFM's configuration system:
 
 ## Testing
 
-### Comprehensive Test Coverage
-
-#### Unit Tests
-- `test/test_text_viewer.py` - Core text viewer functionality
-- `test/test_text_viewer_remote.py` - Remote file support
-- Syntax highlighting tests
-- Search functionality tests
-- Error handling verification
-
-#### Integration Tests
-- TFM integration testing
-- Configuration system integration
-- Key binding validation
-
-
-### Test Results
-```
-✅ Core functionality tests passed
-✅ Remote file support tests passed
-✅ Syntax highlighting tests passed
-✅ Search functionality tests passed
-✅ Error handling tests passed
-✅ Integration tests passed
-```
+- `test/test_binary_file_handling.py` — the binary-sniff ordering described in
+  *Text File Detection* above (a PNG must not render as mojibake).
+- `test/test_viewer_selection.py` — raw-mode and rich-mode text selection / copy.
 
 ## Future Enhancements
 

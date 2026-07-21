@@ -175,14 +175,77 @@ TFM now includes dedicated keys for adjusting pane boundaries:
 - **Reset Functions**: `-` resets horizontal split to 50/50, `_` resets log height to default
 - **Intuitive Design**: Keys visually represent the direction of adjustment
 
+## Architecture and Loading Flow
+
+### Single Source of Truth
+
+All configuration defaults live in the `Config` class in `src/_config.py`. There is
+**no** second defaults class — the earlier `DefaultConfig` in `tfm_config.py` was
+removed, so there are no longer "two configs" to keep in sync. `src/_config.py`
+serves two roles:
+
+1. **Template** — copied verbatim to `~/.tfm/config.py` on first run.
+2. **Default provider** — the source used to fill in any fields a user config is
+   missing.
+
+### Automatic Field Copying
+
+When TFM loads configuration it:
+
+1. Loads the user's `~/.tfm/config.py` (if present).
+2. Loads the template `Config` class from `src/_config.py`.
+3. Copies any missing public fields from the template into the user config.
+4. Returns a complete config with every field present.
+
+This means new options appear automatically in existing user configs, corrupted
+configs are backfilled with defaults, and users never have to hand-edit their
+config to pick up newly added settings.
+
+### Loading Flow
+
+```
+1. ConfigManager.load_config() called
+2. Load template Config class from src/_config.py   (_load_template_config)
+3. Does ~/.tfm/config.py exist?
+   - No  -> create_default_config() copies src/_config.py to ~/.tfm/config.py
+   - Yes -> import and instantiate the user's Config
+            (on error, fall back to an empty config filled from the template)
+4. _copy_missing_fields(user_config, template_class) backfills any missing
+   public attributes, logging each field added
+5. Return the complete config with all fields present
+```
+
+### Key Components (`src/tfm_config.py`)
+
+- **`ConfigManager`** — loads, caches, and provides access to config. Key methods:
+  `load_config()`, `get_config()`, `reload_config()`, `create_default_config()`,
+  `validate_config()`, `get_key_bindings()`.
+- **`_load_template_config()`** — dynamically imports the `Config` class from
+  `src/_config.py` and returns the class (not an instance) for field inspection;
+  returns `None` on failure.
+- **`_copy_missing_fields(user_config, template_config_class)`** — copies public
+  (non-`_`) attributes present on the template but missing on the user config,
+  logging each addition and the total count.
+- **`KeyBindings`** — key-binding lookup and parsing
+  (`find_action_for_event`, `get_keys_for_action`, `format_key_for_display`).
+
+> `validate_config()` builds a merged `Config` from `src/_config.py` internally to
+> check ranges/types — it is a local helper, not a separate defaults class.
+
+### Adding a New Option
+
+1. Add the field to the `Config` class in `src/_config.py`.
+2. That's it — the field is copied into existing user configs on next launch and
+   logged (`Added missing config field: <NAME>`). There is no second class to update.
+
 ## Configuration Management
 
 ### Automatic Loading
 
 1. **Startup Check**: TFM checks for `~/.tfm/config.py` on launch
-2. **Auto-Creation**: Creates default config from `_config.py` template if file doesn't exist
-3. **Template-Based**: Uses separate template file for clean default configuration
-4. **Error Handling**: Falls back to built-in defaults if config is invalid
+2. **Auto-Creation**: Creates the user config from the `src/_config.py` template if the file doesn't exist
+3. **Template-Based**: Uses the single `src/_config.py` template as the source of defaults
+4. **Error Handling**: Fills missing fields from the `src/_config.py` template if the config is incomplete or invalid
 5. **Validation**: Validates configuration values and reports errors
 
 ### Configuration API
@@ -311,16 +374,16 @@ class Config:
 
 ### Configuration Errors
 
-1. **File Not Found**: Creates default configuration
-2. **Syntax Errors**: Falls back to built-in defaults
-3. **Missing Config Class**: Uses default configuration
-4. **Invalid Values**: Uses defaults for invalid settings
-5. **Permission Errors**: Reports warning and uses defaults
+1. **File Not Found**: Creates the user config from the `src/_config.py` template
+2. **Syntax Errors**: Loads an empty config and fills all fields from the `src/_config.py` template
+3. **Missing Config Class**: Fills all fields from the template
+4. **Invalid Values**: Uses template defaults for invalid settings
+5. **Permission Errors**: Reports warning and falls back to template defaults
 
 ### Fallback Behavior
 
 - **Graceful Degradation**: TFM always starts even with config errors
-- **Built-in Defaults**: Comprehensive default configuration available
+- **Template Defaults**: Missing or invalid fields are filled from the `src/_config.py` template
 - **Error Logging**: Configuration errors are logged to the log pane
 - **User Notification**: Clear messages about configuration issues
 

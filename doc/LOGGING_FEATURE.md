@@ -394,4 +394,4 @@ Messages are color-coded for easy identification:
 
 TFM's logging feature provides comprehensive visibility into application operations, helping you monitor activity, troubleshoot issues, and understand what the application is doing. The color-coded, scrollable log pane makes it easy to track operations and identify problems quickly.
 
-For developer documentation, see `doc/dev/LOGGING_SYSTEM_REFACTOR_GUIDE.md`.
+For developer documentation, see `doc/dev/LOGGING_SYSTEM.md`.

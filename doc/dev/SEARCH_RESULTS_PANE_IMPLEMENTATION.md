@@ -12,6 +12,13 @@ Source: [`tfm.py`](../../tfm.py) (the app-side wiring),
 choke point), [`src/tfm_file_pane.py`](../../src/tfm_file_pane.py) (name-column
 rendering). Tests: [`test/test_search_results_pane.py`](../../test/test_search_results_pane.py).
 
+The dialog that *produces* these hits — the live, search-as-you-type
+filename/content finder, its cancel-on-keystroke background worker, and its result
+caps — is `ProgressiveSearchDialog` in
+[`src/tfm_progressive_search_dialog.py`](../../src/tfm_progressive_search_dialog.py);
+see that module's docstring for the threading model. This document covers only
+what happens *after* a hit is accepted (feeding the result set into the pane).
+
 ---
 
 ## Why a virtual pane (not an in-dialog action surface)
