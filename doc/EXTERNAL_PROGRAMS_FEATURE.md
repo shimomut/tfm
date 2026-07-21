@@ -6,9 +6,12 @@ The External Programs feature allows you to execute custom external programs dir
 
 ## Key Bindings
 
-- **x / X**: Open the external programs dialog
+- **X**: Open the external programs dialog
+- **Shift-X**: Enter sub-shell (command line) mode — a separate feature
 
-Note: The sub-shell feature has been moved to **z / Z** keys to make room for the programs feature.
+The programs menu and the sub-shell are two different tools: **X** runs one of
+your configured `PROGRAMS` and returns to TFM, while **Shift-X** drops you into
+an interactive shell in the current pane's directory.
 
 ## Configuration
 
@@ -81,6 +84,60 @@ You can create custom scripts that work with TFM's environment variables. For ex
 echo "Working in: $TFM_THIS_DIR"
 echo "Selected files: $TFM_THIS_SELECTED"
 ```
+
+## Example integrations
+
+TFM ships with a few ready-made `PROGRAMS` entries that show how to wire a real
+external tool into the menu. Each is a single recipe pointing at a small helper
+script that reads the `TFM_*` environment variables above. The helpers live in
+TFM's bundled tools directory (`src/tools/`) and are located at run time by
+`tfm_tool('name')`, which searches `~/.tfm/tools/` first and then that bundled
+directory. `tfm_python` is the interpreter TFM is running under.
+
+### Beyond Compare
+
+Two entries drive [Beyond Compare](https://www.scootersoftware.com/) — one
+compares the two pane *directories*, the other the two selected *files*:
+
+```python
+PROGRAMS = [
+    {'name': 'Compare Files (BeyondCompare)',
+     'command': [tfm_python, tfm_tool('bcompare_files.py')],
+     'options': {'auto_return': True}},
+    {'name': 'Compare Directories (BeyondCompare)',
+     'command': [tfm_python, tfm_tool('bcompare_dirs.py')],
+     'options': {'auto_return': True}},
+]
+```
+
+- `bcompare_dirs.py` launches Beyond Compare on `TFM_LEFT_DIR` and
+  `TFM_RIGHT_DIR` (the left and right pane directories).
+- `bcompare_files.py` compares the first selected file in each pane, building
+  full paths from `TFM_LEFT_SELECTED` / `TFM_RIGHT_SELECTED` and the pane
+  directories. If nothing is explicitly selected, the file under each cursor is
+  used.
+- `auto_return: True` returns to TFM as soon as Beyond Compare launches, without
+  waiting for you to press Enter.
+
+Requires the `bcompare` command on your `PATH` (install Beyond Compare — e.g.
+`brew install --cask beyond-compare` on macOS).
+
+### Visual Studio Code
+
+One entry opens the current directory (and any selected files) in VS Code:
+
+```python
+{'name': 'Open in VSCode',
+ 'command': [tfm_python, tfm_tool('vscode.py')],
+ 'options': {'auto_return': True}}
+```
+
+`vscode.py` reads `TFM_THIS_DIR` and `TFM_THIS_SELECTED`. If the current
+directory is inside a git repository it walks up to the repository root and
+opens that instead of the subdirectory, then adds any selected regular files
+(directories are skipped; filenames with spaces are handled). Requires the
+`code` command on your `PATH` — in VS Code, run *Shell Command: Install 'code'
+command in PATH* from the command palette.
 
 ## Troubleshooting
 

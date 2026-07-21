@@ -1,21 +1,21 @@
-# Mouse Event Support Feature
+# Mouse & Interaction
 
 ## Overview
 
-TFM supports mouse interaction in both Desktop mode (CoreGraphics backend on macOS) and Terminal mode (curses backend in supported terminals). You can use your mouse to switch between file panes by clicking on them, making navigation faster and more intuitive.
+TFM supports mouse interaction in both Desktop mode (CoreGraphics backend on macOS) and Terminal mode (curses backend in supported terminals). You can click to move the cursor and switch panes, scroll with the wheel, right-click for a context menu, and — in Desktop mode — drag files out to other applications.
 
 ## Availability
 
 ### Desktop Mode (Full Support)
 
 - **Platform**: macOS with CoreGraphics backend
-- **Supported Events**: All mouse events including clicks, double-clicks, movement, and scroll wheel
-- **Launch Command**: `python tfm.py --backend gui` or `python tfm.py --backend gui`
+- **Supported Events**: All mouse events including clicks, movement, scroll wheel, and drag-and-drop
+- **Launch Command**: `python tfm.py --backend gui`
 
 ### Terminal Mode (Limited Support)
 
 - **Platform**: Terminal emulators that support mouse events
-- **Supported Events**: Mouse button clicks only (no movement or scroll wheel)
+- **Supported Events**: Mouse button clicks (movement, scroll, and drag depend on the terminal)
 - **Launch Command**: `python tfm.py` (default terminal mode)
 - **Compatibility**: Works in most modern terminal emulators (iTerm2, Terminal.app, xterm, etc.)
 
@@ -23,48 +23,21 @@ TFM supports mouse interaction in both Desktop mode (CoreGraphics backend on mac
 
 If your terminal doesn't support mouse events, TFM automatically falls back to keyboard-only operation without errors. You can always use the Tab key to switch between panes.
 
-## Features
+## Clicking
 
-### Mouse Wheel Scrolling
+The mouse moves the cursor and controls which pane is active.
 
-You can scroll through file lists using your mouse wheel in both left and right panes.
+### Click to Focus and Select a Row
 
-#### How It Works
+1. **Click a file or directory** → the cursor moves to that row and the pane becomes active
+2. **Click the other pane** → focus switches to it, exactly like pressing Tab
+3. **Visual feedback** → the active pane is highlighted, the inactive pane is dimmed
 
-1. **Scroll up** → Scroll the view up in the file list
-2. **Scroll down** → Scroll the view down in the file list
-3. **Works in any pane** → Scroll the pane where your mouse is positioned
-4. **Smooth scrolling** → Natural 1:1 scroll ratio for precise control
-5. **Boundary protection** → Won't scroll past the top or bottom of the list
+Clicking a row is the mouse equivalent of arrowing the cursor onto it; press Enter (or double-click, in the contexts noted below) to open or navigate. Multi-selection is still done with Space (or `+`/`*` patterns).
 
-#### Availability
+### Right-Click for a Context Menu
 
-- **Desktop Mode**: Full support with smooth scrolling
-- **Terminal Mode**: Support depends on terminal emulator capabilities
-
-#### Usage Tips
-
-- Hover your mouse over the pane you want to scroll
-- Use the scroll wheel to navigate through long file lists
-- The pane under your mouse will scroll, regardless of which pane has focus
-- Combine with clicking to quickly navigate and select files
-
-### Pane Focus Switching
-
-The primary mouse feature is the ability to switch focus between the left and right file panes by clicking on them.
-
-#### How It Works
-
-1. **Click on left pane** → Focus switches to left pane
-2. **Click on right pane** → Focus switches to right pane
-3. **Visual feedback** → Active pane is highlighted, inactive pane is dimmed
-
-#### Visual Indicators
-
-When you click on a pane:
-- **Active pane**: Brighter colors, cursor visible
-- **Inactive pane**: Dimmed colors, no cursor
-- **Immediate response**: Focus changes instantly on click
+Right-clicking a file or directory opens a context menu of common operations for that item.
 
 ### Pane Layout
 
@@ -82,43 +55,96 @@ When you click on a pane:
 └─────────────────────────────────────────────────────────────┘
 ```
 
-Click anywhere within a pane's boundaries to switch focus to that pane.
+Click anywhere within a pane's boundaries to move focus and the cursor there.
 
-## Usage Examples
+## Mouse Wheel Scrolling
 
-### Example 1: Switching Focus with Mouse
+You can scroll through file lists using your mouse wheel or trackpad in both left and right panes.
 
-**Scenario**: You're working in the left pane and want to switch to the right pane
+### How It Works
 
-**Using the mouse**:
-1. Click anywhere in the right pane
-2. Focus immediately switches to the right pane
-3. The right pane becomes highlighted
+1. **Scroll up / down** → moves the viewport up or down through the file list
+2. **Pane under the pointer scrolls** → the pane you hover over scrolls, regardless of which pane has focus
+3. **Cursor stays put** → scrolling moves the view, not the cursor
+4. **Smooth scrolling** → a trackpad or precise wheel scrolls pixel-by-pixel in Desktop mode; a plain wheel moves one row per notch
+5. **Boundary protection** → won't scroll past the top or bottom of the list
 
-**Using the keyboard** (alternative):
-1. Press Tab
-2. Focus switches to the right pane
+### Availability
 
-### Example 2: Quick Navigation Between Panes
+- **Desktop Mode**: Full support with smooth (sub-row) scrolling
+- **Terminal Mode**: Support depends on your terminal emulator's mouse reporting
 
-**Scenario**: You're copying files and need to switch between source and destination panes frequently
+## Double-Click
 
-**Using the mouse**:
-1. Click on left pane to select source files
-2. Press Space to select files
-3. Click on right pane to switch to destination
-4. Press 'c' to copy files
+TFM detects double-clicks (two clicks on the same row within the system threshold, roughly 0.5s on macOS) in the **Directory Diff Viewer**:
 
-This is faster than repeatedly pressing Tab to switch panes.
+- **Double-click a directory** → expands it if collapsed, collapses it if expanded (same as Enter)
+- **Double-click a file** → opens the file diff viewer to compare contents (same as Enter)
+- **Double-click in the inactive side** → focuses that side first, then performs the action
 
-### Example 3: Working with Dialogs
+In the main file panes, a single click already moves the cursor and activates the pane, so opening is done with **Enter** (open file / enter directory / enter archive) and **Backspace** (go to the parent directory).
 
-**Scenario**: A dialog is open (search, help, etc.)
+### Terminal Requirements
 
-**Behavior**:
-- Mouse clicks are handled by the dialog (topmost layer)
-- Clicking outside the dialog doesn't switch pane focus
-- Close the dialog first (Escape key) to interact with panes
+Double-click detection requires a terminal that reports mouse events (most modern terminals do); mouse reporting is enabled by default. Supported terminals include iTerm2, Terminal.app, GNOME Terminal, Konsole, Windows Terminal, and most other modern emulators.
+
+## Drag-and-Drop
+
+In Desktop mode you can drag files out of TFM and drop them onto other applications, Finder, or the Dock, using the native operating-system drag-and-drop system.
+
+### How to Use Drag-and-Drop
+
+1. **Navigate to the files** you want to drag
+2. **Select files** (optional):
+   - `Space` to select individual files
+   - `+` to select files matching a pattern
+   - `*` to select all files
+3. **Click and hold** the mouse button on a file
+4. **Move the mouse** past a short threshold to begin the drag
+5. **Drag over** the target application or location
+6. **Release the mouse button** to drop the files
+
+### What Gets Dragged
+
+- **With a selection**: all selected files are dragged together
+- **Without a selection**: only the file under the cursor is dragged
+- **Multiple files**: you can drag up to 1,000 files at once
+
+### Visual Feedback
+
+During a drag you'll see:
+
+- **Single file**: the filename in the drag image
+- **Multiple files**: a count like "5 files" in the drag image
+- **Cursor changes**: the system cursor indicates valid/invalid drop targets and the operation (copy vs. move)
+
+### Modifiers (macOS)
+
+Drag-and-drop uses native macOS drag modifiers, held while dragging:
+
+- **No modifier** or **Option (⌥)**: copy (shows a `+` cursor)
+- **Command (⌘)**: move (no `+` cursor)
+
+The cursor updates automatically based on the modifier and the drop target.
+
+### Dropping Files Into TFM
+
+You can also drop files from another application onto a TFM pane. Dropping onto a directory row targets that directory; dropping on empty space or past the last row targets the pane's current directory.
+
+### Limitations
+
+- **Terminal mode**: drag-and-drop is not available in terminal mode on any platform — use the copy/move commands instead. On Windows and Linux desktop, drag-out is not yet implemented.
+- **Remote files** (S3, SSH, etc.) cannot be dragged; copy them locally first. Error: "Cannot drag remote files".
+- **Files inside archives** (.zip, .tar, .gz) cannot be dragged; you can drag the archive file itself, or extract first. Error: "Cannot drag files from inside archives".
+- **The parent directory marker** ("..") cannot be dragged; the drag simply doesn't start.
+- **More than 1,000 files** cannot be dragged at once. Error: "Too many files selected (limit: 1000)". Drag in smaller batches.
+- **Missing files**: if a selected file no longer exists, the drag is cancelled ("File no longer exists: [filename]") and the list reloads automatically.
+
+### Troubleshooting Drag-and-Drop
+
+**Drag doesn't start** — ensure you're in Desktop mode, move the mouse past the threshold before releasing, and check the file isn't a remote file, archive content, or the ".." marker.
+
+**Drop doesn't work** — the target application must accept file drops of that type; try holding Option or Command, and confirm you're dropping on a valid target.
 
 ## Keyboard Alternatives
 
@@ -126,8 +152,11 @@ All mouse functionality has keyboard equivalents:
 
 | Mouse Action | Keyboard Alternative |
 |--------------|---------------------|
-| Click left pane | Tab (until left pane is active) |
-| Click right pane | Tab (until right pane is active) |
+| Click a pane / row | Tab to switch panes; arrow keys to move the cursor |
+| Double-click to open | Enter |
+| Double-click header (parent dir) | Backspace |
+| Wheel scroll | Page Up / Page Down, arrow keys |
+| Drag files out | Copy/move commands (`C` / `M`) |
 
 The Tab key cycles between panes, so you can always use it if mouse support is unavailable or if you prefer keyboard navigation.
 
@@ -135,82 +164,33 @@ The Tab key cycles between panes, so you can always use it if mouse support is u
 
 ### CoreGraphics Backend (Desktop Mode)
 
-**Full mouse support** with all event types:
+Full mouse support with all event types:
 
 | Event Type | Supported | Description |
 |------------|-----------|-------------|
 | Button Down | ✓ | Mouse button press |
 | Button Up | ✓ | Mouse button release |
-| Double Click | ✓ | Rapid double press |
+| Click | ✓ | Press and release on the same row |
 | Move | ✓ | Cursor movement |
-| Wheel | ✓ | Scroll wheel events |
-| Drag | ✓ | Movement with button held (future use) |
+| Wheel | ✓ | Scroll wheel / trackpad |
+| Drag | ✓ | Native file drag-and-drop |
 
-**Coordinate precision**:
-- Text grid coordinates (column and row)
-- Sub-cell positioning (fractional position within character cell)
-- Accurate to pixel level
+**Coordinate precision**: text grid coordinates (column and row) plus sub-cell positioning (fractional position within a character cell), accurate to pixel level.
 
 ### Curses Backend (Terminal Mode)
 
-**Limited mouse support** with basic events only:
+Basic mouse support, depending on the terminal:
 
 | Event Type | Supported | Description |
 |------------|-----------|-------------|
 | Button Down | ✓ | Mouse button press |
 | Button Up | ✓ | Mouse button release |
-| Double Click | ✗ | Not supported |
-| Move | ✗ | Not supported |
-| Wheel | ✗ | Not supported |
-| Drag | ✗ | Not supported |
+| Click | ✓ | Button click |
+| Move | terminal-dependent | Reported by some terminals only |
+| Wheel | terminal-dependent | Reported by some terminals only |
+| Drag | ✗ | Not available in terminal mode |
 
-**Coordinate precision**:
-- Text grid coordinates only (column and row)
-- No sub-cell positioning
-- Character-level accuracy
-
-**Terminal compatibility**:
-- Works in most modern terminal emulators
-- Automatically disabled if terminal doesn't support mouse events
-- No error messages if unsupported
-
-## Technical Details
-
-### Event Routing
-
-Mouse events follow the same routing pattern as keyboard events:
-
-1. **Event captured** by backend (CoreGraphics or curses)
-2. **Coordinates transformed** to text grid coordinates
-3. **Event delivered** to topmost UI layer only
-4. **No propagation** to lower layers in the stack
-
-This means:
-- Dialogs receive mouse events when open
-- File panes receive mouse events when no dialog is open
-- Only one component handles each mouse event
-
-### Coordinate System
-
-Mouse events use a text grid coordinate system:
-
-- **Column**: Horizontal position (0-based, 0 = leftmost column)
-- **Row**: Vertical position (0-based, 0 = topmost row)
-- **Sub-cell position** (Desktop mode only): Fractional position within a character cell
-  - sub_cell_x: 0.0 (left edge) to 1.0 (right edge)
-  - sub_cell_y: 0.0 (top edge) to 1.0 (bottom edge)
-
-Example: Clicking at column 10, row 5 with sub-cell position (0.4, 0.8) means:
-- Character cell at column 10, row 5
-- 40% from the left edge of the cell
-- 80% from the top edge of the cell
-
-### Event Timestamps
-
-All mouse events include timestamps for:
-- Event ordering (ensuring events are processed in sequence)
-- Timing analysis (detecting double-clicks, drags, etc.)
-- Future gesture recognition
+**Coordinate precision**: text grid coordinates only (column and row), character-level accuracy. Mouse support is automatically disabled — without error messages — if the terminal doesn't report mouse events.
 
 ## Input Mode Behavior
 
@@ -242,81 +222,22 @@ When TFM is in a text input mode, mouse events are automatically ignored to prev
 - **Immediate Resume**: Mouse events work normally as soon as you exit the input mode
 - **Keyboard Always Works**: Keyboard shortcuts continue to function normally
 
-#### Example Scenarios
-
-**Scenario 1: Renaming a File**
-```
-1. Press 'r' to rename a file → Quick Edit Bar appears
-2. Start typing the new filename
-3. Accidentally move your mouse and click → Nothing happens (click ignored)
-4. Press Enter to confirm → Quick Edit Bar closes
-5. Mouse clicks now work normally again
-```
-
-**Scenario 2: Searching in Text Viewer**
-```
-1. Open a file in the text viewer
-2. Press the `search` key (default `F`) to start i-search → Search bar appears
-3. Type your search term
-4. Accidentally click with mouse → Nothing happens (click ignored)
-5. Press Escape to exit search → I-search mode ends
-6. Mouse wheel scrolling works normally again
-```
-
-#### Why This Matters
-
-This behavior is designed to protect your workflow:
-- **Prevents Mistakes**: Accidental mouse clicks won't disrupt text input
-- **Maintains Focus**: You can type without worrying about mouse position
-- **Seamless Experience**: No need to think about mouse vs. keyboard modes
-- **Consistent Behavior**: All text input modes behave the same way
-
-## Limitations
-
-### Current Limitations
-
-1. **Pane focus switching only**: The initial implementation only supports switching focus between panes
-2. **No drag-and-drop**: Dragging files between panes is not yet supported
-3. **No context menus**: Right-click context menus are not yet implemented
-4. **No file selection**: Clicking on individual files doesn't select them (use keyboard)
-
-### Terminal Mode Limitations
-
-1. **Basic events only**: Only button clicks are supported
-2. **No sub-cell positioning**: Coordinates are character-level only
-3. **Terminal dependent**: Support varies by terminal emulator
-4. **No visual feedback**: No mouse cursor changes or hover effects
-
-### Dialog Behavior
-
-When a dialog is open:
-- Mouse events go to the dialog, not the file panes
-- Clicking outside the dialog doesn't close it or switch pane focus
-- Use Escape key to close dialogs
-
-### Input Mode Behavior
-
-When in text input modes (Quick Edit Bar, Quick Choice Bar, or I-search):
-- All mouse events are ignored
-- Keyboard input continues to work normally
-- Mouse events resume immediately after exiting the input mode
-
 ## Troubleshooting
 
 ### Mouse Not Working in Desktop Mode
 
-**Problem**: Clicking on panes doesn't switch focus in Desktop mode
+**Problem**: Clicking doesn't move the cursor or switch focus in Desktop mode
 
 **Solutions**:
 1. Verify you're running in Desktop mode: `python tfm.py --backend gui`
 2. Check that the window has focus (click on the window first)
 3. Ensure you're clicking within the pane boundaries (not on the border)
 4. Check the log pane for error messages
-5. Try using Tab key to verify pane switching works
+5. Try using the Tab key to verify pane switching works
 
 ### Mouse Not Working in Terminal Mode
 
-**Problem**: Clicking on panes doesn't switch focus in Terminal mode
+**Problem**: Clicking doesn't move the cursor or switch focus in Terminal mode
 
 **Solutions**:
 1. Check if your terminal supports mouse events:
@@ -326,7 +247,7 @@ When in text input modes (Quick Edit Bar, Quick Choice Bar, or I-search):
    - tmux: Requires `set -g mouse on` in `.tmux.conf`
 2. Verify mouse reporting is enabled in your terminal settings
 3. Try a different terminal emulator
-4. Use Tab key as alternative (always works)
+4. Use the Tab key as an alternative (always works)
 
 ### Clicks Not Registering
 
@@ -336,81 +257,27 @@ When in text input modes (Quick Edit Bar, Quick Choice Bar, or I-search):
 1. **Click within pane boundaries**: Don't click on the border between panes
 2. **Close dialogs first**: If a dialog is open, close it with Escape
 3. **Check window focus**: Click on the window to ensure it has focus
-4. **Try different locations**: Click in the center of the pane, not near edges
 
 ### Wrong Pane Gets Focus
 
 **Problem**: Clicking on one pane switches focus to the other pane
 
 **Solutions**:
-1. Check pane boundary position (adjust with [ and ] keys if needed)
+1. Check the pane boundary position (adjust with `[` and `]` keys if needed)
 2. Click further from the center divider
-3. Verify window size hasn't changed unexpectedly
-4. Restart TFM if the problem persists
-
-### Mouse Works But Keyboard Doesn't
-
-**Problem**: Mouse clicks work but keyboard shortcuts don't
-
-**Solutions**:
-1. Ensure the window has keyboard focus (click on it)
-2. Check that you're not in a text input mode
-3. Verify no dialog is open (press Escape to close)
-4. Check for key binding conflicts in your configuration
-
-## Future Enhancements
-
-Planned improvements for mouse support:
-
-### Drag-and-Drop Operations
-
-- **Drag files between panes**: Click and drag files from one pane to another to copy/move
-- **Visual feedback**: Show drag cursor and drop target highlighting
-- **Modifier keys**: Hold Shift to move, Cmd/Ctrl to copy
-
-### File Selection
-
-- **Click to select**: Click on a file to select it
-- **Shift-click for range**: Select a range of files
-- **Cmd/Ctrl-click for multi-select**: Add/remove files from selection
-
-### Context Menus
-
-- **Right-click menus**: Context-sensitive menus for files and folders
-- **Common operations**: Copy, move, delete, rename, properties
-- **Quick access**: Faster than navigating through main menu
-
-### Scroll Wheel Support
-
-- **Scroll file lists**: Use mouse wheel to scroll through long file lists
-- **Smooth scrolling**: Pixel-perfect scrolling in Desktop mode
-- **Horizontal scrolling**: Shift+wheel for horizontal scrolling
-
-### Enhanced Visual Feedback
-
-- **Hover effects**: Highlight files as you hover over them
-- **Cursor changes**: Different cursors for different actions (arrow, hand, etc.)
-- **Tooltips**: Show file information on hover
-
-### Double-Click Actions
-
-- **Open files**: Double-click to open files or navigate into folders
-- **Configurable**: Set preferred action for double-click
-- **Quick access**: Faster than pressing Enter
+3. Verify the window size hasn't changed unexpectedly
 
 ## Related Features
 
 - **Dual-Pane Interface**: Two file panes for efficient file management
 - **Keyboard Navigation**: Complete keyboard control for all operations
-- **Desktop Mode**: Native desktop application mode with full mouse support
-- **Terminal Mode**: Terminal-based interface with limited mouse support
+- **File Associations**: Configure which programs open which file types
+- **Directory Diff Viewer**: Compare directory contents (double-click supported)
 
 ## See Also
 
 - [Dual-Pane Feature](DUAL_PANE_FEATURE.md) - Overview of dual-pane interface
 - [Desktop Mode Guide](DESKTOP_MODE_GUIDE.md) - Complete desktop mode documentation
-- [Keyboard Shortcuts](../README.md#keyboard-shortcuts) - All available keyboard shortcuts
-
-## Feedback
-
-If you encounter issues with mouse support or have suggestions for improvements, please report them through the project's issue tracker. Mouse support is a new feature and we're actively working on enhancements based on user feedback.
+- [Diff Viewer Feature](DIFF_VIEWER_FEATURE.md) - File and directory comparison tool
+- [Archive Feature](ARCHIVE_FEATURE.md) - Working inside archives
+- [S3 Support Feature](S3_SUPPORT_FEATURE.md) - Remote file storage

@@ -31,6 +31,38 @@ vim ~/.tfm/config.py        # or: nano / code / your editor of choice
 
 Changes take effect the next time you start TFM.
 
+## Editing and Reloading Config
+
+You can also edit and apply your config without leaving TFM. Both actions live
+under the **Tools** menu (neither is bound to a key by default):
+
+- **Edit Configuration…** opens `~/.tfm/config.py` in your configured
+  `TEXT_EDITOR`, creating it from the template first if needed. With a terminal
+  editor (e.g. `vim`) TFM reloads automatically when you save and quit; with a
+  GUI editor (e.g. VS Code) TFM can't tell when you're done, so save and then run
+  **Reload Configuration**.
+- **Reload Configuration** re-reads `~/.tfm/config.py` from disk and applies it
+  without opening an editor — handy when you edit the file in a separate window.
+
+To bind either action, add it to `KEY_BINDINGS`:
+
+```python
+KEY_BINDINGS = {
+    'edit_config':   ['Y'],
+    'reload_config': ['Ctrl-R'],
+}
+```
+
+Reloading applies **live** to key bindings, file associations, external programs,
+favorite directories, confirmation prompts, and the text-editor / diff-tool
+settings. Themes and post-effects, fonts (desktop mode), the pane-split and
+log-height ratios, and file-monitoring intervals are read once at startup and
+only fully apply on the **next launch**. TFM logs a reminder after each reload.
+
+If your edited config has a Python error, TFM logs it and falls back to built-in
+defaults rather than crashing; out-of-range values are still applied but logged
+as a `Config warning:`.
+
 ## Appearance
 
 ### Fonts (GUI / desktop mode only)
@@ -79,7 +111,13 @@ MAX_EXTENSION_LENGTH    = 5      # longer extensions stay with the filename
 ```
 
 Adjust the pane split at runtime with `[` / `]`, and the log-pane height with
-`{` / `}`. See [Date Format](DATE_FORMAT_FEATURE.md).
+`{` / `}`.
+
+`DATE_FORMAT` chooses how modification times are shown in the file panes:
+`'short'` gives `YY-MM-DD HH:mm` (compact, no seconds) and `'full'` gives
+`YYYY-MM-DD HH:mm:ss` (four-digit year plus seconds). Both use ISO-8601 ordering,
+and the date column widens automatically for the longer form. You can also cycle
+the format live from the **View Options** menu (`z`) without editing the config.
 
 ## Sorting
 
@@ -89,6 +127,12 @@ DEFAULT_SORT_REVERSE = False
 ```
 
 Change sorting at runtime via the sort menu (`s`) or the quick-sort keys.
+
+Name sorting is **natural** (alphanumeric): embedded numbers are compared as
+numbers, so `file2` sorts before `file10`, and leading zeros (`Report001`,
+`Report010`) order as expected. It is case-insensitive, always applies to the
+`'name'` sort mode, and can't be turned off; the `'size'` and `'date'` modes are
+unaffected. Directories are always listed before files regardless of sort mode.
 
 ## Confirmations
 
@@ -113,9 +157,12 @@ KEY_BINDINGS = {
 ```
 
 Each action maps to a list of keys. Keys can be single characters (`'a'`, `'Q'`)
-or special names (`'HOME'`, `'END'`, `'F1'`…`'F12'`, `'UP'`, `'DELETE'`, …). Note
-that letter keys are case-sensitive — most default file-operation bindings use the
-uppercase letter (e.g. `'Q'`, `'C'`, `'M'`, `'K'`, `'R'`).
+or special names (`'HOME'`, `'END'`, `'F1'`…`'F12'`, `'UP'`, `'DELETE'`, …). Letter
+keys are **case-insensitive**: a bare `'q'` and a bare `'Q'` bind the *same*
+physical key (the default template simply happens to spell them uppercase, e.g.
+`'Q'`, `'C'`, `'M'`, `'K'`). To bind the shifted/uppercase variant on its own, use
+`Shift-<letter>` (e.g. `'Shift-F'`). Non-alphabet characters such as `'?'` and
+`'/'` stay case-sensitive.
 
 Some actions use the extended, selection-aware form:
 
@@ -127,8 +174,8 @@ KEY_BINDINGS = {
 ```
 
 Selection modes: `'any'` (default), `'required'` (only with a selection), `'none'`
-(only without one). See [Key Bindings](KEY_BINDINGS_SELECTION_FEATURE.md) for the
-full action list.
+(only without one). See [Key Bindings](KEY_BINDINGS_FEATURE.md) for the full
+action list.
 
 ## Favorite Directories
 
@@ -140,7 +187,7 @@ FAVORITE_DIRECTORIES = [
 ]
 ```
 
-Access favorites with the `j` key. See [Favorite Directories](FAVORITE_DIRECTORIES_FEATURE.md).
+Access favorites with the `J` key. See [Navigation Dialogs](NAVIGATION_DIALOGS_FEATURE.md).
 
 ## History and Logging
 
@@ -278,11 +325,10 @@ available setting.
 ## Related Documentation
 
 - [Color Schemes](COLOR_SCHEMES_FEATURE.md) - Themes and colors
-- [Date Format](DATE_FORMAT_FEATURE.md) - Date display options
 - [Logging](LOGGING_FEATURE.md) - Logging configuration
 - [External Programs](EXTERNAL_PROGRAMS_FEATURE.md) - External program integration
 - [File Associations](FILE_ASSOCIATIONS_FEATURE.md) - File type associations
 - [File Monitoring](FILE_MONITORING_FEATURE.md) - Automatic directory reloading
-- [Key Bindings](KEY_BINDINGS_SELECTION_FEATURE.md) - Key binding configuration
+- [Key Bindings](KEY_BINDINGS_FEATURE.md) - Key binding configuration
 - [Desktop Mode](DESKTOP_MODE_GUIDE.md) - Desktop mode (macOS)
 - [TFM User Guide](TFM_USER_GUIDE.md) - Complete user guide

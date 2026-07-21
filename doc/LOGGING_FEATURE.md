@@ -144,96 +144,50 @@ Set log level in configuration:
 LOG_LEVEL = "INFO"  # or "WARNING", "DEBUG", "ERROR"
 ```
 
-## File Logging
+## Copy Log to Clipboard
 
-### Overview
+When running TFM in **desktop mode**, you can copy the log pane contents to the system clipboard — handy for sharing log information with others or saving it for later reference. This feature is not available in terminal mode.
 
-TFM can write all log messages to a file for persistent storage and later analysis. This is useful for:
+### Accessing the Feature
 
-- Debugging issues that occur over time
-- Keeping a permanent record of operations
-- Analyzing patterns in errors or warnings
-- Sharing logs with others for troubleshooting
+The log clipboard copy commands live in the **Edit** menu:
 
-### Enabling File Logging
+1. Open TFM in desktop mode.
+2. Click the **Edit** menu in the menu bar.
+3. Choose one of the clipboard copy options:
+   - **Copy Visible Logs to Clipboard** — copies only the log lines currently visible in the log pane.
+   - **Copy All Logs to Clipboard** — copies all log messages, including those scrolled out of view.
 
-Start TFM with the `--log-file` option:
+### Copy Visible Logs
 
-```bash
-# Write logs to a specific file
-tfm --log-file /tmp/tfm.log
+Copies only the log lines currently visible in the log pane. The copied content reflects your current scroll position, the number of lines that fit in the visible area, and the exact formatting shown on screen.
 
-# Write logs to a file in your home directory
-tfm --log-file ~/tfm-$(date +%Y%m%d).log
+Use this when you want to share a specific section of the logs, you've scrolled to a particular area of interest, or you only need recent messages.
+
+### Copy All Logs
+
+Copies all log messages from the current session — everything from startup, messages that have scrolled out of view, and the complete log history (up to the configured maximum).
+
+Use this when you need the full log history, you're troubleshooting an issue and need complete context, or you want to save all logs for later analysis.
+
+### Copied Format
+
+Copied logs preserve the same format shown in the log pane — timestamp (HH:MM:SS), logger name, log level, and message content:
+
+```
+14:23:45 [Main  ] INFO: Application started
+14:23:46 [FileOp] INFO: Loaded directory: /home/user/documents
+14:23:47 [Main  ] WARNING: Configuration file not found, using defaults
 ```
 
-### Log File Format
+### Tips for Copying
 
-The log file contains the same formatted messages shown in the log pane:
+- **Scroll position matters**: When using "Copy Visible Logs", scroll to the section you want first.
+- **Log pane size**: The visible-logs option copies based on the current log pane height — adjust the log divider if needed.
+- **Maximum logs**: TFM stores a limited number of log messages (default: 1000); very old messages may be discarded.
+- **Paste anywhere**: Paste the logs into any text editor, email, or document.
 
-```
-14:23:45 [Main] INFO: TFM started
-14:23:46 [FileOp] INFO: Copying file.txt to backup/
-14:23:47 [FileOp] INFO: Copy completed successfully
-14:23:48 [STDOUT] Processing complete
-```
-
-### What Gets Logged
-
-File logging captures:
-
-- **Logger Messages**: All messages from TFM components (INFO, WARNING, ERROR)
-- **stdout Output**: Output from print() statements and external programs
-- **stderr Output**: Error output from external programs
-
-### Log File Behavior
-
-- **Append Mode**: Logs are appended to existing files (not overwritten)
-- **Automatic Flushing**: Messages are written immediately for reliability
-- **Error Handling**: File write errors are logged to stderr but don't crash TFM
-- **Cleanup**: Log file is automatically closed when TFM exits
-
-### Common Use Cases
-
-#### Daily Log Files
-
-Create a new log file each day:
-
-```bash
-tfm --log-file ~/logs/tfm-$(date +%Y-%m-%d).log
-```
-
-#### Session-Specific Logs
-
-Create a unique log file for each session:
-
-```bash
-tfm --log-file /tmp/tfm-session-$(date +%s).log
-```
-
-#### Debugging Issues
-
-Enable file logging when troubleshooting:
-
-```bash
-tfm --log-file /tmp/tfm-debug.log
-```
-
-Then review the log file after reproducing the issue:
-
-```bash
-cat /tmp/tfm-debug.log | grep ERROR
-```
-
-#### Monitoring Long Operations
-
-Log file operations for later review:
-
-```bash
-tfm --log-file ~/tfm-backup.log
-# Perform backup operations
-# Review log later: less ~/tfm-backup.log
-```
+There are currently no keyboard shortcuts for these commands; use the Edit menu.
 
 ## Tips and Tricks
 
@@ -291,16 +245,6 @@ tfm --log-file ~/tfm-backup.log
 - Increase `MAX_LOG_MESSAGES` in config (default: 1000)
 - Set higher log level (WARNING or ERROR)
 - Clear old messages by restarting TFM
-
-### File Logging Not Working
-
-**Problem:** Log file is not created or empty.
-
-**Solution:**
-- Verify `--log-file` option was used with valid path
-- Check directory exists and is writable
-- Check disk space is available
-- Review stderr for file write errors
 
 ## Benefits
 

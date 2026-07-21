@@ -21,41 +21,31 @@ Your cursor position and selection are preserved during automatic updates, so yo
 
 ### Enabling or Disabling Monitoring
 
-Automatic file monitoring is enabled by default. To change this setting, edit your TFM configuration file:
+Automatic file monitoring is enabled by default. To change this setting, edit your TFM configuration file (`~/.tfm/config.py`) and set the constant on the `Config` class:
 
-```json
-{
-  "file_monitoring": {
-    "enabled": true
-  }
-}
+```python
+FILE_MONITORING_ENABLED = True
 ```
 
-Set `enabled` to `false` to disable automatic monitoring. When disabled, TFM only updates the file list after you perform actions like navigating directories or manually refreshing.
+Set `FILE_MONITORING_ENABLED` to `False` to disable automatic monitoring. When disabled, TFM only updates the file list after you perform actions like navigating directories or manually refreshing.
 
 ### Advanced Configuration Options
 
-Most users won't need to adjust these settings, but they're available for fine-tuning:
+Most users won't need to adjust these settings, but they're available in `~/.tfm/config.py` for fine-tuning:
 
-```json
-{
-  "file_monitoring": {
-    "enabled": true,
-    "coalesce_delay_ms": 200,
-    "max_reloads_per_second": 5,
-    "suppress_after_action_ms": 1000,
-    "fallback_poll_interval_s": 5
-  }
-}
+```python
+FILE_MONITORING_ENABLED = True                # Enable/disable automatic reloading
+FILE_MONITORING_COALESCE_DELAY_MS = 200       # Event coalescing window (milliseconds)
+FILE_MONITORING_MAX_RELOADS_PER_SECOND = 5    # Maximum reloads per second (rate limiting)
+FILE_MONITORING_FALLBACK_POLL_INTERVAL_S = 5  # Polling interval for fallback mode (seconds)
 ```
 
 **Configuration Options:**
 
-- `enabled` (default: `true`) - Enable or disable automatic monitoring
-- `coalesce_delay_ms` (default: `200`) - Time window in milliseconds to batch multiple changes into a single update
-- `max_reloads_per_second` (default: `5`) - Maximum number of automatic updates per second to prevent UI thrashing
-- `suppress_after_action_ms` (default: `1000`) - Time in milliseconds to suppress automatic updates after you perform an action (prevents redundant reloads)
-- `fallback_poll_interval_s` (default: `5`) - Polling interval in seconds when native monitoring is unavailable
+- `FILE_MONITORING_ENABLED` (default: `True`) - Enable or disable automatic monitoring
+- `FILE_MONITORING_COALESCE_DELAY_MS` (default: `200`) - Time window in milliseconds to batch multiple changes into a single update
+- `FILE_MONITORING_MAX_RELOADS_PER_SECOND` (default: `5`) - Maximum number of automatic updates per second to prevent UI thrashing
+- `FILE_MONITORING_FALLBACK_POLL_INTERVAL_S` (default: `5`) - Polling interval in seconds when native monitoring is unavailable
 
 ## Runtime Toggle
 
@@ -131,7 +121,7 @@ During automatic updates, TFM preserves your context:
 ### File List Not Updating Automatically
 
 **Check if monitoring is enabled:**
-1. Verify `file_monitoring.enabled` is `true` in your configuration
+1. Verify `FILE_MONITORING_ENABLED` is `True` in your configuration
 2. Try toggling monitoring off and on at runtime
 3. Restart TFM to reload configuration
 
@@ -157,7 +147,7 @@ If monitoring doesn't work at all on a network drive:
 1. Check that you have read permissions for the directory
 2. Verify the network connection is stable
 3. Check TFM logs for error messages
-4. Consider increasing `fallback_poll_interval_s` if the network is slow
+4. Consider increasing `FILE_MONITORING_FALLBACK_POLL_INTERVAL_S` if the network is slow
 
 ### Too Many Updates / UI Feels Sluggish
 
@@ -167,8 +157,8 @@ If you're working in a directory with very frequent changes (e.g., a build outpu
 - Sluggish interface
 
 **Solutions:**
-1. Reduce `max_reloads_per_second` to limit update frequency
-2. Increase `coalesce_delay_ms` to batch more changes together
+1. Reduce `FILE_MONITORING_MAX_RELOADS_PER_SECOND` to limit update frequency
+2. Increase `FILE_MONITORING_COALESCE_DELAY_MS` to batch more changes together
 3. Temporarily disable monitoring in high-activity directories
 4. Navigate to a parent directory where changes are less frequent
 
@@ -215,7 +205,7 @@ Automatic file monitoring is designed to be lightweight:
 
 For remote filesystems in fallback mode:
 - Polling generates periodic network requests
-- Adjust `fallback_poll_interval_s` to balance responsiveness vs. network usage
+- Adjust `FILE_MONITORING_FALLBACK_POLL_INTERVAL_S` to balance responsiveness vs. network usage
 - Consider disabling monitoring for very slow or metered connections
 
 ## When to Disable Monitoring

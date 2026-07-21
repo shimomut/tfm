@@ -417,11 +417,94 @@ Local files only; remote and in-archive paths are skipped.
 
 If a file has no configured association:
 
-1. **Enter key**: Falls back to text viewer for text files, otherwise shows file info
-2. **V key**: Checks if file is a text file first
-   - If text file: Opens in built-in text viewer
-   - If not text file: Shows "No viewer configured" error
-3. **E key**: Falls back to TEXT_EDITOR config setting
+1. **Enter key**: Falls back to the built-in viewer for text files; for a file
+   TFM has no built-in way to render (an image, say) it logs a warning naming
+   the key that opens the file externally, rather than showing garbage
+2. **V key**: Opens the built-in text viewer, which reads the bytes — text is
+   shown with syntax highlighting, a binary shows a placeholder
+3. **E key**: Falls back to the `TEXT_EDITOR` config setting
+
+### How TFM decides a file is text
+
+**TFM detects text by reading the bytes, not by looking at the extension.**
+There is deliberately no list of "text extensions" anywhere in TFM: such a list
+is wrong for files with no extension (`Makefile`, `README`), an unknown one, or
+a misleading one — and inspecting the content gets all three right for free.
+
+The built-in viewer decides like this:
+
+1. **Try to decode** the file as `utf-8`, then `latin-1`, then `cp1252`
+2. **If none decode**, read the raw bytes and look for a NUL byte in the first
+   1024 — a NUL means binary, and `[Binary file — cannot display as text]` is
+   shown
+3. **Otherwise** fall back to `latin-1` with replacement characters
+
+The rule of thumb across TFM is **detect capability from the bytes; configure
+preference by extension.** Extensions decide *which application you prefer* —
+never whether a file is readable as text.
+
+### View action: command, None, or no rule
+
+For the **view** action there are three cases, and two of them land in the same
+place:
+
+| `view` value | Effect |
+|---|---|
+| a command, e.g. `['less']` | Launch that external viewer |
+| `None` | Use the built-in viewer (text shown, binary → placeholder) |
+| *(no rule matches)* | Same as `None` — the built-in viewer, via fallback |
+
+So for `view`, `None` and "no rule at all" are equivalent. The distinction only
+matters for **open** and **edit**, where `None` means "this action is
+unavailable for this file type" and stops the fallback. Set `'view': None`
+explicitly only when you want to *guarantee* the built-in viewer even though a
+later, more general entry might otherwise supply a command.
+
+### Action fallback at a glance
+
+| Action | With association | No association — text | No association — binary |
+|---|---|---|---|
+| **Enter** | Built-in handler or configured open | Built-in viewer | Warns to use the open-externally key |
+| **V (View)** | Configured viewer (or built-in if `None`) | Built-in viewer | Built-in viewer shows placeholder |
+| **E (Edit)** | Configured editor | `TEXT_EDITOR` config | `TEXT_EDITOR` config |
+
+## Open Externally and Reveal in File Manager
+
+Beyond the configurable actions above, TFM has two fixed gestures that hand a
+file to the operating system.
+
+### Open externally — the OS default app
+
+**Key**: `Cmd-Enter` (macOS) / `Ctrl-Enter` (Linux/Windows) — the same key as
+the **open** action.
+
+This is the deliberate-open tier described under
+[Cmd/Ctrl-Enter](#cmdctrl-enter---open-externally): TFM first looks for an
+`open` command in your associations, and if there is none (and it is not
+explicitly `None`) it falls back to the OS default application — `open` on
+macOS, `xdg-open` on Linux, `start` on Windows. Selected files are opened; if
+nothing is selected, the focused file is used. This handoff is *not*
+configurable per file the way the `open` command is — it is whatever the OS
+has registered for that type.
+
+### Reveal in File Manager
+
+**Key**: `Alt-Enter` (macOS/Linux) / `Ctrl-Shift-E` (Windows).
+
+Opens the OS file manager with the item selected:
+
+- **macOS**: Finder, via `open -R`
+- **Windows**: Explorer, via `explorer`
+- **Linux**: the default file manager (nautilus, nemo, dolphin, …)
+
+This action always uses the **focused** item, not the selection. When a
+directory is focused it is revealed *in its parent* (shown as a selected item),
+not opened to show its contents — useful for jumping out to the OS to
+drag-and-drop or reach a native context menu.
+
+To run one of your own configured tools instead of the OS default, open the
+external programs menu with **X** (see
+[External Programs](EXTERNAL_PROGRAMS_FEATURE.md)).
 
 ## Examples
 

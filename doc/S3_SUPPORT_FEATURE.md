@@ -420,7 +420,7 @@ tfm s3://my-bucket/downloads/
 
 - [Configuration](CONFIGURATION_FEATURE.md) - S3 configuration options
 - [File Operations](TFM_USER_GUIDE.md) - General file operations
-- [Copy Progress](COPY_PROGRESS_FEATURE.md) - Progress tracking for S3 transfers
+- [File Operations](FILE_OPERATIONS_FEATURE.md) - Copy/move progress tracking for S3 transfers
 - [External Programs](EXTERNAL_PROGRAMS_FEATURE.md) - Using external tools with S3 files
 
 ## Conclusion

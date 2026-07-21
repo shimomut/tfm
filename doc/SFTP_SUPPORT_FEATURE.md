@@ -439,7 +439,7 @@ tar czf archive.tar.gz $TFM_THIS_DIR/*
 - **[User Guide](TFM_USER_GUIDE.md)** - Complete TFM documentation
 - **[Configuration](CONFIGURATION_FEATURE.md)** - Configuration options
 - **[AWS S3 Support](S3_SUPPORT_FEATURE.md)** - Cloud storage integration
-- **[Archive Browsing](ARCHIVE_VIRTUAL_DIRECTORY_FEATURE.md)** - Archive support
+- **[Archive Browsing](ARCHIVE_FEATURE.md)** - Archive support
 
 ## Technical Details
 

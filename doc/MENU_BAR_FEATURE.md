@@ -152,6 +152,6 @@ customized them.
 
 ## Related Features
 
-- [Key Bindings](KEY_BINDINGS_SELECTION_FEATURE.md) — the keymap the menu mirrors
+- [Key Bindings](KEY_BINDINGS_FEATURE.md) — the keymap the menu mirrors
 - [Configuration](CONFIGURATION_FEATURE.md) — customizing key bindings
 - [Menu System](dev/MENU_SYSTEM.md) — developer documentation for the menu system

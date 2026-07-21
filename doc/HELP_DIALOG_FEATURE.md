@@ -1,198 +1,51 @@
-# Help Dialog Feature (? Key)
+# Help Dialog (? Key)
 
-TFM now includes a comprehensive help dialog that shows all key bindings and usage information using the **?** key.
+TFM includes a scrollable help dialog listing every key binding and usage tip.
+Press **?** from anywhere in TFM to open it — no special mode or prerequisite.
 
 ## Usage
 
-### Basic Operation
+- **?** — open the help dialog
+- **↑/↓** — scroll line by line
+- **Page Up/Down** — scroll by page
+- **Home/End** — jump to top/bottom
+- **Escape** or **q** — close
 
-- **? Key**: Show help dialog with all key bindings
-- **ESC** or **q**: Close help dialog
-- **↑/↓**: Scroll through help content
-- **Page Up/Down**: Scroll by page
-- **Home/End**: Jump to top/bottom of help
+## Content
 
-### Help Dialog Content
+The help is generated from your current key bindings, so it always reflects your
+configuration (including any customizations). It is organized into sections:
 
-The help dialog is organized into clear sections:
-
-#### Navigation
-- Arrow keys for navigation
-- Pane switching and directory navigation
-- File selection and movement
-
-#### File Operations
-- File selection (Space)
-- Bulk operations (A for all files, Shift-A for all items)
-- File operations (C copy, M move, K delete, R rename)
-- Text viewing and editing (V view, E edit)
-- File details (I)
-
-#### Search & Sorting
-- Search (F incremental, Shift-F filename, Shift-G content)
-- Sort options and quick sort keys (S, 1-4)
-
-#### View Options
-- Hidden files toggle (.)
-- Pane synchronization (O, Shift-O)
-- Layout adjustments
-
-#### Log Pane Controls
-- Log pane resizing (bracket keys)
-- Log scrolling (Shift+Up/Down)
-
-#### General Controls
-- Help access (?)
-- Quit application (Q)
-- Cancel operations (ESC)
-
-#### Configuration
-- Information about configuration files
-- Tips for customization
-
-#### Tips Section
-- Best practices for using TFM
-- Feature highlights and usage tips
-
-## Key Features
-
-### 1. Comprehensive Coverage
-- All key bindings documented in one place
-- Organized by functional categories
-- Clear, concise descriptions
-
-### 2. Scrollable Interface
-- Full scrolling support for long content
-- Page-based navigation for quick movement
-- Home/End keys for instant navigation
-
-### 3. Consistent with Other Dialogs
-- Uses the same info dialog system as file details
-- Familiar navigation controls
-- Consistent visual styling
-
-### 4. Always Accessible
-- Available from any screen in TFM
-- Accessible via ? key
-- No prerequisites or special modes required
-
-## Implementation Details
-
-### Dialog System Integration
-- Uses existing `show_info_dialog()` infrastructure
-- Leverages `handle_info_dialog_input()` for navigation
-- Consistent with file details and other info dialogs
-
-### Content Generation
-- Dynamic help content generation
-- Includes current version and GitHub information
-- Organized sections for easy reference
-
-### Key Binding Integration
-- Integrated with existing key binding system
-- Respects user configuration for help keys
-- Works with both '?' and 'h' keys by default
+- **Navigation** — arrow keys, pane switching, directory navigation
+- **File Operations** — selection (Space), bulk selection (A, Shift-A), copy
+  (C), move (M), delete (K), rename (R), view (V), edit (E), details (I)
+- **Search & Sorting** — search (F incremental, Shift-F filename, Shift-G
+  content) and sort options (S, 1–4)
+- **View Options** — hidden files (.), pane sync (O, Shift-O), layout
+- **Log Pane** — resize (bracket keys) and scroll (Shift+Up/Down)
+- **General** — help (?), quit (Q), cancel (ESC)
+- **Configuration** — where config lives and tips for customizing it
 
 ## Configuration
 
-### Key Bindings
-The help dialog can be accessed via keys configured in `KEY_BINDINGS`:
+Help is bound to **?** by default. Rebind the `help` action in `KEY_BINDINGS`
+to use a different key:
 
 ```python
 KEY_BINDINGS = {
-    'help': ['?'],  # ? key shows help
+    'help': ['?'],  # ? shows help
     # ... other bindings
 }
 ```
 
-### Customization
-Users can customize which keys trigger the help dialog by modifying the `help` key binding in their configuration file.
+## About dialog
 
-## Examples
+Separate from the help dialog, the **About** dialog shows TFM's logo, version
+number, and GitHub repository URL over an animated Matrix-style background
+(falling full-width green katakana). Open it from the menu bar in desktop mode:
 
-### Quick Help Access
-```
-1. Press '?' from anywhere in TFM
-2. Help dialog opens with full key reference
-3. Scroll through sections using arrow keys
-4. Press 'q' or ESC to close and return
-```
+- **macOS**: TFM → About TFM
+- **Other platforms**: Help → About TFM
 
-### Finding Specific Information
-```
-1. Open help dialog with '?'
-2. Use Page Down to quickly navigate sections
-3. Find the relevant section (e.g., "FILE OPERATIONS")
-4. Review the key bindings for that category
-5. Close help and use the learned keys
-```
-
-## Benefits
-
-### 1. Self-Documenting Interface
-- No need to remember all key bindings
-- Quick reference always available
-- Reduces learning curve for new users
-
-### 2. Comprehensive Reference
-- All functionality documented in one place
-- Organized by logical categories
-- Includes tips and best practices
-
-### 3. Consistent User Experience
-- Familiar dialog interface
-- Standard navigation controls
-- Integrated with existing TFM patterns
-
-### 4. Accessibility
-- Always available regardless of current state
-- Multiple access keys for convenience
-- Clear, readable formatting
-
-## Technical Implementation
-
-### Help Content Structure
-The help dialog content is generated dynamically and includes:
-
-- Version and project information
-- Categorized key bindings
-- Usage tips and best practices
-- Configuration guidance
-
-### Dialog Integration
-- Uses existing info dialog infrastructure
-- Supports full scrolling and navigation
-- Consistent visual styling with other dialogs
-
-### Key Binding System
-- Integrated with TFM's configurable key binding system
-- Supports multiple keys for the same action
-- Respects user customizations
-
-## Future Enhancements
-
-Potential improvements for the help system:
-
-1. **Context-Sensitive Help**: Show relevant help based on current mode
-2. **Interactive Tutorials**: Step-by-step guides for complex operations
-3. **Search Within Help**: Find specific key bindings quickly
-4. **Customizable Help Content**: Allow users to add their own help sections
-
-## Troubleshooting
-
-### Help Dialog Not Opening
-- Verify key bindings in configuration
-- Check that '?' or 'h' keys are properly configured
-- Ensure no conflicting key bindings
-
-### Content Not Displaying
-- Check terminal size (help requires minimum dimensions)
-- Verify all constants are properly imported
-- Check for any error messages in log pane
-
-### Navigation Issues
-- Use standard dialog navigation (↑↓, Page Up/Down)
-- ESC or 'q' to close dialog
-- Home/End for quick navigation to top/bottom
-
-The help dialog feature makes TFM more user-friendly by providing comprehensive, always-accessible documentation of all available functionality.
+Close it by pressing any key, clicking, or pressing ESC. The animation runs
+while the dialog is open and adapts to window resizing.

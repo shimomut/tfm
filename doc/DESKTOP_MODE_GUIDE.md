@@ -54,7 +54,7 @@ When you launch TFM in desktop mode:
 
 ### Performance Benefits
 
-- **High-Quality Rendering**: Smooth rendering using CoreGraphics
+- **High-Quality Rendering**: Smooth GPU-accelerated rendering
 - **Better Responsiveness**: Immediate input handling
 - **Smooth Scrolling**: No tearing or lag when navigating large directories
 - **Lower CPU Usage**: GPU handles rendering, freeing up CPU
@@ -64,8 +64,8 @@ When you launch TFM in desktop mode:
 - **True RGB Colors**: Accurate color reproduction
 - **Better Fonts**: Crisp font rendering with anti-aliasing
 - **Customizable Fonts**: Choose your preferred monospace font
-- **Dynamic Font Size**: Change font size on-the-fly with Cmd-Plus/Cmd-Minus
-- **Adjustable Size**: Change font size for better readability
+- **Screen Effects & Animated Backgrounds**: Themes can add CRT-style effects and
+  moving backdrops (see [Color Schemes](COLOR_SCHEMES_FEATURE.md))
 
 
 ## Configuration
@@ -149,14 +149,11 @@ All keyboard shortcuts work identically in desktop mode:
 - **File Operations**: C (copy), M (move), K (delete), R (rename)
 - **Selection**: Space, A (all files), Shift-A (all items)
 - **Search**: F (incremental), Shift-F (filename), Shift-G (content)
+- **Theme**: T (cycle color schemes)
 - **Help**: ? (help dialog)
 - **Quit**: Q
 
-**Desktop Mode Exclusive**:
-- **Cmd-Plus** or **Cmd-=**: Increase font size
-- **Cmd-Minus**: Decrease font size
-
-See the [User Guide](TFM_USER_GUIDE.md) for complete keyboard reference and [Font Size Adjustment](FONT_SIZE_ADJUSTMENT_FEATURE.md) for details on dynamic font sizing.
+See the [User Guide](TFM_USER_GUIDE.md) for the complete keyboard reference.
 
 ### Window Management
 
@@ -278,7 +275,7 @@ See the [User Guide](TFM_USER_GUIDE.md) for complete keyboard reference and [Fon
 
 **Solutions**:
 1. Adjust color scheme in configuration
-2. Try different color schemes with `Z` key
+2. Cycle through themes with the `T` key
 3. Colors should be more accurate in desktop mode, not worse
 
 ### Text Rendering Issues
@@ -306,7 +303,7 @@ See the [User Guide](TFM_USER_GUIDE.md) for complete keyboard reference and [Fon
 |---------|--------------|--------------|
 | **Platform** | All (macOS, Linux, Windows) | macOS only |
 | **Dependencies** | Python + curses | Python + PyObjC |
-| **Window** | Terminal window | Native macOS window |
+| **Window** | Terminal window | Native desktop window |
 | **Rendering** | Terminal-based | GPU-accelerated |
 | **Performance** | Good | Excellent (60 FPS) |
 | **Colors** | Terminal palette | True RGB |

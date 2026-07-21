@@ -4,7 +4,7 @@ How TFM's modal entrance, reduced-motion switch, and per-theme pane focus chrome
 are put together, and — more usefully — *why* they are split between TFM and
 PuiKit the way they are.
 
-User-facing behavior: `doc/MOTION_FEATURE.md`.
+User-facing behavior: `doc/COLOR_SCHEMES_FEATURE.md` (Motion & text effects section).
 
 ---
 

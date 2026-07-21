@@ -250,7 +250,7 @@ MarkdownViews build without the flag and stay inert.
 
 Tests: `test/test_viewer_selection.py` (raw-mode drag / multi-line / select-all /
 press-outside-clears, and rich-mode mouse + copy forwarding). User-facing
-behavior: `doc/TEXT_SELECTION_FEATURE.md`.
+behavior: `doc/TEXT_VIEWER_FEATURE.md`.
 
 ## Installation & Dependencies
 

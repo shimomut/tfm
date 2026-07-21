@@ -35,7 +35,6 @@ TFM automatically detects and handles wide characters in:
 
 - Automatic detection of terminal Unicode capabilities
 - Graceful fallback for terminals with limited Unicode support
-- Configurable Unicode handling modes for different environments
 
 ## Configuration
 
@@ -85,8 +84,7 @@ These terminals may have limited wide character support:
 **Solutions**:
 1. Check your terminal's Unicode support
 2. Verify your locale settings include UTF-8 encoding
-3. Try different Unicode modes in configuration
-4. Enable fallback mode if needed
+3. Ensure the terminal uses a font with good Unicode coverage
 
 **Check locale settings**:
 ```bash
@@ -182,8 +180,7 @@ sudo yum install glibc-locale-source glibc-langpack-en
 ### Performance Considerations
 
 - Very large directories with many Unicode filenames may be slower to display
-- Caching helps but uses additional memory
-- ASCII mode provides best performance at the cost of Unicode support
+- Display-width caching helps but uses additional memory
 
 ### Font Requirements
 
@@ -197,15 +194,13 @@ If you encounter issues with wide character support:
 
 1. Check the troubleshooting section above
 2. Verify your terminal and locale settings
-3. Try different Unicode modes in configuration
-4. Test with a known Unicode-capable terminal
-5. Check TFM's log output for Unicode-related warnings
+3. Test with a known Unicode-capable terminal
+4. Check TFM's log output for Unicode-related warnings
 
 For additional support, include the following information when reporting issues:
 
 - Terminal application and version
 - Operating system and version
 - Locale settings (`locale` command output)
-- TFM configuration (Unicode-related settings)
 - Example filenames that cause problems
 - Screenshots if display issues are visual

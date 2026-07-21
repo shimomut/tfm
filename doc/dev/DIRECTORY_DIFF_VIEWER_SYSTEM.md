@@ -299,7 +299,7 @@ Key areas for testing:
 
 ## Related Documentation
 
-- [Directory Diff Viewer Feature](../DIRECTORY_DIFF_VIEWER_FEATURE.md) - User documentation
+- [Diff Viewer Feature](../DIFF_VIEWER_FEATURE.md) - User documentation (Directory diff section)
 - [Search Results Pane](SEARCH_RESULTS_PANE_IMPLEMENTATION.md) - Similar threaded background-worker pattern (`ProgressiveSearchDialog`)
 - [Progress Manager System](PROGRESS_MANAGER_SYSTEM.md) - Progress reporting
 - [Dialog System](DIALOG_SYSTEM.md) - Dialog framework

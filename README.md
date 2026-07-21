@@ -89,12 +89,12 @@ For comprehensive information about TFM's features and usage:
 - **[Complete User Guide](doc/TFM_USER_GUIDE.md)** - Comprehensive guide covering all features, configuration, and usage
 - **[Configuration](doc/CONFIGURATION_FEATURE.md)** - Complete configuration reference and customization guide
 - **[Desktop Mode](doc/DESKTOP_MODE_GUIDE.md)** - Native Windows / macOS desktop app setup and options
-- **[Background Animations](doc/BACKGROUND_ANIMATIONS_FEATURE.md)** - Themeable GPU background scenes and screen effects
+- **[Color Schemes & Visual Effects](doc/COLOR_SCHEMES_FEATURE.md)** - Themes, themeable GPU background scenes, and screen effects
 - **[Image Viewer](doc/IMAGE_VIEWER_FEATURE.md)** - Built-in zoom / pan image viewer
 - **[Markdown Viewer](doc/MARKDOWN_VIEWER_FEATURE.md)** & **[JSON / CSV Viewers](doc/JSON_CSV_VIEWERS_FEATURE.md)** - Rendered structured-file views
 - **[SFTP Support](doc/SFTP_SUPPORT_FEATURE.md)** - Remote server access via SSH with file operations and search
 - **[AWS S3 Support](doc/S3_SUPPORT_FEATURE.md)** - Cloud storage integration and S3 bucket management
-- **[Archive Virtual Directory Browsing](doc/ARCHIVE_VIRTUAL_DIRECTORY_FEATURE.md)** - Browse archives as directories
+- **[Archives](doc/ARCHIVE_FEATURE.md)** - Create, extract, and browse archives as directories
 - **[Search Animation](doc/SEARCH_ANIMATION_FEATURE.md)** - Advanced search features and visual feedback
 
 ### Developer Documentation
@@ -151,7 +151,7 @@ TFM lets you browse archive files as if they were regular directories - no extra
 - Select multiple files for batch operations
 - Sort by name, size, date, or extension
 
-See [Archive Virtual Directory Feature](doc/ARCHIVE_VIRTUAL_DIRECTORY_FEATURE.md) for complete documentation.
+See [Archive Feature](doc/ARCHIVE_FEATURE.md) for complete documentation.
 
 ## Built-in File Viewers
 

@@ -96,7 +96,6 @@ The status bar updates in real-time as you:
 - **Proper percentage calculation** avoiding division by zero
 
 ### Terminal Compatibility
-- **Uses curses status color** for consistent appearance
 - **Handles narrow terminals** by truncating information gracefully
 - **Right-aligned layout** that adapts to available space
 

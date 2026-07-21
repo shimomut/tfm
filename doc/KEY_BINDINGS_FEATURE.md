@@ -17,7 +17,7 @@ TFM's key bindings system allows you to customize keyboard shortcuts for all act
 The simplest form - just a single character:
 
 ```python
-'quit': ['q']
+'quit': ['Q']
 'help': ['?']
 'toggle_hidden': ['.']
 ```
@@ -29,9 +29,9 @@ The simplest form - just a single character:
 
 Examples:
 ```python
-'quit': ['q']           # Matches both 'q' and 'Q' (alphabet, case-insensitive)
+'quit': ['Q']           # 'Q' and 'q' are equivalent (alphabet, case-insensitive)
 'help': ['?']           # Matches only '?' (non-alphabet, case-sensitive)
-'search': ['f']         # Matches both 'f' and 'F' (alphabet, case-insensitive)
+'search': ['F']         # 'F' and 'f' are equivalent (alphabet, case-insensitive)
 'search_dialog': ['Shift-F']  # Matches only Shift+F (explicit modifier)
 ```
 
@@ -89,10 +89,10 @@ For actions without selection requirements, use a list of keys:
 
 ```python
 KEY_BINDINGS = {
-    'quit': ['q'],              # Matches both 'q' and 'Q' (alphabet is case-insensitive)
+    'quit': ['Q'],              # 'Q' and 'q' are equivalent (alphabet is case-insensitive)
     'help': ['?'],              # Matches only '?' (non-alphabet is case-sensitive)
-    'move_up': ['UP', 'k'],     # 'k' matches both 'k' and 'K'
-    'move_down': ['DOWN', 'j'], # 'j' matches both 'j' and 'J'
+    'move_up': ['UP', 'k'],     # 'k' and 'K' are equivalent
+    'move_down': ['DOWN', 'j'], # 'j' and 'J' are equivalent
 }
 ```
 
@@ -103,20 +103,31 @@ For actions that require or prohibit file selection, use a dictionary:
 ```python
 KEY_BINDINGS = {
     'delete_files': {
-        'keys': ['DELETE', 'Command-Backspace', 'k', 'K'],
+        'keys': ['K', 'DELETE'],
         'selection': 'required'  # Only available when files are selected
     },
     'create_directory': {
-        'keys': ['m', 'M'],
+        'keys': ['M'],
         'selection': 'none'  # Only available when no files are selected
     },
 }
 ```
 
+The plain list form is just shorthand for `'selection': 'any'`, so existing
+list-style bindings keep working unchanged.
+
 **Selection requirements:**
 - `'required'` - Action only available when files are selected
 - `'none'` - Action only available when no files are selected
 - `'any'` - Action always available (default)
+
+**Default selection-aware actions.** Out of the box these file operations use
+`'required'` (they act on the selection, so they're hidden when nothing is
+selected): `copy_files` (`C`), `move_files` (`M`), `delete_files` (`K` / `DELETE`),
+and `create_archive` (`P`). `create_directory` (`M`) uses `'none'` so it shares
+the `M` key with `move_files` without conflict — TFM picks whichever action fits
+the current selection state. You can add a `'selection'` requirement to any other
+action the same way.
 
 ## Complete Example
 
@@ -143,15 +154,15 @@ class Config:
         
         # File operations with selection requirements
         'delete_files': {
-            'keys': ['DELETE', 'Command-Backspace'],
+            'keys': ['K', 'DELETE'],
             'selection': 'required'
         },
         'copy_files': {
-            'keys': ['c'],                # Matches both 'c' and 'C'
+            'keys': ['C'],                # 'C' and 'c' are equivalent
             'selection': 'required'
         },
         'create_directory': {
-            'keys': ['m'],                # Matches both 'm' and 'M'
+            'keys': ['M'],                # 'M' and 'm' are equivalent
             'selection': 'none'
         },
         # Use Shift modifier for uppercase-specific bindings
@@ -178,9 +189,9 @@ KEY_BINDINGS = {
 
 ```python
 KEY_BINDINGS = {
-    'quit': ['q'],                # Single entry, matches both 'q' and 'Q'
-    'copy_files': ['c'],          # Single entry, matches both 'c' and 'C'
-    'move_up': ['UP', 'k'],       # 'k' matches both 'k' and 'K'
+    'quit': ['Q'],                # Single entry, 'Q' and 'q' are equivalent
+    'copy_files': ['C'],          # Single entry, 'C' and 'c' are equivalent
+    'move_up': ['UP', 'k'],       # 'k' and 'K' are equivalent
     'page_up': ['PAGE_UP', 'Shift-UP'],  # Use KeyCode name + modifier
 }
 ```

@@ -1061,7 +1061,7 @@ Before releasing platform support:
 
 ### Related TFM Documentation
 
-- `doc/DRAG_AND_DROP_FEATURE.md` - End-user documentation
+- `doc/MOUSE_EVENT_SUPPORT_FEATURE.md` - End-user documentation (Drag-and-Drop section)
 - `doc/MOUSE_EVENT_SUPPORT_FEATURE.md` - Mouse event infrastructure
 - `doc/dev/MOUSE_EVENT_SYSTEM.md` - Mouse event system implementation
 

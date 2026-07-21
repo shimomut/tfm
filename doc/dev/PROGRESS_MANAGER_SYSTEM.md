@@ -197,5 +197,5 @@ Synchronous mode (used by tests) runs the worker inline with no dialog, and
 - `src/tfm_task.py` — `Task` / `TaskManager` / `ProgressDialog` (threading, UI
   bridge, rendering).
 - `src/tfm_file_operations.py` — the copy/move/delete worker.
-- `doc/COPY_PROGRESS_FEATURE.md` — end-user documentation.
+- `doc/FILE_OPERATIONS_FEATURE.md` — end-user documentation.
 </content>

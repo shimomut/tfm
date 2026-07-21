@@ -350,17 +350,15 @@ Shift-E  - Create a new file
 ```
 
 **See detailed documentation**: 
-- [Create File Feature](CREATE_FILE_FEATURE.md)
-- [Create Directory Feature](CREATE_DIRECTORY_FEATURE.md)
-- [Cross-Storage Move Feature](CROSS_STORAGE_MOVE_FEATURE.md)
+- [File Operations Feature](FILE_OPERATIONS_FEATURE.md)
 
 ### Multi-Selection
 1. Use **Space** to select individual files
-2. Use **a** to select all files
-3. Use **A** to select all items (files + directories)
+2. Use **A** to select/deselect all files
+3. Use **Shift-A** to select/deselect all items (files + directories)
 4. Perform operations on selected files
 
-**See detailed documentation**: [Key Bindings Selection Feature](KEY_BINDINGS_SELECTION_FEATURE.md)
+**See detailed documentation**: [Key Bindings Feature](KEY_BINDINGS_FEATURE.md)
 
 ### Advanced Operations
 - **Batch Rename**: Regex-based renaming for multiple files
@@ -377,7 +375,7 @@ Shift-E  - Create a new file
 - **Permission Checks**: Validate file system permissions
 - **Undo Prevention**: Clear warnings about irreversible operations
 
-**See detailed documentation**: [Rename Conflict Resolution Feature](RENAME_CONFLICT_RESOLUTION_FEATURE.md)
+**See detailed documentation**: [File Operations Feature](FILE_OPERATIONS_FEATURE.md)
 
 ---
 
@@ -403,8 +401,7 @@ Shift-O  - Sync other pane to the current pane
 ```
 
 **See detailed documentation**: 
-- [Favorite Directories Feature](FAVORITE_DIRECTORIES_FEATURE.md)
-- [Command Line Directory Arguments Feature](COMMAND_LINE_DIRECTORY_ARGUMENTS_FEATURE.md)
+- [Navigation Dialogs Feature](NAVIGATION_DIALOGS_FEATURE.md)
 
 ---
 
@@ -542,25 +539,25 @@ _        - Reset log pane height (Shift+-)
 ### File Comparison
 ```
 =        - View diff between two selected text files (requires 2 files selected)
-@        - Compare directories recursively (Shift+2)
+Shift-=  - Compare the two panes' current directories recursively
 W        - Show file and directory comparison options
 ```
 
-**See detailed documentation**: [Diff Viewer Feature](DIFF_VIEWER_FEATURE.md), [Directory Diff Viewer Feature](DIRECTORY_DIFF_VIEWER_FEATURE.md)
+**See detailed documentation**: [Diff Viewer Feature](DIFF_VIEWER_FEATURE.md) (file and directory diff)
 
 ### View and Display Options
 ```
-z        - Show view options menu
-Z        - Show settings and configuration menu
-t        - Toggle between dark and light color schemes
-T        - Toggle fallback color mode for terminal compatibility
+Z        - Show view options menu
+Shift-Z  - Show settings and configuration menu
+T        - Switch color scheme (cycles dark / light / themes)
+Shift-T  - Toggle fallback color mode for terminal compatibility
 .        - Toggle visibility of hidden files
 ```
 
 ### Progress Animation
 TFM shows animated progress indicators during long-running operations like searching files.
 
-**See detailed documentation**: [Log Redraw Trigger Feature](LOG_REDRAW_TRIGGER_FEATURE.md)
+**See detailed documentation**: [Search Animation Feature](SEARCH_ANIMATION_FEATURE.md)
 
 ---
 
@@ -607,7 +604,7 @@ KEY_BINDINGS = {
 - **Modifier keys**: Shift, Control, Alt, Command
 - **Multiple keys per action**: Assign several keys to the same action
 - **Selection requirements**: Control when actions are available
-- **Special key names are case-insensitive** ('ENTER' = 'enter'); **letter keys are case-sensitive** ('Q' ≠ 'q')
+- **Case-insensitive keys**: special key names ('ENTER' = 'enter') and bare letter keys ('q' = 'Q') bind the same physical key; use 'Shift-Q' to bind the shifted variant
 - **Order-independent modifiers**: 'Command-Shift-X' = 'Shift-Command-X'
 
 **See detailed documentation**: [Key Bindings Feature](KEY_BINDINGS_FEATURE.md)
@@ -629,7 +626,7 @@ FAVORITE_DIRECTORIES = [
 ]
 ```
 
-**See detailed documentation**: [Favorite Directories Feature](FAVORITE_DIRECTORIES_FEATURE.md)
+**See detailed documentation**: [Navigation Dialogs Feature](NAVIGATION_DIALOGS_FEATURE.md)
 
 ### External Programs
 ```python
@@ -677,7 +674,7 @@ python3 tfm.py --backend gui      # Native macOS window (alias: --backend macos)
 python3 tfm.py --backend gui --left ~/projects --right ~/docs
 ```
 
-**See detailed documentation**: [Command Line Directory Arguments Feature](COMMAND_LINE_DIRECTORY_ARGUMENTS_FEATURE.md)
+Startup directories set with `--left`/`--right` override any saved pane history for that session; an invalid path falls back to the saved (or home) directory.
 
 ---
 
@@ -730,39 +727,45 @@ Check file permissions and disk space
 For detailed information about specific features, see these dedicated guides:
 
 ### File Operations
+- [File Operations Feature](FILE_OPERATIONS_FEATURE.md) - Copy, move, duplicate, rename-conflict handling, and progress
 - [Batch Rename Feature](BATCH_RENAME_FEATURE.md) - Regex-based renaming for multiple files
-- [Create Directory Feature](CREATE_DIRECTORY_FEATURE.md) - Creating new directories
-- [Create File Feature](CREATE_FILE_FEATURE.md) - Creating and editing new files
-- [Cross-Storage Move Feature](CROSS_STORAGE_MOVE_FEATURE.md) - Moving files between storage types
+- [Archive Feature](ARCHIVE_FEATURE.md) - Create, extract, and browse archives (incl. password-protected)
 - [File Details Feature](FILE_DETAILS_FEATURE.md) - Viewing detailed file information
-- [Rename Conflict Resolution Feature](RENAME_CONFLICT_RESOLUTION_FEATURE.md) - Handling file name conflicts
+- [File Monitoring Feature](FILE_MONITORING_FEATURE.md) - Automatic refresh when directories change on disk
 
-### Cloud Storage and Archives
+### Remote and Cloud Storage
 - [AWS S3 Support Feature](S3_SUPPORT_FEATURE.md) - Cloud storage integration and S3 bucket management
-- [Archive Virtual Directory Feature](ARCHIVE_VIRTUAL_DIRECTORY_FEATURE.md) - Browse ZIP, TAR, and compressed archives as directories
+- [SFTP Support Feature](SFTP_SUPPORT_FEATURE.md) - Remote server access over SSH
 
 ### Navigation and Search
-- [Favorite Directories Feature](FAVORITE_DIRECTORIES_FEATURE.md) - Quick directory bookmarks
+- [Navigation Dialogs Feature](NAVIGATION_DIALOGS_FEATURE.md) - Favorites, jump, history, and drives pickers
+- [Tab Completion Feature](TAB_COMPLETION_FEATURE.md) - Path completion in input dialogs
 - [Search Animation Feature](SEARCH_ANIMATION_FEATURE.md) - Progress indicators during search
-- [Command Line Directory Arguments Feature](COMMAND_LINE_DIRECTORY_ARGUMENTS_FEATURE.md) - Startup directory options
+
+### Viewers
+- [Text Viewer Feature](TEXT_VIEWER_FEATURE.md) - Syntax highlighting, selection, and search in the built-in text viewer
+- [Markdown Viewer Feature](MARKDOWN_VIEWER_FEATURE.md) - Rendered Markdown view
+- [JSON / CSV Viewers Feature](JSON_CSV_VIEWERS_FEATURE.md) - Rendered structured-file views
+- [Image Viewer Feature](IMAGE_VIEWER_FEATURE.md) - Built-in zoom / pan image viewer
+- [Diff Viewer Feature](DIFF_VIEWER_FEATURE.md) - File and directory diff viewers
+- [Text Editor Feature](TEXT_EDITOR_FEATURE.md) - External editor integration
 
 ### Interface and Display
-- [Color Schemes](COLOR_SCHEMES_FEATURE.md) - Color scheme configuration and display
-- [Color Schemes Feature](COLOR_SCHEMES_FEATURE.md) - Dark and light themes
+- [Dual Pane Feature](DUAL_PANE_FEATURE.md) - The two-pane layout and pane operations
+- [Menu Bar Feature](MENU_BAR_FEATURE.md) - Native / in-window menu bar
+- [Status Bar Feature](STATUS_BAR_FEATURE.md) - Viewer status information display
 - [Help Dialog Feature](HELP_DIALOG_FEATURE.md) - Built-in help system
-- [Key Bindings Selection Feature](KEY_BINDINGS_SELECTION_FEATURE.md) - Customizable keyboard shortcuts
-- [Log Redraw Trigger Feature](LOG_REDRAW_TRIGGER_FEATURE.md) - Real-time log updates
-- [Status Bar Feature](STATUS_BAR_FEATURE.md) - Status information display
+- [Mouse & Interaction Feature](MOUSE_EVENT_SUPPORT_FEATURE.md) - Mouse, double-click, and drag-and-drop
+- [Color Schemes & Visual Effects](COLOR_SCHEMES_FEATURE.md) - Themes, background animations, and motion
 - [Wide Character Support Feature](WIDE_CHARACTER_SUPPORT_FEATURE.md) - International character display
+- [Desktop Mode Guide](DESKTOP_MODE_GUIDE.md) - Native desktop app setup and options
 
 ### Configuration and Customization
 - [Configuration Feature](CONFIGURATION_FEATURE.md) - Complete configuration reference and customization guide
+- [Key Bindings Feature](KEY_BINDINGS_FEATURE.md) - Customizable keyboard shortcuts
 
 ### Integration and Extensions
-- [Beyond Compare Integration](BEYONDCOMPARE_INTEGRATION.md) - File comparison tool integration
-- [External Programs Feature](EXTERNAL_PROGRAMS_FEATURE.md) - Custom program integration
-- [Text Editor Feature](TEXT_EDITOR_FEATURE.md) - External editor integration
-- [VSCode Integration](VSCODE_INTEGRATION.md) - Visual Studio Code integration
+- [External Programs Feature](EXTERNAL_PROGRAMS_FEATURE.md) - Custom program integration (incl. Beyond Compare & VSCode recipes)
 
 ---
 
@@ -882,7 +885,7 @@ All key bindings can be customized in your configuration file (`~/.tfm/config.py
 - **Modifier keys**: Shift, Control, Alt, Command (e.g., 'Shift-UP', 'Command-Q')
 - **Multiple keys per action**: Assign several keys to the same action
 - **Selection requirements**: Control when actions are available based on file selection
-- **Case-sensitivity**: special key names (`ENTER`) are case-insensitive; letter keys (`Q` vs `q`) are not
+- **Case-insensitive keys**: special key names (`ENTER`) and bare letter keys (`q` = `Q`) bind the same physical key; use `Shift-Q` for the shifted variant
 
 **Examples:**
 ```python

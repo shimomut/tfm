@@ -2,7 +2,7 @@
 
 How TFM's animated backgrounds are defined, registered and drawn, and what to do
 to add one. End-user documentation is in
-[BACKGROUND_ANIMATIONS_FEATURE.md](../BACKGROUND_ANIMATIONS_FEATURE.md).
+[COLOR_SCHEMES_FEATURE.md](../COLOR_SCHEMES_FEATURE.md) (Background animations section).
 
 ## One renderer
 
@@ -140,7 +140,7 @@ with no usable shader path) inherits a no-op, so none of this branches on the ba
 
 1. Write `<SCENE>_MSL` and `<SCENE>_HLSL` in `src/tfm_background_shaders.py`.
 2. Add both to `SHADER_KINDS`, with `resolution_scale` if the scene can afford it.
-3. Add a row to the table in `doc/BACKGROUND_ANIMATIONS_FEATURE.md` and to the theme
+3. Add a row to the table in `doc/COLOR_SCHEMES_FEATURE.md` (Background animations section) and to the theme
    comment block in `src/_config.py`.
 4. Update the expected set in `test/test_background_shaders.py`. The generic suites
    pick the scene up from `SHADER_KINDS` automatically, so compilation, drawing,
