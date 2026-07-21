@@ -8,35 +8,35 @@ The Path Polymorphism System is TFM's core abstraction layer that enables storag
 
 ### Component Hierarchy
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    UI/Dialog Layer                          │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
-│  │ Text Viewer  │  │ Info Dialog  │  │Search Dialog │     │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘     │
-│         │                  │                  │              │
-│         │  Storage-agnostic method calls:    │              │
-│         │  - get_display_prefix()            │              │
-│         │  - get_extended_metadata()         │              │
-│         │  - get_search_strategy()           │              │
-│         └─────────────────────────────────────┘              │
-└─────────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    Path Layer                               │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │              Path (Facade)                           │  │
-│  │  Delegates to PathImpl                               │  │
-│  └──────────────────┬───────────────────────────────────┘  │
-│                     │                                       │
-│         ┌───────────┼───────────┐                          │
-│         ▼           ▼           ▼                          │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐                  │
-│  │  Local   │ │ Archive  │ │   S3     │                  │
-│  │PathImpl  │ │PathImpl  │ │PathImpl  │                  │
-│  └──────────┘ └──────────┘ └──────────┘                  │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph UI["UI / Dialog Layer — storage-agnostic (zero if/elif on storage type)"]
+        direction LR
+        TV["TextViewer"]
+        ID["InfoDialog"]
+        SD["SearchDialog"]
+        FO["FileOperationService"]
+    end
+
+    Path["Path — facade (tfm_path)<br/>delegates every call to self._impl"]
+    Impl["PathImpl — abstract base (tfm_path)<br/>Display: get_display_prefix / get_display_title<br/>Content strategy: get_search_strategy · supports_streaming_read · requires_extraction_for_reading<br/>Capability: supports_write_operations · is_remote · supports_directory_rename<br/>Metadata: get_extended_metadata"]
+    Local["LocalPathImpl<br/>tfm_path"]
+    SSH["SSHPathImpl<br/>tfm_ssh"]
+    S3["S3PathImpl<br/>tfm_s3"]
+    Archive["ArchivePathImpl<br/>tfm_archive"]
+
+    UI -->|polymorphic methods only| Path
+    Path -->|delegates| Impl
+    Impl --> Local & SSH & S3 & Archive
+
+    classDef ui fill:#1e7e34,stroke:#7fd39b,color:#fff;
+    classDef facade fill:#1a5490,stroke:#7fb3d5,color:#fff;
+    classDef abc fill:#5e2d70,stroke:#b98fd0,color:#fff;
+    classDef impl fill:#9a6308,stroke:#e0b45f,color:#fff;
+    class TV,ID,SD,FO ui;
+    class Path facade;
+    class Impl abc;
+    class Local,SSH,S3,Archive impl;
 ```
 
 ### Design Principles

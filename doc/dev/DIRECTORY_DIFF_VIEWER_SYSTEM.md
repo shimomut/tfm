@@ -6,22 +6,60 @@ The Directory Diff Viewer is a sophisticated component that provides recursive d
 
 ## Architecture
 
+```mermaid
+flowchart TB
+    View["DirectoryDiffView (Widget) — main thread<br/>dual-pane tree · navigation · events · render"]
+
+    subgraph WORK["Background threads (daemon)"]
+        direction LR
+        Coord["scan coordinator"]
+        ScanW["scanner worker"]
+        CmpW["comparator worker"]
+        Coord --> ScanW
+        Coord --> CmpW
+    end
+
+    Scanner["DirectoryScanner<br/>lists dir → {relative_path: FileInfo}"]
+    Diff["DiffEngine<br/>builds + classifies the unified tree"]
+
+    subgraph DATA["Data model"]
+        direction LR
+        Tree["TreeNode<br/>children · left/right FileInfo · difference_type"]
+        FInfo["FileInfo<br/>path · size · mtime · is_dir · accessible"]
+        DType["DifferenceType (enum)<br/>IDENTICAL · ONLY_LEFT · ONLY_RIGHT<br/>CONTENT_DIFFERENT · CONTAINS_DIFFERENCE · PENDING"]
+    end
+
+    View -->|"enqueue visible/expanded first (priority queues)"| Coord
+    ScanW --> Scanner
+    CmpW --> Diff
+    Scanner --> FInfo
+    Diff --> Tree
+    Tree --> DType
+    Diff -->|"update tree under RLock, repaint"| View
+
+    classDef main fill:#1a5490,stroke:#7fb3d5,color:#fff;
+    classDef work fill:#8b2e24,stroke:#e0897f,color:#fff;
+    classDef engine fill:#1e7e34,stroke:#7fd39b,color:#fff;
+    classDef data fill:#9a6308,stroke:#e0b45f,color:#fff;
+    class View main;
+    class Coord,ScanW,CmpW work;
+    class Scanner,Diff engine;
+    class Tree,FInfo,DType data;
+```
+
 ### Core Components
 
 **DifferenceType Enum**
 - Defines the types of differences that can be detected:
   - `IDENTICAL`: Files/directories are the same
-  - `DIFFERENT`: Files have different content
-  - `LEFT_ONLY`: Item exists only in left directory
-  - `RIGHT_ONLY`: Item exists only in right directory
-  - `PENDING`: Comparison not yet complete
-  - `ERROR`: Error occurred during comparison
+  - `ONLY_LEFT`: Item exists only in the left directory
+  - `ONLY_RIGHT`: Item exists only in the right directory
+  - `CONTENT_DIFFERENT`: Two-sided files whose content differs
+  - `CONTAINS_DIFFERENCE`: A directory that contains differences below it
+  - `PENDING`: Not yet scanned / compared (progressive)
 
-**ScanPriority Enum**
-- Controls the order of directory scanning:
-  - `HIGH`: Visible items (immediate display)
-  - `MEDIUM`: Expanded directories (user interest)
-  - `LOW`: Background scanning (completeness)
+**Priority scheduling**
+- Scan and comparison work run on two priority queues holding `(-priority, seq, node)`, so **visible and expanded** directories are processed before deep background items. Priority is an integer, not an enum.
 
 **FileInfo Class**
 - Stores metadata about files and directories:
@@ -32,29 +70,23 @@ The Directory Diff Viewer is a sophisticated component that provides recursive d
 
 ### Main Classes
 
-**DirectoryDiffViewer**
-- Primary UI component for displaying directory comparisons
-- Manages tree-structured display with expand/collapse
-- Handles user navigation and interaction
-- Coordinates background scanning and comparison
+**DirectoryDiffView** (`Widget`)
+- Primary UI component (a PuiKit `Widget`) for the dual-pane comparison tree
+- Manages expand/collapse, navigation, and rendering on the main thread
+- Owns the scan-coordinator plus scanner/comparator worker threads and re-prioritises the viewport
 
-**DirectoryScannerWorker**
-- Background thread for scanning directory contents
-- Implements priority-based scanning
-- Yields control to prevent UI blocking
-- Handles errors gracefully
+**DirectoryScanner**
+- Recursively lists one directory into `{relative_path: FileInfo}`
+- Iterative (stack-based); records inaccessible entries instead of aborting
+- Cancellable via `cancel()`
 
-**FileComparatorWorker**
-- Background thread for comparing file contents
-- Performs byte-by-byte comparison for accuracy
-- Processes files in priority order
-- Reports progress to UI
+**DiffEngine**
+- Builds the unified tree from the two scan dictionaries and classifies each node
+- With `compare_content=False`, two-sided files stay `PENDING` so the tree structure appears before any file is read
 
-**DiffNode**
-- Represents a node in the comparison tree
-- Stores comparison results and metadata
-- Manages parent-child relationships
-- Tracks expansion state
+**TreeNode**
+- A node in the comparison tree: children, left/right `FileInfo`, and `difference_type`
+- Tracks expansion and progressive-scan state
 
 ## Key Features
 

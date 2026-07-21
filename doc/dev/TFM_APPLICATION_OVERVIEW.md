@@ -6,7 +6,74 @@ TFM (Terminal File Manager) is a sophisticated terminal-based file manager built
 
 ## Core Architecture
 
-![TFM Architecture Diagram](images/Tfm_Highlevel_Architecture.svg)
+```mermaid
+flowchart TB
+    subgraph APP["Application Layer"]
+        TfmApp["TfmApp — tfm.py<br/>Controller · PuiKit event loop · key→action mapping · pane state"]
+    end
+
+    subgraph MGR["Manager Systems"]
+        direction LR
+        Pane["PaneManager<br/>tfm_pane_manager"]
+        FileOps["FileOperationService<br/>tfm_file_operations"]
+        Task["TaskManager<br/>tfm_task"]
+        Progress["ProgressManager<br/>tfm_progress_manager"]
+        State["StateManager<br/>tfm_state_manager"]
+        Log["LogManager<br/>tfm_log_manager"]
+    end
+
+    subgraph UI["UI Components — TFM widgets built on PuiKit"]
+        direction LR
+        Panes["Panes &amp; Status<br/>PaneHeader · PaneFooter · StatusBar · LayoutView"]
+        Viewers["Viewers<br/>Text · Diff · DirectoryDiff · Image · JSON/CSV/Markdown"]
+        Dialogs["Dialogs<br/>FilterList · Search · BatchRename · Conflict · Jump · Drives"]
+    end
+
+    subgraph STORE["Storage Abstraction — Path Polymorphism"]
+        direction LR
+        Path["Path facade + PathImpl ABC<br/>tfm_path"]
+        Local["LocalPathImpl<br/>tfm_path"]
+        SSH["SSHPathImpl<br/>tfm_ssh"]
+        S3["S3PathImpl<br/>tfm_s3"]
+        Archive["ArchivePathImpl<br/>tfm_archive"]
+        Path --> Local & SSH & S3 & Archive
+    end
+
+    subgraph PUI["PuiKit Framework — external UI toolkit (../puikit)"]
+        direction LR
+        Events["Event system<br/>puikit.event"]
+        Widgets["Widgets<br/>ListView · TextEdit · Menu · Splitter · message box"]
+        TextEng["Text · Theme · Font · Layout<br/>puikit.text / theme / font / layout"]
+    end
+
+    subgraph BE["PuiKit Backends"]
+        direction LR
+        Curses["Curses<br/>terminal"]
+        MacOS["macOS<br/>native"]
+        Windows["Windows<br/>native"]
+    end
+
+    TfmApp --> MGR
+    TfmApp --> UI
+    MGR --> STORE
+    UI --> STORE
+    UI --> PUI
+    PUI --> BE
+
+    classDef app fill:#1a5490,stroke:#7fb3d5,color:#ffffff;
+    classDef mgr fill:#8b2e24,stroke:#e0897f,color:#ffffff;
+    classDef ui fill:#1e7e34,stroke:#7fd39b,color:#ffffff;
+    classDef store fill:#9a6308,stroke:#e0b45f,color:#ffffff;
+    classDef pui fill:#5e2d70,stroke:#b98fd0,color:#ffffff;
+    classDef be fill:#0e7c66,stroke:#5fd0b4,color:#ffffff;
+
+    class TfmApp app;
+    class Pane,FileOps,Task,Progress,State,Log mgr;
+    class Panes,Viewers,Dialogs ui;
+    class Path,Local,SSH,S3,Archive store;
+    class Events,Widgets,TextEng pui;
+    class Curses,MacOS,Windows be;
+```
 
 ### Main Components
 

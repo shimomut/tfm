@@ -8,6 +8,51 @@ The first concrete implementation, `FileOperationTask`, replaces the previous ca
 
 ## Architecture
 
+### Current design (post-PuiKit port)
+
+A `Task` is a cancellable background job whose body is an ordinary `run(task)` function handed to `TaskManager.submit()`. The manager shows a `ProgressDialog`, spawns one worker thread, and pumps the task's UI bridge on each animation tick — so the worker can request a modal (via `ask()`) and cooperatively cancel (via `checkpoint()`) without ever touching the panel directly.
+
+```mermaid
+flowchart TB
+    App["TfmApp<br/>TaskManager.submit(task, panel, run=fn, on_done=…)"]
+
+    subgraph MAINT["Main thread"]
+        direction TB
+        Mgr["TaskManager<br/>registry · one modal task at a time<br/>active_tasks() · has_active()"]
+        Dlg["ProgressDialog (Widget)<br/>show · pump · draw · close"]
+        Tick["animation tick()<br/>pump UI bridge · repaint<br/>on finish → close + on_done"]
+    end
+
+    subgraph WORKT["Worker thread (daemon)"]
+        direction TB
+        Run["run(task) — the job body"]
+        TaskO["Task<br/>ask() · checkpoint() · cancelled()<br/>progress · status"]
+    end
+
+    App --> Mgr
+    Mgr -->|show + register| Dlg
+    Mgr -->|spawn worker| Run
+    Mgr --> Tick
+    Run -->|drives| TaskO
+    TaskO -.->|"ask(): enqueue _UiRequest, block until answer"| Tick
+    Tick -.->|"pump → show modal → deliver(answer)"| TaskO
+    TaskO -->|"request_cancel() sets Event → Cancelled"| Run
+
+    Status["TaskStatus: PENDING → RUNNING → DONE / CANCELLED / FAILED"]
+    Tick --> Status
+
+    classDef app fill:#1a5490,stroke:#7fb3d5,color:#fff;
+    classDef main fill:#1e7e34,stroke:#7fd39b,color:#fff;
+    classDef work fill:#8b2e24,stroke:#e0897f,color:#fff;
+    classDef state fill:#9a6308,stroke:#e0b45f,color:#fff;
+    class App app;
+    class Mgr,Dlg,Tick main;
+    class Run,TaskO work;
+    class Status state;
+```
+
+> **Note:** the sections below (`BaseTask`, `FileOperationTask`, the 6-state machine, the four-layer refactor) describe the **pre-PuiKit-port** design and are superseded by the diagram above. They are retained pending a prose refresh.
+
 ### Refactored Architecture (Post-Refactoring)
 
 The file operations architecture has been refactored to achieve clean separation of concerns with four distinct layers:
