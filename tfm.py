@@ -2389,15 +2389,33 @@ class TfmApp:
         def details(entry) -> list[str]:
             out = [f"### {_md_escape(entry.name)}", ""]
             try:
+                is_symlink = entry.is_symlink()
+            except Exception:
+                is_symlink = False
+            try:
                 st = entry.stat()
             except Exception as exc:
-                out += [f"*stat unavailable: {_md_escape(str(exc))}*", ""]
-                return out
+                # A broken symlink can't be stat()'d (the target is gone), so
+                # fall back to the link's own metadata rather than bailing out.
+                try:
+                    st = entry.lstat() if is_symlink else None
+                except Exception:
+                    st = None
+                if st is None:
+                    out += [f"*stat unavailable: {_md_escape(str(exc))}*", ""]
+                    return out
+            # ``is_dir``/``is_file`` follow the link, so check ``is_symlink``
+            # first — otherwise a symlink to a directory reads as "Directory".
             try:
-                kind = "Directory" if entry.is_dir() else \
-                       ("Symlink" if entry.is_symlink() else "File")
+                if is_symlink:
+                    kind = "Symlink → Directory" if entry.is_dir() else \
+                           ("Symlink → File" if entry.is_file() else "Symlink (broken)")
+                elif entry.is_dir():
+                    kind = "Directory"
+                else:
+                    kind = "File"
             except Exception:
-                kind = "File"
+                kind = "Symlink" if is_symlink else "File"
             mtime = _dt.datetime.fromtimestamp(st.st_mtime).strftime("%Y-%m-%d %H:%M:%S")
             out += [
                 "| Field | Value |",
