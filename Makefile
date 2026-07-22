@@ -1,6 +1,6 @@
 # TFM Makefile
 
-.PHONY: help run run-gui test test-quick clean install uninstall dev-install lint format demo macos-app macos-app-clean macos-app-install macos-refresh-icon macos-dmg windows-app windows-app-clean windows-app-zip windows-app-install windows-app-msix windows-app-msix-install windows-app-msix-uninstall install-config venv venv-clean check-venv install-puikit
+.PHONY: help run run-gui run-web test test-quick clean install uninstall dev-install lint format demo macos-app macos-app-clean macos-app-install macos-refresh-icon macos-dmg windows-app windows-app-clean windows-app-zip windows-app-install windows-app-msix windows-app-msix-install windows-app-msix-uninstall install-config venv venv-clean check-venv install-puikit
 
 # Python interpreter selection
 # All Python is run through the project virtual environment (.venv). There is no
@@ -37,6 +37,7 @@ help:
 	@echo "  install-puikit - Install PuiKit (editable) from PUIKIT_DIR into .venv"
 	@echo "  run            - Run TFM (terminal); LEFT=/RIGHT= set startup dirs"
 	@echo "  run-gui        - Run TFM in a native macOS GUI window"
+	@echo "  run-web        - Run TFM in a web browser (web backend)"
 	@echo "  test           - Run all tests"
 	@echo "  test-quick     - Run quick verification tests"
 	@echo "  clean          - Clean up temporary files"
@@ -66,6 +67,7 @@ help:
 	@echo "Examples:"
 	@echo "  make run                        # Run TFM in the terminal"
 	@echo "  make run-gui                    # Run TFM in a macOS GUI window"
+	@echo "  make run-web                    # Run TFM in a web browser"
 	@echo "  make run LEFT=./src RIGHT=./doc # Run with custom startup directories"
 	@echo "  make install-config             # Install/update user config file"
 	@echo "  make macos-app                  # Build macOS app bundle"
@@ -152,6 +154,10 @@ run: check-venv
 run-gui: check-venv
 	@echo "Running TFM on PuiKit (macOS GUI)..."
 	@$(PYTHON) tfm.py --backend gui $(PUIKIT_DIRS)
+
+run-web: check-venv
+	@echo "Running TFM on PuiKit (web backend — opens a browser tab)..."
+	@$(PYTHON) tfm.py --backend web $(PUIKIT_DIRS)
 
 test: check-venv
 	@echo "Running TFM tests..."

@@ -4475,7 +4475,8 @@ class TfmApp:
             sys.stderr = self._orig_stderr
 
 
-_BACKENDS = {"tui": "tui", "curses": "tui", "gui": "gui", "macos": "gui"}
+_BACKENDS = {"tui": "tui", "curses": "tui", "gui": "gui", "macos": "gui",
+             "web": "web", "webbrowser": "web", "browser": "web"}
 
 _VERSION = "0.99"
 
@@ -4508,19 +4509,20 @@ def main() -> None:
     # rather than re-sniffing sys.argv. Set before get_config()/TfmApp load the
     # config below.
     os.environ["TFM_BACKEND"] = backend_name
-    # The GUI backend persists and restores the window's position and size via
-    # the native NSWindow frame-autosave feature; the curses backend ignores it.
+    # The native GUI backend persists and restores the window's position and size
+    # via the NSWindow frame-autosave feature; curses and the web backend (whose
+    # window is a browser tab) ignore it, and WebBackend takes no such kwarg.
     backend_kwargs = {"frame_autosave_name": "TFMMainWindow"} if backend_name == "gui" else {}
-    # Ground the GUI base (grid) font in the user's config: the base unit — hence
-    # the on-screen text size — is derived from this font's glyph box, so
-    # MONO_FONT_NAME and FONT_SIZE take effect here. The base font must be
+    # Ground the pixel backends' base (grid) font in the user's config: the base
+    # unit — hence the on-screen text size — is derived from this font's glyph
+    # box, so MONO_FONT_NAME and FONT_SIZE take effect here. The base font must be
     # monospaced; MONO_FONT_NAME=None falls back to PuiKit's bundled Noto Sans
-    # Mono. Curses has one terminal font and no base_font parameter, so this is
-    # GUI-only.
-    if backend_name == "gui":
+    # Mono. Both the native GUI and the browser backend read it; curses has one
+    # terminal font and no base_font parameter, so this is skipped there.
+    if backend_name in ("gui", "web"):
         cfg = get_config()
-        # Name the native window (and the macOS app menu, e.g. "Quit TFM");
-        # without this the GUI backend falls back to its default "PuiKit".
+        # Name the window / tab (and, on native GUI, the macOS app menu, e.g.
+        # "Quit TFM"); without this the backend falls back to its default "PuiKit".
         backend_kwargs["title"] = "TFM"
         backend_kwargs["base_font"] = Font(
             family=cfg.MONO_FONT_NAME,

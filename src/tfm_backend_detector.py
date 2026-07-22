@@ -22,6 +22,10 @@ _cached_backend = None
 # they're passed explicitly and mirroring the Method-3 module check below.
 _DESKTOP_BACKEND_NAMES = frozenset({
     'gui', 'macos', 'windows',
+    # The web backend renders in a browser but is a pixel/GUI backend (real
+    # fonts, mouse, pointer), so TFM treats it as desktop mode too — the config
+    # picks its GUI-appropriate settings (proportional UI font, GUI editor, ...).
+    'web', 'webbrowser', 'browser',
 })
 
 
