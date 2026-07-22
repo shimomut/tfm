@@ -70,6 +70,28 @@ class Registry(unittest.TestCase):
             self.assertIn("source_hlsl", params, kind)
             self.assertIn(HLSL_ENTRY, params["source_hlsl"], kind)
 
+    def test_every_scene_ships_a_glsl_translation(self):
+        # The web (WebGL) backend compiles ``source_glsl``; a scene missing it draws
+        # nothing on web.
+        for kind, params in SHADER_KINDS.items():
+            self.assertIn("source_glsl", params, kind)
+            self.assertIn(SHADER_ENTRY, params["source_glsl"], kind)
+
+    def test_glsl_is_regenerated_from_msl(self):
+        # ``source_glsl`` is a mechanical transpile of the MSL (tools/
+        # generate_shader_glsl.py), not hand-maintained. Re-transpiling must match
+        # the committed GLSL, so tuning the MSL without regenerating is caught here.
+        import os
+        import sys
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tools"))
+        from generate_shader_glsl import transpile  # noqa: E402
+        import tfm_background_shaders as mod
+        for name in ("WAVE", "RAIN", "STARFIELD", "GRID", "CONSTELLATION",
+                     "DATASTREAM", "HOLOGRAM"):
+            expected = transpile(getattr(mod, name + "_MSL"))
+            self.assertEqual(getattr(mod, name + "_GLSL"), expected,
+                             f"{name}_GLSL is stale — run tools/generate_shader_glsl.py")
+
 
 class DialectParity(unittest.TestCase):
     """Every scene ships the same maths twice, in two languages, and no compiler
