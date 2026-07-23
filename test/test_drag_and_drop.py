@@ -215,6 +215,64 @@ class AppDragDrop(unittest.TestCase):
         self.assertEqual(calls, [])
         self.assertTrue(any("already in this folder" in m for m in logs))
 
+    def test_drop_back_onto_source_pane_cancels_silently(self):
+        """A native drag released back onto its own source pane, over that pane's
+        own directory, is a released-in-place gesture: cancel it silently rather
+        than reporting a no-op copy — the files are already here (#230)."""
+        self._write(self.src, "here.txt")
+        self.app._list_pane("left")
+        self.app._settle_listings()
+        pane = self.app.pane("left")
+        idx = next(i for i, f in enumerate(pane["files"]) if f.name == "here.txt")
+
+        # Start a native drag from the left pane. Returning True keeps the session
+        # "open" (no synchronous on_complete), so the source pane stays recorded.
+        self.app.panel.begin_file_drag = lambda paths, **kw: True
+        self.app._start_drag("left", idx, Event(type=EventType.MOUSE_DRAG, x=0, y=0))
+        self.assertEqual(self.app._drag_source_pane, "left")
+
+        calls = self._capture_copy()
+        logs = []
+        self.app.log_info = lambda m: logs.append(m)
+        # Release back onto the same pane's own directory (index -1).
+        self.app._on_drop("left", -1, [str(pane["files"][idx])])
+        self.assertEqual(calls, [])
+        self.assertFalse(any("already in this folder" in m for m in logs))
+        # The session then ends (the OS still reports "copy") — no drag-out log,
+        # and the cancel flag is cleared for the next drag.
+        self.app._on_drag_complete([str(pane["files"][idx])], "copy")
+        self.assertFalse(any("Dragged" in m for m in logs))
+        self.assertFalse(self.app._drag_cancelled_in_place)
+        self.assertIsNone(self.app._drag_source_pane)
+
+    def test_drop_onto_subdir_of_source_pane_still_copies(self):
+        """Dropping onto a *sub-directory row* of the source pane targets a real,
+        different location, so it copies even though the release is over the same
+        pane — only a released-in-place gesture cancels (#230)."""
+        os.makedirs(os.path.join(self.src, "sub"))
+        self._write(self.src, "f.txt")
+        self.app._list_pane("left")
+        self.app._settle_listings()
+        pane = self.app.pane("left")
+        sub_idx = next(i for i, f in enumerate(pane["files"]) if f.name == "sub")
+        file_idx = next(i for i, f in enumerate(pane["files"]) if f.name == "f.txt")
+
+        self.app.panel.begin_file_drag = lambda paths, **kw: True
+        self.app._start_drag("left", file_idx, Event(type=EventType.MOUSE_DRAG, x=0, y=0))
+        calls = self._capture_copy()
+        self.app._on_drop("left", sub_idx, [str(pane["files"][file_idx])])
+        self.assertEqual(len(calls), 1)
+        _targets, dest_dir = calls[0]
+        self.assertEqual(str(dest_dir), str(pane["files"][sub_idx]))
+
+    def test_drag_complete_clears_source_pane(self):
+        """Once the session ends, the recorded source pane is forgotten so a later
+        external drop that lands where its files already sit is never mistaken for
+        a released-in-place cancel (#230)."""
+        self.app._drag_source_pane = "left"
+        self.app._on_drag_complete(["/x/f.txt"], "none")
+        self.assertIsNone(self.app._drag_source_pane)
+
     def test_drop_refused_on_virtual_pane(self):
         pane = self.app.pane("left")
         pane["virtual"] = {"mode": "filename", "query": "x"}

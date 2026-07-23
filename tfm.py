@@ -960,6 +960,16 @@ class TfmApp:
         self._isearch_matches: list[int] = []
         self._isearch_bar: "ISearchBar | None" = None
 
+        #: The pane a native file-drag started from — set by ``_start_drag`` and
+        #: cleared once the session ends in ``_on_drag_complete``. Lets a drop
+        #: routed back to the *same* pane be recognised as a released-in-place
+        #: gesture and cancelled silently rather than treated as a copy (#230).
+        self._drag_source_pane: "str | None" = None
+        #: Set by ``_on_drop`` when that drag was released in place on its source
+        #: pane, so ``_on_drag_complete`` (which the OS still ends as ``copy``)
+        #: suppresses its "Dragged … out" log for the cancelled no-op (#230).
+        self._drag_cancelled_in_place = False
+
         self.panel = Panel(backend)
         # Guarantee text legibility across every theme: each run is lifted to a
         # readability floor against its own background at draw time (floor-only,
@@ -4330,6 +4340,11 @@ class TfmApp:
         if not paths:
             self.log_info("Only local files can be dragged out")
             return
+        # Remember which pane this drag came from *before* starting the session:
+        # the TUI clipboard fallback fires on_complete synchronously, which would
+        # otherwise clear the source right after we set it (see _on_drag_complete).
+        self._drag_source_pane = pane_name
+        self._drag_cancelled_in_place = False
         self.panel.begin_file_drag(
             paths, event=event, operations=("copy",),
             on_complete=lambda op: self._on_drag_complete(paths, op),
@@ -4338,7 +4353,16 @@ class TfmApp:
     def _on_drag_complete(self, paths: list[str], operation: str) -> None:
         """Log the outcome once a drag-out session ends. PuiKit never deletes the
         originals (only ``copy`` is offered), so this is purely informational; a
-        cancelled drop reports ``"none"`` and is ignored."""
+        cancelled drop reports ``"none"`` and is ignored, as is a drag released in
+        place on its own pane (the OS still ends it as ``copy``, but ``_on_drop``
+        already cancelled the no-op — #230)."""
+        # The session is over; forget its source pane so a later external drop
+        # (no drag of ours in flight) is never mistaken for a released-in-place one.
+        cancelled_in_place = self._drag_cancelled_in_place
+        self._drag_source_pane = None
+        self._drag_cancelled_in_place = False
+        if cancelled_in_place:
+            return
         if operation and operation != "none":
             n = len(paths)
             self.log_info(f"Dragged {n} item{'' if n == 1 else 's'} out ({operation})")
@@ -4378,6 +4402,15 @@ class TfmApp:
             if str(src.parent) != str(dest_dir):
                 targets.append(src)
         if not targets:
+            if pane_name == self._drag_source_pane:
+                # Released back onto the pane the drag started from, over its own
+                # directory: the files are already here, so cancel the drag
+                # silently rather than reporting a no-op copy (#230). A drop onto a
+                # sub-directory row of the same pane still resolves to real targets
+                # above and copies, so only the released-in-place gesture cancels.
+                # Flag it so _on_drag_complete also drops its "Dragged … out" log.
+                self._drag_cancelled_in_place = True
+                return
             self.log_info("Nothing to copy (already in this folder)")
             return
 
