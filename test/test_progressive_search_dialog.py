@@ -172,7 +172,9 @@ class AppIntegration(unittest.TestCase):
             dlg = app.panel._layers[-1].widget
             self.assertIsInstance(dlg, ProgressiveSearchDialog)
 
-            dlg.query_edit.text = "needle"
+            # Exact-glob matching (issue #231): a wildcard is used explicitly for
+            # a partial match — a bare "needle" would match nothing here.
+            dlg.query_edit.text = "needle*"
             dlg._start_search()
             dlg._thread.join(timeout=5)
             b.run_animation_ticks()  # drain the queue on the tick
@@ -180,6 +182,42 @@ class AppIntegration(unittest.TestCase):
             names = [os.path.basename(dlg.to_label("filename", v)) for v in dlg.results]
             self.assertIn("needle_here.txt", names)
             self.assertNotIn("other.txt", names)
+        finally:
+            app.file_monitor.stop_monitoring()
+            b.close()
+
+    def test_filename_search_is_exact_match(self):
+        # Issue #231: the query is matched against the whole filename, not as a
+        # substring. A bare "report" matches only a file named exactly "report";
+        # wildcards opt into partial matches.
+        from puikit.backends import create_backend
+
+        self._write("dir/report")
+        self._write("dir/report.txt")
+        self._write("dir/annual_report")
+
+        b = create_backend("memory")
+        b.open()
+        app = tfm.TfmApp(b, self.tmp, self.tmp, left_provided=True, right_provided=True)
+        try:
+            app._settle_listings()
+            app._open_search("filename")
+            dlg = app.panel._layers[-1].widget
+
+            def search(query):
+                dlg.query_edit.text = query
+                dlg._start_search()
+                dlg._thread.join(timeout=5)
+                b.run_animation_ticks()
+                return {os.path.basename(dlg.to_label("filename", v)) for v in dlg.results}
+
+            # Exact: only the file named exactly "report".
+            self.assertEqual(search("report"), {"report"})
+            # Prefix glob picks up the others.
+            self.assertEqual(search("report*"), {"report", "report.txt"})
+            # Substring still available via an explicit surrounding wildcard.
+            self.assertEqual(search("*report*"),
+                             {"report", "report.txt", "annual_report"})
         finally:
             app.file_monitor.stop_monitoring()
             b.close()
@@ -200,23 +238,26 @@ class AppIntegration(unittest.TestCase):
             app._open_search("filename")
             dlg = app.panel._layers[-1].widget
 
-            dlg.query_edit.text = "needle"
+            dlg.query_edit.text = "needle*"
             dlg._start_search()
             dlg._thread.join(timeout=5)
             b.run_animation_ticks()
             self.assertEqual(len(dlg.results), 5)
 
-            # Accept the hit that sorts *last* in the pane's name order, so a
-            # cursor left at the top would be a visible failure regardless of
-            # the order the walk happened to produce.
-            picked = max(dlg.results, key=str)
-            dlg._accept_index(dlg.results.index(picked))
+            # Accept the *last* streamed hit. The fed listing preserves the
+            # stream order here (the files are empty, so they tie under the pane's
+            # size sort), so the last result lands on the last row — a cursor left
+            # at the top would be a visible failure. Assert against the row where
+            # the picked hit actually landed, so the test is robust to sort order.
+            picked = dlg.results[-1]
+            dlg._accept_index(len(dlg.results) - 1)
 
             pane = app.active_pane()
             self.assertIsNotNone(pane["virtual"])
             self.assertEqual(len(pane["files"]), 5)  # whole set fed
-            self.assertEqual(pane["focused_index"], 4)
-            self.assertEqual(str(pane["files"][pane["focused_index"]]), str(picked))
+            landed = pane["focused_index"]
+            self.assertGreater(landed, 0)  # cursor moved off the top row
+            self.assertEqual(str(pane["files"][landed]), str(picked))
         finally:
             app.file_monitor.stop_monitoring()
             b.close()

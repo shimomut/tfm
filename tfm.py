@@ -2904,15 +2904,15 @@ class TfmApp:
     def _iter_filename_matches(self, root, pattern, cancel, node_cap: int = 50000):
         """Depth-first walk under ``root`` yielding entries whose name matches
         ``pattern`` (case-insensitive glob), checking ``cancel`` between entries so
-        a superseded search stops promptly. Hidden entries are skipped unless the
-        pane is showing them; ``node_cap`` bounds the walk. The result cap is
-        applied by the dialog consuming this generator."""
+        a superseded search stops promptly. The pattern is matched against the
+        *whole* filename — an exact glob (issue #231): ``report.txt`` matches only
+        that name, and wildcards are used explicitly for partial matches
+        (``*.py``, ``report*``, or ``*report*`` for the old "contains" behaviour).
+        Hidden entries are skipped unless the pane is showing them; ``node_cap``
+        bounds the walk. The result cap is applied by the dialog consuming this
+        generator."""
         import fnmatch
         pat = pattern.lower()
-        if not pat.startswith("*"):
-            pat = "*" + pat
-        if not pat.endswith("*"):
-            pat = pat + "*"
         stack, nodes = [root], 0
         while stack and nodes < node_cap:
             if cancel.is_set():

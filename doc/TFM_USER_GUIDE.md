@@ -428,6 +428,9 @@ S        - Show sort options menu
 ### Search Tips
 - **Incremental search**: Start typing to filter files immediately
 - **Pattern filtering**: Use wildcards like `*.txt` or `test_*`
+- **Filename search (Shift-F)**: The query is an *exact* glob matched against the
+  whole filename — `report.txt` matches only that name. Add wildcards for partial
+  matches: `report*`, `*.py`, or `*report*` for the old "contains" behaviour.
 - **Content search**: Search inside files with progress tracking
 - **Quick sort**: Use number keys 1-4 for instant sorting
 - **ESC**: Cancel any search operation
