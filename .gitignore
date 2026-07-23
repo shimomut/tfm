@@ -22,6 +22,9 @@ wheels/
 .pytest_cache/
 .coverage
 
+# Per-developer Make overrides (e.g. PUIKIT_DIR for an editable PuiKit checkout)
+Makefile.local
+
 # Virtual environments
 .venv/
 venv/

@@ -20,10 +20,18 @@ PYTHON := $(abspath .venv/$(VENV_BINDIR)/python)
 endif
 PIP := $(PYTHON) -m pip
 
-# PuiKit source checkout (sibling repo). Installed editable into .venv so edits
-# to PuiKit are picked up live with no reinstall. Override if it lives elsewhere:
-#   make venv PUIKIT_DIR=/path/to/puikit
-PUIKIT_DIR ?= ../puikit
+# --- PuiKit source: PyPI by default, local editable checkout on opt-in ---------
+# PuiKit is released on PyPI, so `make venv` installs it from there by default.
+# To develop against a local PuiKit checkout, set PUIKIT_DIR to its path — PuiKit
+# is then installed *editable* from there (live edits, no reinstall). Declare it
+# once, persistently, without editing this file, in either way:
+#   * Makefile.local (gitignored):   PUIKIT_DIR = ../puikit
+#   * or your environment:           export PUIKIT_DIR=../puikit
+# venv / install / dev-install then honour it. On demand, `make install-puikit`
+# (re)installs PuiKit into an existing .venv from whichever source PUIKIT_DIR
+# selects right now — set it for editable, unset for the released PyPI build.
+-include Makefile.local
+PUIKIT_DIR ?=
 
 help:
 	@echo "TFM - Terminal File Manager"
@@ -34,7 +42,7 @@ help:
 	@echo "Available commands:"
 	@echo "  venv           - Create .venv using the latest python3 in PATH and install deps"
 	@echo "  venv-clean     - Remove the .venv directory"
-	@echo "  install-puikit - Install PuiKit (editable) from PUIKIT_DIR into .venv"
+	@echo "  install-puikit - (Re)install PuiKit: editable if PUIKIT_DIR set, else from PyPI"
 	@echo "  run            - Run TFM (terminal); LEFT=/RIGHT= set startup dirs"
 	@echo "  run-gui        - Run TFM in a native macOS GUI window"
 	@echo "  run-web        - Run TFM in a web browser (web backend)"
@@ -47,6 +55,10 @@ help:
 	@echo "  install-config - Copy default config to ~/.tfm/config.py (overwrites existing)"
 	@echo "  lint           - Run code linting"
 	@echo "  format         - Format code"
+	@echo ""
+	@echo "  PuiKit installs from PyPI by default. To develop against a local"
+	@echo "  editable checkout, set PUIKIT_DIR (Makefile.local / env / CLI),"
+	@echo "  e.g. PUIKIT_DIR=../puikit."
 	@echo ""
 	@echo "macOS App Bundle:"
 	@echo "  macos-app         - Build native macOS application bundle"
@@ -120,15 +132,36 @@ endif
 	@echo ".venv created successfully with $$(.venv/$(VENV_BINDIR)/python --version 2>&1)"
 	@echo "Run 'make run' to launch TFM using the new environment."
 
-# Install PuiKit editable from its sibling checkout (PUIKIT_DIR). Run standalone
-# to (re)link PuiKit into an existing .venv without recreating it.
+# Install PuiKit into .venv from the source chosen by PUIKIT_DIR: a local editable
+# checkout when PUIKIT_DIR is set (live edits, no reinstall), otherwise the
+# released build from PyPI. Idempotent — skips the install when PuiKit is already
+# present from the selected source. Run standalone to switch an existing .venv
+# between the two; also run automatically by venv / install / dev-install.
 install-puikit: check-venv
-	@if [ ! -d "$(PUIKIT_DIR)" ]; then \
-		echo "Error: PuiKit not found at $(PUIKIT_DIR). Set PUIKIT_DIR=/path/to/puikit."; \
-		exit 1; \
+	@info=$$($(PIP) show puikit 2>/dev/null); \
+	editloc=$$(echo "$$info" | sed -n 's/^Editable project location: //p'); \
+	if [ -n "$(PUIKIT_DIR)" ]; then \
+		if [ ! -d "$(PUIKIT_DIR)" ]; then \
+			echo "Error: PuiKit not found at '$(PUIKIT_DIR)'. Set PUIKIT_DIR to your checkout."; \
+			exit 1; \
+		fi; \
+		want=$$(cd "$(PUIKIT_DIR)" && pwd -P); \
+		have=""; \
+		[ -n "$$editloc" ] && [ -d "$$editloc" ] && have=$$(cd "$$editloc" && pwd -P); \
+		if [ -n "$$have" ] && [ "$$have" = "$$want" ]; then \
+			echo "PuiKit already editable from $$want; skipping."; \
+		else \
+			echo "Installing PuiKit (editable) from $(PUIKIT_DIR)..."; \
+			$(PIP) install -e "$(PUIKIT_DIR)"; \
+		fi; \
+	else \
+		if [ -n "$$info" ] && [ -z "$$editloc" ]; then \
+			echo "PuiKit already installed from PyPI; skipping."; \
+		else \
+			echo "Installing PuiKit from PyPI..."; \
+			$(PIP) install --force-reinstall --no-deps "puikit>=1.0"; \
+		fi; \
 	fi
-	@echo "Installing PuiKit (editable) from $(PUIKIT_DIR)..."
-	@$(PIP) install -e "$(PUIKIT_DIR)"
 
 venv-clean:
 	@echo "Removing .venv..."
