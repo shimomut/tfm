@@ -5,15 +5,16 @@
 # pillow for the built-in image viewer (decode/crop/scale; the viewer degrades
 #   to a metadata card without it, and inline terminal images need it too)
 #
-# Platform-specific dependencies are selected automatically via environment
-# markers below, so this file is the single source of truth for both
-# `make venv` (pip install -r requirements.txt) and setup.py install_requires:
-#   - pyobjc         : macOS desktop mode (CoreGraphics backend)
-#   - windows-curses : curses support on Windows
+# Backend/platform deps (pyobjc on macOS, windows-curses on Windows, numpy on
+# Windows) are PuiKit's own requirements and resolve transitively via the puikit
+# pin below, so TFM does not list them here. pillow is listed because TFM's
+# image viewer imports PIL directly, independent of PuiKit.
 
+# PuiKit is TFM's UI/rendering framework (the TUI/GUI backend layer), published
+# on PyPI as of 1.0. For co-development against a local checkout, ``make venv``
+# additionally installs it editable from ../puikit, which overrides this pin.
+puikit>=1.0
 pygments
 boto3
 watchdog
 pillow
-pyobjc; sys_platform == "darwin"
-windows-curses; sys_platform == "win32"

@@ -46,9 +46,10 @@ Issues = "https://github.com/shimomut/tfm/issues"
 # ``tfm.py`` puts that dir on sys.path at import time (see its header), so
 # ``from tfm_* import`` resolves once installed.
 #
-# NOT declared here: PuiKit, TFM's UI framework. It is not yet on PyPI, so it is
-# installed separately (``pip install -e ../puikit``). Once PuiKit is published,
-# add it to requirements.txt so it flows into the dynamic dependencies below.
+# PuiKit, TFM's UI framework, is declared in requirements.txt (``puikit>=1.0``),
+# so it flows into the dynamic dependencies below and resolves from PyPI on a
+# normal install. For co-development, ``make venv`` additionally installs it
+# editable from ../puikit, which overrides the PyPI build.
 [tool.setuptools]
 py-modules = ["tfm"]
 packages = ["tfm_modules"]
