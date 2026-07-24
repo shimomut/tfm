@@ -353,12 +353,31 @@ if (Test-Path $PyLicense) {
     Warn "Embedded Python LICENSE.txt not found at $PyLicense; interpreter will be omitted from notices."
 }
 
-# PuiKit's LICENSE lives at the checkout root, one level above the package dir.
-$PuikitLicense = Join-Path (Split-Path -Parent $PuikitSrc) 'LICENSE'
-if (Test-Path $PuikitLicense) {
+# PuiKit's LICENSE location depends on how PuiKit is installed:
+#   * editable checkout (PUIKIT_DIR / ..\puikit): LICENSE sits at the checkout
+#     root, one level above the package dir.
+#   * published wheel: LICENSE ships inside puikit-*.dist-info (…\licenses\LICENSE).
+# In the wheel case the package dir's parent IS the venv site-packages, which
+# holds that .dist-info; in the editable case the checkout-root LICENSE is found
+# first. So a single parent path resolves both layouts.
+$PuikitParent = Split-Path -Parent $PuikitSrc
+$PuikitLicense = $null
+$rootLicense = Join-Path $PuikitParent 'LICENSE'
+if (Test-Path $rootLicense) {
+    $PuikitLicense = $rootLicense
+} else {
+    $distInfo = Get-ChildItem -Path $PuikitParent -Directory -Filter 'puikit-*.dist-info' -ErrorAction SilentlyContinue |
+                Select-Object -First 1
+    if ($distInfo) {
+        $PuikitLicense = Get-ChildItem -Path $distInfo.FullName -Recurse -File -ErrorAction SilentlyContinue |
+                         Where-Object { $_.Name -match '^LICEN[SC]E' } |
+                         Select-Object -First 1 -ExpandProperty FullName
+    }
+}
+if ($PuikitLicense -and (Test-Path $PuikitLicense)) {
     $NoticesExtras += @('--extra', "PuiKit (MIT License)=$PuikitLicense")
 } else {
-    Fail "PuiKit LICENSE not found at $PuikitLicense"
+    Fail "PuiKit LICENSE not found (looked for '$rootLicense' and puikit-*.dist-info under '$PuikitParent'). Install it: make install-puikit"
 }
 
 # Bundled fonts (SIL OFL 1.1) - OFL.txt travels inside the copied puikit\fonts.

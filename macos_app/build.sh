@@ -722,13 +722,24 @@ else
     log_warning "Python LICENSE.txt not found at ${PYTHON_LICENSE}; the interpreter will not be listed in the generated notices"
 fi
 
-# PuiKit's LICENSE lives at the checkout root, one level above the package
-# directory resolved into PUIKIT_SRC; its source is copied in by Step 3.
-PUIKIT_LICENSE="$(dirname "${PUIKIT_SRC}")/LICENSE"
-if [ -f "${PUIKIT_LICENSE}" ]; then
+# PuiKit's LICENSE location depends on how PuiKit is installed:
+#   * editable checkout (PUIKIT_DIR / ../puikit): LICENSE sits at the checkout
+#     root, one level above the package directory resolved into PUIKIT_SRC.
+#   * published wheel: LICENSE ships inside puikit-*.dist-info (.../licenses/LICENSE).
+# In the wheel case the package dir's parent IS the venv site-packages, which
+# holds that .dist-info; in the editable case the checkout-root LICENSE is found
+# first. So a single parent path resolves both layouts.
+PUIKIT_PARENT="$(dirname "${PUIKIT_SRC}")"
+PUIKIT_LICENSE="${PUIKIT_PARENT}/LICENSE"
+if [ ! -f "${PUIKIT_LICENSE}" ]; then
+    # …/site-packages/puikit-*.dist-info/licenses/LICENSE is 3 levels down.
+    PUIKIT_LICENSE="$(find "${PUIKIT_PARENT}" -maxdepth 3 -ipath '*puikit-*.dist-info*' \
+                      -iname 'LICEN[SC]E*' -type f 2>/dev/null | head -n 1)"
+fi
+if [ -n "${PUIKIT_LICENSE}" ] && [ -f "${PUIKIT_LICENSE}" ]; then
     NOTICES_EXTRAS+=(--extra "PuiKit (MIT License)=${PUIKIT_LICENSE}")
 else
-    log_error "PuiKit LICENSE not found at ${PUIKIT_LICENSE}"
+    log_error "PuiKit LICENSE not found (looked for ${PUIKIT_PARENT}/LICENSE and puikit-*.dist-info under ${PUIKIT_PARENT})"
     exit 1
 fi
 

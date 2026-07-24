@@ -328,6 +328,18 @@ macos-dmg: macos-app
 # Delegates to windows_app/build.ps1 (PowerShell). These targets are only
 # meaningful on Windows; on other platforms PowerShell won't be present.
 
+# The built bundle's launcher; its presence marks a complete bundle. Targets
+# that only *consume* the bundle (install, msix) depend on this file target so
+# it is built once, on demand, if missing (e.g. after 'make windows-app-clean')
+# instead of failing deep inside a packaging script. It is NOT rebuilt when
+# already present, so iterating on packaging stays fast; run 'make windows-app'
+# to force a fresh bundle.
+WINDOWS_APP_BUNDLE := windows_app/build/TFM/TFM.exe
+
+$(WINDOWS_APP_BUNDLE):
+	@echo "Windows app bundle not found; building it first..."
+	@powershell -ExecutionPolicy Bypass -File windows_app/build.ps1
+
 windows-app:
 	@echo "Building Windows application bundle..."
 	@powershell -ExecutionPolicy Bypass -File windows_app/build.ps1
@@ -341,21 +353,35 @@ windows-app-clean:
 	@powershell -ExecutionPolicy Bypass -File windows_app/build.ps1 -Clean
 
 # Install the built bundle to Program Files (override dir with INSTALLDIR=...).
-# Self-elevates via UAC; run 'make windows-app' first to produce the bundle.
-windows-app-install:
+# Self-elevates via UAC; builds the bundle first if it is missing.
+windows-app-install: $(WINDOWS_APP_BUNDLE)
 	@echo "Installing Windows application bundle..."
 	@powershell -ExecutionPolicy Bypass -File windows_app/build.ps1 -Install $(if $(INSTALLDIR),-InstallDir "$(INSTALLDIR)")
 
 # --- MSIX (Microsoft Store / winget) packaging, PROTOTYPE ------------------
-# Wraps the built bundle into a self-signed .msix for local testing. Run
-# 'make windows-app' first. See doc/dev/WINDOWS_STORE_MSIX_PLAN.md.
-windows-app-msix:
+# The throwaway self-signed cert emitted alongside the signed .msix. It is a
+# file target so 'install' can depend on it: a missing cert -- e.g. after
+# 'make windows-app-msix-uninstall', which deletes this throwaway cert -- then
+# triggers a fresh pack+sign instead of failing. When present (and no newer than
+# the bundle) it is not rebuilt, so repeat installs stay fast. Rebuilt if the
+# bundle is newer, so a rebuilt bundle is always repackaged before install.
+WINDOWS_MSIX_CERT := windows_app/build/TFM-proto-test.cer
+
+$(WINDOWS_MSIX_CERT): $(WINDOWS_APP_BUNDLE)
+	@echo "Signed MSIX package/cert not found (or stale); packaging and signing first..."
+	@powershell -ExecutionPolicy Bypass -File windows_app/build_msix.ps1 -Sign
+
+# Wraps the built bundle into a self-signed .msix for local testing; builds the
+# bundle first if it is missing. Always re-packs (unlike the file target above),
+# since invoking this explicitly means "produce a fresh package now".
+# See doc/dev/WINDOWS_STORE_MSIX_PLAN.md.
+windows-app-msix: $(WINDOWS_APP_BUNDLE)
 	@echo "Packaging Windows app as MSIX (self-signed prototype)..."
 	@powershell -ExecutionPolicy Bypass -File windows_app/build_msix.ps1 -Sign
 
 # Trust the self-signed cert (self-elevates via UAC) then install per-user.
-# Run 'make windows-app-msix' first to produce the signed package.
-windows-app-msix-install:
+# Packages + signs first if the cert is missing (e.g. after an uninstall).
+windows-app-msix-install: $(WINDOWS_MSIX_CERT)
 	@echo "Installing MSIX package locally..."
 	@powershell -ExecutionPolicy Bypass -File windows_app/build_msix.ps1 -Install
 

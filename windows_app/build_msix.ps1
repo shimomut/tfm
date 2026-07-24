@@ -52,9 +52,13 @@ if (-not $PayloadSource) { $PayloadSource = Join-Path $ScriptDir 'build\TFM' }
 if (-not $OutDir)        { $OutDir        = Join-Path $ScriptDir 'build' }
 
 # Artifact paths shared by build + install actions.
-$msix = "$OutDir\TFM-$Version-$Arch.msix"
-$pfx  = "$OutDir\TFM-proto-test.pfx"
-$cer  = "$OutDir\TFM-proto-test.cer"
+$msix    = "$OutDir\TFM-$Version-$Arch.msix"
+# Packed/signed here, then renamed to $msix only on full success. Keeps the
+# .msix extension (before .building) because signtool refuses to sign a file
+# whose extension it doesn't recognize as an app package.
+$msixTmp = "$OutDir\TFM-$Version-$Arch.building.msix"
+$pfx     = "$OutDir\TFM-proto-test.pfx"
+$cer     = "$OutDir\TFM-proto-test.cer"
 $pfxPassword = "prototest"
 
 function Find-SdkTool([string]$name) {
@@ -152,7 +156,7 @@ if ($Uninstall) {
 # ===========================================================================
 if ($Install) {
     if (-not (Test-Path $msix)) { throw "Package not found: $msix. Run 'make windows-app-msix' first." }
-    if (-not (Test-Path $cer))  { throw "Signing cert not found: $cer. Rebuild with -Sign." }
+    if (-not (Test-Path $cer))  { throw "Signing cert not found: $cer. Run 'make windows-app-msix' first." }
 
     # Step 1: trust the self-signed cert (machine-wide store => needs admin).
     if (Test-IsAdmin) {
@@ -186,8 +190,8 @@ if ($Sign) {
     Write-Host "[INFO] signtool: $signtool"
 }
 
-if (-not (Test-Path $PayloadSource))            { throw "Payload source not found: $PayloadSource  (run build.ps1 first)" }
-if (-not (Test-Path "$PayloadSource\TFM.exe"))  { throw "TFM.exe not found in payload source $PayloadSource" }
+if (-not (Test-Path $PayloadSource))            { throw "Payload source not found: $PayloadSource. Run 'make windows-app' first." }
+if (-not (Test-Path "$PayloadSource\TFM.exe"))  { throw "TFM.exe not found in payload source $PayloadSource. Run 'make windows-app' first." }
 
 # ---- 1. Generate Store tile assets ---------------------------------------
 $assetsSrc = "$ScriptDir\resources\Assets"
@@ -273,25 +277,50 @@ $manifestPath = "$staging\AppxManifest.xml"
 [System.IO.File]::WriteAllText($manifestPath, $manifest, (New-Object System.Text.UTF8Encoding($false)))
 Write-Host "[INFO] Wrote manifest: $manifestPath"
 
-# ---- 4. Pack --------------------------------------------------------------
-Write-Host "[INFO] Packing -> $msix"
-& $makeappx pack /d $staging /p $msix /o
-if ($LASTEXITCODE -ne 0) { throw "makeappx pack failed ($LASTEXITCODE)" }
-Write-Host "[OK] Built $msix"
+# ---- 4. Pack + optional sign (atomic) -------------------------------------
+# The final $msix must only ever exist as a fully-built (and, if requested,
+# fully-signed) artifact. So we pack to a temp path and promote it with a
+# rename only after every step below succeeds. Any stale artifacts from a
+# previously-aborted run are cleared first, so a failure here leaves NO $msix
+# rather than an unsigned one masquerading as complete -- which is what the
+# -Install step would otherwise trust.
+foreach ($stale in @($msix, $msixTmp, $pfx, $cer)) {
+    if (Test-Path $stale) { Remove-Item -Force $stale }
+}
 
-# ---- 5. Optional self-sign (LOCAL TEST ONLY) ------------------------------
+# When signing, mint the cert FIRST: it is the cheap, most-likely-to-fail step
+# (cert policy, missing signtool), so failing before the slow pack is cheaper
+# and never leaves a packed-but-unsigned artifact behind.
 if ($Sign) {
     Write-Host "[INFO] Creating self-signed cert (Subject must equal Publisher)..."
+    # Drop any prior private-key certs with the same subject so CurrentUser\My
+    # does not accumulate a duplicate on every rebuild (trust lives in the
+    # machine store via the .cer, so removing these here is safe).
+    Get-ChildItem Cert:\CurrentUser\My -ErrorAction SilentlyContinue |
+        Where-Object { $_.Subject -eq $Publisher } | Remove-Item -Force -ErrorAction SilentlyContinue
     $cert = New-SelfSignedCertificate -Type Custom -CertStoreLocation Cert:\CurrentUser\My `
         -Subject $Publisher -KeyUsage DigitalSignature -FriendlyName "TFM MSIX prototype" `
         -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3")
     $securePw = ConvertTo-SecureString -String $pfxPassword -Force -AsPlainText
     Export-PfxCertificate -Cert $cert -FilePath $pfx -Password $securePw | Out-Null
     Export-Certificate -Cert $cert -FilePath $cer | Out-Null
+}
 
+Write-Host "[INFO] Packing -> $msixTmp"
+& $makeappx pack /d $staging /p $msixTmp /o
+if ($LASTEXITCODE -ne 0) { throw "makeappx pack failed ($LASTEXITCODE)" }
+
+if ($Sign) {
     Write-Host "[INFO] Signing package..."
-    & $signtool sign /fd SHA256 /f $pfx /p $pfxPassword $msix
+    & $signtool sign /fd SHA256 /f $pfx /p $pfxPassword $msixTmp
     if ($LASTEXITCODE -ne 0) { throw "signtool sign failed ($LASTEXITCODE)" }
+}
+
+# Commit point: promote the temp package to its final name. From here on the
+# artifact is guaranteed complete, so -Install can trust its presence.
+Move-Item -Force $msixTmp $msix
+Write-Host "[OK] Built $msix"
+if ($Sign) {
     Write-Host "[OK] Signed $msix"
     Write-Host "Install locally with:  make windows-app-msix-install" -ForegroundColor Yellow
 }
